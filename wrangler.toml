@@ -1,0 +1,32 @@
+# Cloudflare configuration for ChiroSmarts (Astro SSR on Pages).
+#
+# The IDs below are placeholders. After running the provisioning steps in
+# README.md ("Cloudflare setup"), paste the real values here. Do NOT put
+# secrets (API keys) in this file — those go in `.dev.vars` locally and in
+# `wrangler pages secret put ...` for the deployed environment.
+
+name = "chirosmarts-site"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+# Public, non-secret vars. SITE_URL must always come from the environment
+# (used for magic-link emails, Stripe redirects, certificate verification links).
+# Locally this is overridden by `.dev.vars`.
+[vars]
+SITE_URL = "http://localhost:4321"
+
+# --- D1 (database) ---
+[[d1_databases]]
+binding = "DB"
+database_name = "chirosmarts"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "./migrations"
+
+# --- R2 (documents: certificate PDFs, signed hands-on logs) ---
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "chirosmarts-docs"
+
+# Cloudflare Stream is not a wrangler binding — it is accessed via the
+# Cloudflare API using CF_ACCOUNT_ID + CF_STREAM_API_TOKEN (see .dev.vars).

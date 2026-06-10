@@ -1,0 +1,24 @@
+# Copy this file to `.dev.vars` and fill in real values for local development.
+# `.dev.vars` is git-ignored and must NEVER be committed.
+# Wrangler loads `.dev.vars` automatically for `astro dev` and `wrangler` commands.
+
+# Public site URL — used for magic-link emails, Stripe redirect URLs, and
+# certificate verification links. Never hard-code these URLs anywhere.
+# Local: http://localhost:4321  |  Deployed: https://chirosmarts-site.pages.dev
+SITE_URL="http://localhost:4321"
+
+# --- Resend (transactional + compliance email: magic links, receipts, certs) ---
+RESEND_API_KEY=""
+
+# --- Stripe (test mode throughout the build) ---
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+
+# --- Cloudflare Stream (signed playback tokens; not a wrangler binding) ---
+CF_ACCOUNT_ID=""
+CF_STREAM_API_TOKEN=""
+CF_STREAM_SIGNING_KEY_ID=""
+CF_STREAM_SIGNING_KEY_PEM=""
+
+# --- Anthropic API (M6 AI tutor only; unused until then) ---
+ANTHROPIC_API_KEY=""

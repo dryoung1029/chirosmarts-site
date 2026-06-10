@@ -186,11 +186,19 @@ Principles: `events` append-only; derived totals always recomputed, never stored
 
 ## 10. M0 scaffold checklist (this session)
 
-- [ ] Astro 5 SSR + Cloudflare adapter, TypeScript.
-- [ ] `wrangler.toml` (D1/R2/Stream bindings) + CF provisioning checklist.
-- [ ] Drizzle schema (all tables above) + first D1 migration.
-- [ ] Seed: one published $149 course (module/lesson/quiz) + one student user + Oregon initial & renewal `path_templates`.
-- [ ] `SITE_URL` env var; `.dev.vars` (git-ignored); env vars documented in `README.md`.
-- [ ] `CLAUDE.md` (stack rules + domain model + compliance requirements).
-- [ ] Deployable "hello" `/` page (targets `*.pages.dev` after provisioning).
-- [ ] Small commits on `m0-scaffold`; stop and confirm before M1.
+- [x] Astro 5 SSR + Cloudflare adapter, TypeScript.
+- [x] `wrangler.toml` (D1/R2 bindings; Stream via API) + CF provisioning checklist (README).
+- [x] Drizzle schema (all tables above) + first D1 migration (`migrations/0000_init.sql`).
+- [x] Seed: one published $149 course (Module 1 free + lesson + knowledge check + final exam) + one student user + Oregon initial & renewal `path_templates`.
+- [x] `SITE_URL` env var (`src/lib/env.ts`); `.dev.vars` (git-ignored); env vars documented in `README.md`.
+- [x] `CLAUDE.md` (stack rules + domain model + compliance requirements).
+- [x] Deployable "hello" `/` page + `/health` probe; verified locally (DB reachable, SITE_URL wired).
+- [x] Small commits on `m0-scaffold`. **Next: owner runs CF provisioning + deploys; then confirm before M1.**
+
+### Verified locally this session
+- `npm run build` — clean.
+- `npm run db:migrate:local` + `db:seed:local` — 19 tables created; seed loaded (1 user, 1 course, 2 modules, 11 path steps).
+- `GET /health` → `{ ok: true, db: "ok", siteUrlPresent: true }`; `GET /` renders `SITE_URL` from env.
+
+### Owner to-do to go live on pages.dev (see README "Cloudflare setup")
+`wrangler login` → `d1 create chirosmarts` (paste `database_id` into `wrangler.toml`) → `r2 bucket create chirosmarts-docs` → `db:migrate:remote` + `db:seed:remote` → enable Stream + tokens → `npm run deploy` → set `SITE_URL` + secrets.
