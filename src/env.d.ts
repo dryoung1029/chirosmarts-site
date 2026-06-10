@@ -13,6 +13,7 @@ interface CloudflareEnv {
 
   // Secrets (set via .dev.vars locally, wrangler secrets in prod)
   RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   CF_ACCOUNT_ID?: string;
@@ -25,5 +26,9 @@ interface CloudflareEnv {
 type Runtime = import("@astrojs/cloudflare").Runtime<CloudflareEnv>;
 
 declare namespace App {
-  interface Locals extends Runtime {}
+  interface Locals extends Runtime {
+    // Populated by src/middleware.ts on every request.
+    user: import("@/lib/auth/session").SessionUser | null;
+    sessionId: string | null;
+  }
 }

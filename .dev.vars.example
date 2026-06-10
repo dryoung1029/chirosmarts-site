@@ -9,7 +9,12 @@
 SITE_URL="http://localhost:4322"
 
 # --- Resend (transactional + compliance email: magic links, receipts, certs) ---
+# If RESEND_API_KEY is empty, sign-in links are printed to the dev server console
+# (and shown on the login page) instead of emailed, so you can test without a key.
 RESEND_API_KEY=""
+# From address for transactional email. For Resend testing without a verified
+# domain, "onboarding@resend.dev" works (delivers to your own account email).
+EMAIL_FROM="ChiroSmarts <onboarding@resend.dev>"
 
 # --- Stripe (test mode throughout the build) ---
 STRIPE_SECRET_KEY=""

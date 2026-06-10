@@ -6,7 +6,7 @@ training. Astro 5 (SSR) on Cloudflare (D1 / R2 / Stream), Stripe, Resend.
 - **Project plan & status:** [`PLAN.md`](./PLAN.md)
 - **Rules for contributors / AI sessions:** [`CLAUDE.md`](./CLAUDE.md)
 
-Current milestone: **M0 — Scaffold**.
+Current milestone: **M1 — Auth + intake + roadmap**.
 
 ---
 
@@ -39,6 +39,10 @@ Then open:
   it read from the environment).
 - <http://localhost:4322/health> — JSON liveness check. Should return
   `{"ok": true, ... "db": "ok"}` once the local DB is migrated.
+- <http://localhost:4322/login> — sign in. With no `RESEND_API_KEY` set, submit
+  your email and the one-time sign-in link appears on the page (and in the dev
+  console) instead of being emailed. Click it → fill in intake → see your
+  roadmap at `/dashboard`.
 
 > The dev server uses Cloudflare's platform proxy, so the D1/R2 bindings and
 > the values in `.dev.vars` are available exactly as they will be in production.
@@ -52,7 +56,8 @@ Public, non-secret vars live in `wrangler.toml` (`[vars]`). Secrets live in
 | Variable | Where | Purpose |
 |---|---|---|
 | `SITE_URL` | wrangler `[vars]` / `.dev.vars` | Public site URL for magic links, Stripe redirects, cert verification. **Never hard-code URLs.** |
-| `RESEND_API_KEY` | secret | Transactional + compliance email (M1+). |
+| `RESEND_API_KEY` | secret | Transactional + compliance email (magic links). If empty, sign-in links print to the dev console + login page so you can test without a key. |
+| `EMAIL_FROM` | var | From address for transactional email (default `onboarding@resend.dev` for Resend testing). |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | secret | Payments (M3). Test mode throughout the build. |
 | `CF_ACCOUNT_ID`, `CF_STREAM_API_TOKEN`, `CF_STREAM_SIGNING_KEY_ID`, `CF_STREAM_SIGNING_KEY_PEM` | secret | Cloudflare Stream upload + signed playback (M2). |
 | `ANTHROPIC_API_KEY` | secret | AI course tutor (M6 only). |

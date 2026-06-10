@@ -9,9 +9,24 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M0 — Scaffold** (in progress) |
+| Current milestone | **M1 — Auth + intake + roadmap** (built on `m1-auth`, verified locally; awaiting review) |
+| M0 | ✅ merged to `main` |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, …) merged to `main` |
+
+### M1 — what shipped this build
+- **Magic-link auth** (`/login` → emailed one-time link → `/auth/callback`). Tokens are random, only their SHA-256 hash is stored, single-use, 15-min expiry. Login & signup are the same flow (no account-enumeration). Dev fallback: with no `RESEND_API_KEY`, the link is logged to the console and shown on the login page.
+- **D1 sessions** (`cs_session` cookie, HttpOnly/SameSite=Lax, Secure when SITE_URL is https). Concurrent logins allowed; sessions never force-revoked. Session token hashed at rest.
+- **Middleware** (`src/middleware.ts`): resolves `locals.user`, guards private routes → `/login`, funnels un-onboarded users → `/intake`.
+- **Intake** (`/intake` → `/api/intake`): legal name, preferred name, path choice, birth month, clinic, phone, optional supervising DC, marketing-consent (timestamped). Marketing attributes captured for later Brevo sync; sets `clinic_owner` → `clinic_admin` role.
+- **Roadmap instantiation** (`src/lib/roadmap.ts`): snapshots template steps into `user_steps` with a linear gate (step 1 done, step 2 available, rest locked). Initial & renewal paths wired.
+- **Dashboard** (`/dashboard`): renders the user's roadmap with per-step status.
+- **Append-only events**: `signup`, `login`, `intake_completed` written via `src/lib/events.ts`.
+- **Schema delta**: added `users.intake_completed_at`; `legal_name` now defaults to `""` (filled at intake). Migration `0001_add_intake_completed_at.sql`.
+- **Verified locally** (curl, port 4322): guard redirect, request-link, callback→session, intake gate, intake submit, dashboard roadmap (initial + renewal), single-use token reuse blocked, logout.
+
+### Open product question raised in M1
+- **Clinic-owner path:** there is no clinic roadmap template yet, so clinic owners are set to `clinic_admin` and land on a dashboard placeholder. Confirm desired behavior (own onboarding path? seat management? — currently a deferred feature). Defaulted, not invented.
 
 **Build order is strict and one-at-a-time: M0 → M1 → M2 → M3 → M4 → M5 → M6. Confirm before moving between milestones.**
 

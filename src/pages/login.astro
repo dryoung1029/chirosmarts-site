@@ -1,0 +1,55 @@
+---
+import Layout from "@/layouts/Layout.astro";
+
+const params = Astro.url.searchParams;
+const sent = params.get("sent") === "1";
+const error = params.get("error");
+const next = params.get("next") ?? "";
+// Dev convenience: when no Resend key is configured, request-link passes the
+// magic-link URL back so you can click it without checking email.
+const devLink = params.get("dev");
+---
+
+<Layout title="Sign in">
+  <div class="panel">
+    <h1>Sign in to ChiroSmarts</h1>
+    <p>
+      Enter your email and we'll send you a secure sign-in link. No password
+      needed. New here? The same link creates your account.
+    </p>
+
+    {error && <div class="notice err">We couldn't sign you in: {error}. Please request a new link.</div>}
+
+    {
+      sent ? (
+        <div class="notice ok">
+          Check your email for a sign-in link. It expires in 15 minutes.
+        </div>
+      ) : (
+        <form method="POST" action="/api/auth/request-link">
+          <input type="hidden" name="next" value={next} />
+          <label for="email">Email address</label>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+          <button type="submit">Email me a sign-in link</button>
+        </form>
+      )
+    }
+
+    {
+      devLink && (
+        <div class="notice warn" style="margin-top:1rem">
+          <strong>Dev mode (no email key set):</strong> use this one-time link:
+          <br />
+          <a href={devLink}>{devLink}</a>
+        </div>
+      )
+    }
+  </div>
+</Layout>

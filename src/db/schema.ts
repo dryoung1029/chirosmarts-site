@@ -28,7 +28,7 @@ const nowUtc = sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`;
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
-  legalName: text("legal_name").notNull(), // printed on certificates
+  legalName: text("legal_name").notNull().default(""), // printed on certificates; empty until intake
   displayName: text("display_name"),
   phone: text("phone"),
   birthMonth: integer("birth_month"), // 1-12; renewal keying
@@ -43,6 +43,7 @@ export const users = sqliteTable("users", {
     .notNull()
     .default(false),
   marketingConsentAt: text("marketing_consent_at"),
+  intakeCompletedAt: text("intake_completed_at"), // null until the intake form is submitted
   createdAt: text("created_at").notNull().default(nowUtc),
   updatedAt: text("updated_at").notNull().default(nowUtc),
 });

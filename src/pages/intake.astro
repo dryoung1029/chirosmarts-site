@@ -1,0 +1,84 @@
+---
+import Layout from "@/layouts/Layout.astro";
+
+const user = Astro.locals.user!; // middleware guarantees a signed-in user here
+const error = Astro.url.searchParams.get("error");
+
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+---
+
+<Layout title="Welcome — tell us about you" showNav={true}>
+  <div class="panel">
+    <h1>Welcome to ChiroSmarts</h1>
+    <p>
+      A few details to set up your account and build your roadmap. Your
+      <strong>legal name</strong> is what appears on your certificate, so please
+      enter it exactly as it should be printed.
+    </p>
+
+    {error && <div class="notice err">{error}</div>}
+
+    <form method="POST" action="/api/intake">
+      <label for="legalName">Legal name (as it should appear on your certificate)</label>
+      <input id="legalName" type="text" name="legalName" required autocomplete="name" />
+
+      <label for="displayName">Preferred name (optional)</label>
+      <input id="displayName" type="text" name="displayName" />
+
+      <div class="row">
+        <div>
+          <label for="path">What brings you here?</label>
+          <select id="path" name="path" required>
+            <option value="initial">Initial CA certification</option>
+            <option value="renewal">Annual CA renewal</option>
+            <option value="clinic_owner">Clinic owner / manager</option>
+          </select>
+        </div>
+        <div>
+          <label for="birthMonth">Birth month (sets your renewal date)</label>
+          <select id="birthMonth" name="birthMonth" required>
+            <option value="">Select…</option>
+            {months.map((m, i) => <option value={i + 1}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <label for="clinicName">Clinic name (optional)</label>
+      <input id="clinicName" type="text" name="clinicName" />
+
+      <label for="phone">Phone (optional)</label>
+      <input id="phone" type="text" name="phone" autocomplete="tel" />
+
+      <h2 style="margin-top:1.5rem">Supervising chiropractor (optional)</h2>
+      <p class="muted" style="margin-top:0">
+        Required later to sign off your 4 hands-on hours — you can add this now or
+        from your dashboard.
+      </p>
+      <label for="dcName">Supervising DC name</label>
+      <input id="dcName" type="text" name="supervisingDcName" />
+      <div class="row">
+        <div>
+          <label for="dcLicense">DC license #</label>
+          <input id="dcLicense" type="text" name="supervisingDcLicense" />
+        </div>
+        <div>
+          <label for="dcEmail">DC email</label>
+          <input id="dcEmail" type="text" name="supervisingDcEmail" />
+        </div>
+      </div>
+
+      <div class="check">
+        <input id="marketing" type="checkbox" name="marketingConsent" value="yes" />
+        <label for="marketing" style="margin:0">
+          Send me ChiroSmarts news and CE reminders by email. (We'll always email
+          you account, receipt, and certificate messages regardless.)
+        </label>
+      </div>
+
+      <button type="submit">Save and see my roadmap</button>
+    </form>
+  </div>
+</Layout>
