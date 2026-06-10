@@ -35,9 +35,9 @@ npm run dev
 
 Then open:
 
-- <http://localhost:4321/> — the scaffold "hello" page (shows the `SITE_URL`
+- <http://localhost:4322/> — the scaffold "hello" page (shows the `SITE_URL`
   it read from the environment).
-- <http://localhost:4321/health> — JSON liveness check. Should return
+- <http://localhost:4322/health> — JSON liveness check. Should return
   `{"ok": true, ... "db": "ok"}` once the local DB is migrated.
 
 > The dev server uses Cloudflare's platform proxy, so the D1/R2 bindings and

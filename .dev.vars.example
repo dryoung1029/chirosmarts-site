@@ -4,8 +4,9 @@
 
 # Public site URL — used for magic-link emails, Stripe redirect URLs, and
 # certificate verification links. Never hard-code these URLs anywhere.
-# Local: http://localhost:4321  |  Deployed: https://chirosmarts-site.pages.dev
-SITE_URL="http://localhost:4321"
+# Local: http://localhost:4322  |  Deployed: https://chirosmarts-site.pages.dev
+# (ChiroSmarts uses 4322 to avoid clashing with other Astro projects on 4321.)
+SITE_URL="http://localhost:4322"
 
 # --- Resend (transactional + compliance email: magic links, receipts, certs) ---
 RESEND_API_KEY=""

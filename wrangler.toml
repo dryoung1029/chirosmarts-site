@@ -14,7 +14,7 @@ pages_build_output_dir = "./dist"
 # (used for magic-link emails, Stripe redirects, certificate verification links).
 # Locally this is overridden by `.dev.vars`.
 [vars]
-SITE_URL = "http://localhost:4321"
+SITE_URL = "http://localhost:4322"
 
 # --- D1 (database) ---
 [[d1_databases]]
