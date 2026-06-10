@@ -95,3 +95,19 @@ VALUES
   ('pts_r_confirm', 'pt_or_renewal', 1, 'confirm_date', 'Confirm your renewal date', 'Renewal follows your birth month.', 'custom', NULL, 0),
   ('pts_r_bundle',  'pt_or_renewal', 2, 'ce_bundle', 'Complete the 6-hour CE bundle', 'Includes required vitals and cultural competency hours.', 'course', NULL, 0),
   ('pts_r_submit',  'pt_or_renewal', 3, 'submit_obce', 'Submit to OBCE', 'Submit your renewal to the Oregon Board.', 'external_action', NULL, 0);
+
+-- ---------------------------------------------------------------------------
+-- Path template: Clinic owner / manager roadmap (seat pool + invite CAs)
+-- ---------------------------------------------------------------------------
+INSERT OR REPLACE INTO path_templates (id, slug, name, description, state, audience, status) VALUES
+  ('pt_clinic_owner', 'oregon-clinic-owner', 'Clinic — Train Your CAs',
+   'Buy a pool of training seats and invite your Chiropractic Assistants to get certified.',
+   'oregon', 'dc', 'published');
+
+INSERT OR REPLACE INTO path_template_steps
+  (id, template_id, position, key, title, description, step_type, course_id, evidence_required)
+VALUES
+  ('pts_c_account',  'pt_clinic_owner', 1, 'account', 'Set up your clinic', 'Create your clinic account and name your practice.', 'account', NULL, 0),
+  ('pts_c_seats',    'pt_clinic_owner', 2, 'buy_seats', 'Purchase training seats', 'Buy a pool of CA training seats for your staff.', 'external_action', NULL, 0),
+  ('pts_c_invite',   'pt_clinic_owner', 3, 'invite_cas', 'Invite your CAs', 'Invite each Chiropractic Assistant by email to claim a seat.', 'custom', NULL, 0),
+  ('pts_c_track',    'pt_clinic_owner', 4, 'track_progress', 'Track them to certification', 'Follow each CA''s progress through the initial certification.', 'custom', NULL, 0);

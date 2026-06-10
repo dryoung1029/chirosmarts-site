@@ -106,6 +106,61 @@ export const playbackLeases = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// Clinics (clinic-owner path: bulk seat pool + invite-by-email staff CAs)
+// ---------------------------------------------------------------------------
+// A clinic owner buys a POOL of training seats and invites their CAs by email;
+// each CA self-claims their own account (the invite link proves email ownership,
+// same security model as a magic link). Seats consumed = CA members that are
+// still invited or active — RECOMPUTED from `clinicMembers`, never stored as a
+// counter (compliance ethos). `seatsPurchased` is the only stored figure and is
+// set by the seat-purchase flow (comped in test mode now; Stripe in M3).
+export const clinics = sqliteTable(
+  "clinics",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+    seatsPurchased: integer("seats_purchased").notNull().default(0),
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [index("clinics_owner_idx").on(t.ownerUserId)],
+);
+
+// Membership rows tie a person to a clinic. The owner gets a `role=owner` row;
+// each invited CA gets a `role=ca` row that starts `invited` (with an invite
+// token hash) and becomes `active` once they claim it. `userId` is null until
+// the invite is claimed. Seats are consumed by CA rows in (invited|active).
+export const clinicMembers = sqliteTable(
+  "clinic_members",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id),
+    userId: text("user_id").references(() => users.id), // null until claimed
+    email: text("email").notNull(), // normalized; the invited address
+    role: text("role", { enum: ["owner", "ca"] }).notNull(),
+    status: text("status", { enum: ["invited", "active", "removed"] })
+      .notNull()
+      .default("invited"),
+    inviteTokenHash: text("invite_token_hash"), // null for owner / claimed rows
+    inviteExpiresAt: text("invite_expires_at"),
+    invitedAt: text("invited_at").notNull().default(nowUtc),
+    claimedAt: text("claimed_at"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("clinic_members_clinic_idx").on(t.clinicId),
+    index("clinic_members_user_idx").on(t.userId),
+    index("clinic_members_email_idx").on(t.email),
+    uniqueIndex("clinic_members_invite_token_idx").on(t.inviteTokenHash),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Course catalog
 // ---------------------------------------------------------------------------
 export const courses = sqliteTable("courses", {

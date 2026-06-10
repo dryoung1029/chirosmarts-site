@@ -15,6 +15,13 @@
       "when": 1781108829733,
       "tag": "0001_add_intake_completed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1781121007480,
+      "tag": "0002_clinics",
+      "breakpoints": true
     }
   ]
 }
