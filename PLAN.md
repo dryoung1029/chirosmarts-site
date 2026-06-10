@@ -197,6 +197,32 @@ Principles: `events` append-only; derived totals always recomputed, never stored
 - Small, frequent commits; never commit secrets (`.dev.vars` local, env vars documented in `README.md`).
 - Product ambiguity → ask. Technical ambiguity → 2 options + recommendation. Plain-language recap + local test steps at the end of each block.
 
+## 9a. Cloud-session network allowlist
+
+The Claude Code **web environment** runs behind an egress proxy. As of this
+session the environment is set to **Full** (any domain) for convenience. If we
+later tighten it to **Custom** (recommended for a compliance product), allowlist
+the hosts below. **Scope note:** this governs only the *dev sandbox* (the agent
+running scripts/tests). The **deployed app runs on Cloudflare**, so production
+outbound calls are unaffected by this setting.
+
+| Host | Why | Milestone |
+|---|---|---|
+| `registry.npmjs.org` | `npm install` (in Trusted defaults already) | all |
+| `github.com`, `*.githubusercontent.com` | git (via GitHub proxy; in defaults) | all |
+| `api.anthropic.com` | Anthropic API (in Trusted defaults already) | M6 |
+| `code.claude.com`, `docs.claude.com` | Claude Code docs (in defaults) | — |
+| `api.resend.com` | Resend email send (only if we test real sends from the sandbox) | M1+ |
+| `api.cloudflare.com` | Stream uploads + signing-key calls from `scripts/upload-to-stream` | M2 |
+| `customer-*.cloudflarestream.com`, `*.videodelivery.net` | Stream playback/iframe + HLS (browser-side; sandbox only if we fetch) | M2 |
+| `api.stripe.com` | Stripe API calls if exercised from the sandbox | M3 |
+| `developers.cloudflare.com` | CF docs (optional) | — |
+
+> Most of these fire from the **deployed Worker**, not the sandbox. The sandbox
+> only needs a host allowlisted when *we* call it directly (e.g. running
+> `scripts/upload-to-stream`, or a local script that hits Resend/Stripe).
+
+
 ---
 
 ## 10. M0 scaffold checklist (this session)
