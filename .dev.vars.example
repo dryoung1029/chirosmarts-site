@@ -21,10 +21,18 @@ STRIPE_SECRET_KEY=""
 STRIPE_WEBHOOK_SECRET=""
 
 # --- Cloudflare Stream (signed playback tokens; not a wrangler binding) ---
+# CF_ACCOUNT_ID + CF_STREAM_API_TOKEN are used by scripts/upload-to-stream.
+# The signing key (created once via the /stream/keys API) lets the Worker mint
+# short-lived RS256 playback tokens without calling the Stream API per request.
+# CF_STREAM_CUSTOMER_CODE is the "customer-<code>" playback subdomain.
+# If these are empty, the lesson player falls back to a dev simulator so
+# seat-time can still be exercised locally without real video.
 CF_ACCOUNT_ID=""
 CF_STREAM_API_TOKEN=""
+CF_STREAM_CUSTOMER_CODE=""
 CF_STREAM_SIGNING_KEY_ID=""
 CF_STREAM_SIGNING_KEY_PEM=""
+CF_STREAM_SIGNING_KEY_JWK=""
 
 # --- Anthropic API (M6 AI tutor only; unused until then) ---
 ANTHROPIC_API_KEY=""

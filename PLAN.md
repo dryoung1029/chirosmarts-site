@@ -9,11 +9,23 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M1.5 — Clinic-owner path** (built on `m1.5-clinic`, verified locally). **M2 — Course player** is next. |
+| Current milestone | **M2 — Course player + seat time + transcripts** (built + verified locally; awaiting review). **M3 — Quizzes + Stripe** is next. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
+| M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### M2 — what shipped this build (course player + seat time + transcripts)
+- **`creditedSeconds()` compliance core** (`src/lib/seat-time.ts`): pure, dependency-free union-of-coverage with per-endpoint clamping; rewatch never double-counts, credit capped at duration, reversed/seek-back intervals dropped. **17 unit tests** (vitest). Seat time is always RECOMPUTED from `events`, never stored.
+- **Signed Stream playback** (`src/lib/stream.ts`, `POST /api/stream/token`): RS256 JWT minted in-Worker from a Stream signing key — no per-request Stream API call. Entitlement-checked; dev fallback when keys absent.
+- **Single-device lease** (`src/lib/playback-lease.ts`, `POST /api/playback/lease`): 90s TTL keyed to `user_id`+`device_id`; heartbeats renew, stale leases are stealable, a live lease on another device returns **409**.
+- **Heartbeat** (`POST /api/lessons/[id]/heartbeat`): append-only `lesson_heartbeat` events (typed position/wall/rate columns); lease-guarded; rejects playback rate over the per-course cap (400).
+- **Progress + resume** (`src/lib/progress.ts`, `GET /api/lessons/[id]/progress`): recomputed credited seconds, resume position, completion; course-wide sum drives the **final-exam gate** (`credited ≥ credit_hours × 3600`).
+- **Player UI**: `/learn/[courseSlug]` overview (enrollment-gated, Module 1 previewable, progress bar + gate state) and the lesson page with a client engine (`public/lesson-player.js`) — heartbeats fire ~every 20s only while playing in a focused tab; seeks/pauses break coverage runs; resume-to-position. Real Cloudflare Stream adapter **plus a local dev simulator** so seat-time is testable without uploading video.
+- **Transcript ingestion** (`src/lib/transcript.ts`, **8 unit tests**) + **`scripts/upload-to-stream.ts`**: uploads video to Stream, waits for ready/duration, attaches WebVTT captions, ingests cues into `lesson_transcripts` (one row per cue — M6 prerequisite), and registers the lesson. Has `--dry-run`.
+- **Env additions**: `CF_STREAM_CUSTOMER_CODE`, `CF_STREAM_SIGNING_KEY_JWK`. **Dev tooling**: `vitest` (approved), `npm run test`, `npm run stream:upload`.
+- **Verified locally** (curl + vitest, port 4322): 25/25 unit tests; heartbeat→recompute with rewatch (no double-count); full coverage → complete; lease 409 across devices; rate-cap 400; exam gate locks at 8h and unlocks at threshold; cross-course lesson URL → redirect; append-only events retained; `astro check` + build clean; upload-to-stream dry-run SQL correct.
 
 ### M1.5 — what shipped this build (clinic-owner path)
 Owner decisions: **build a real clinic roadmap template**; staff CAs join by **invite-by-email (self-claim)**; seats are a **bulk pool**.

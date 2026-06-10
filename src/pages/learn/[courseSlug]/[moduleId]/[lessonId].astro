@@ -1,0 +1,72 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb } from "@/db/client";
+import { getLessonContext } from "@/lib/courses";
+import { canAccessModule } from "@/lib/entitlement";
+import { getLessonProgress } from "@/lib/progress";
+
+const user = Astro.locals.user!;
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const { courseSlug, moduleId, lessonId } = Astro.params;
+const ctx = await getLessonContext(db, courseSlug!, moduleId!, lessonId!);
+if (!ctx) return Astro.redirect("/dashboard", 302);
+
+// Entitlement: free-preview module or active enrollment.
+if (!(await canAccessModule(db, user.id, ctx.module))) {
+  return Astro.redirect(`/learn/${courseSlug}`, 302);
+}
+
+const progress = await getLessonProgress(
+  db,
+  user.id,
+  ctx.lesson.id,
+  ctx.lesson.durationSeconds,
+);
+
+const config = {
+  lessonId: ctx.lesson.id,
+  durationSeconds: ctx.lesson.durationSeconds,
+  resumeSeconds: progress.resumeSeconds,
+  maxPlaybackRate: ctx.course.maxPlaybackRate,
+  hasVideo: !!ctx.lesson.streamVideoUid,
+};
+const fmtMin = (s: number) => (s / 60).toFixed(1);
+---
+
+<Layout title={ctx.lesson.title} showNav={true}>
+  <p style="margin:0">
+    <a href={`/learn/${courseSlug}`}>← {ctx.course.title}</a>
+  </p>
+  <h1>{ctx.lesson.title}</h1>
+  <p class="muted" style="margin-top:0">
+    Module {ctx.module.position}: {ctx.module.title} · {fmtMin(ctx.lesson.durationSeconds)} min
+  </p>
+
+  <div id="status" class="notice" style="display:none"></div>
+
+  <div class="panel" style="padding:0;overflow:hidden">
+    <div id="player" style="aspect-ratio:16/9;background:#000"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Seat time (this lesson)</h2>
+    <p style="margin-top:0">
+      Credited:{" "}
+      <strong id="credited" style="color:var(--text)">{fmtMin(progress.creditedSeconds)}</strong>
+      {" "}/ {fmtMin(ctx.lesson.durationSeconds)} min
+      <span id="complete" style="color:var(--ok);margin-left:0.5rem">{progress.complete ? "✓ complete" : ""}</span>
+    </p>
+    <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+      <div id="bar" style={`height:100%;width:${ctx.lesson.durationSeconds ? Math.min(100, Math.round((progress.creditedSeconds / ctx.lesson.durationSeconds) * 100)) : 0}%;background:var(--accent)`}></div>
+    </div>
+    <p class="muted" style="margin:0.75rem 0 0">
+      Credit reflects unique content watched — rewatching never double-counts, and
+      time counts only while the video is playing in this focused tab on one device.
+    </p>
+  </div>
+
+  <script type="application/json" id="lesson-config" set:html={JSON.stringify(config)} />
+  <script src="/lesson-player.js" type="module"></script>
+</Layout>

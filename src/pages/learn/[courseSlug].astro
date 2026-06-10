@@ -1,0 +1,120 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb } from "@/db/client";
+import { getCourseBySlug, getCourseStructure } from "@/lib/courses";
+import { hasActiveEnrollment } from "@/lib/entitlement";
+import { getCourseSeatTime } from "@/lib/progress";
+
+const user = Astro.locals.user!;
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const { courseSlug } = Astro.params;
+const course = await getCourseBySlug(db, courseSlug!);
+if (!course) return Astro.redirect("/dashboard", 302);
+
+const structure = await getCourseStructure(db, course.id);
+const enrolled = await hasActiveEnrollment(db, user.id, course.id);
+const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+
+const fmtMin = (s: number) => (s / 60).toFixed(0);
+const requiredMin = (course.creditHours * 60).toFixed(0);
+const pct = seat.requiredSeconds
+  ? Math.min(100, Math.round((seat.creditedSeconds / seat.requiredSeconds) * 100))
+  : 0;
+
+// Quick lookup: per-lesson credited seconds.
+const lessonCredit = new Map(seat.perLesson.map((p) => [p.lessonId, p]));
+---
+
+<Layout title={course.title} showNav={true}>
+  <p style="margin:0"><a href="/dashboard">← Dashboard</a></p>
+  <h1>{course.title}</h1>
+  {course.description && <p style="margin-top:0">{course.description}</p>}
+
+  <div class="panel">
+    <h2>Your progress</h2>
+    <p style="margin-top:0">
+      Credited content time:{" "}
+      <strong style="color:var(--text)">{fmtMin(seat.creditedSeconds)} min</strong>{" "}
+      of {requiredMin} min required ({course.creditHours} credit hours).
+    </p>
+    <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+      <div style={`height:100%;width:${pct}%;background:var(--accent)`}></div>
+    </div>
+    <p class="muted" style="margin:0.75rem 0 0">
+      {seat.examUnlocked
+        ? "✓ Seat-time requirement met — the final exam is unlocked."
+        : "The final exam unlocks once you reach the required content time across all lessons."}
+    </p>
+  </div>
+
+  {
+    structure.map(({ module, lessons }) => {
+      const unlocked = module.isFreePreview || enrolled;
+      return (
+        <div class="panel">
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <h2 style="margin:0">
+              {module.position}. {module.title}
+            </h2>
+            {module.isFreePreview && (
+              <span style="font-size:0.75rem;color:var(--ok);border:1px solid var(--ok);border-radius:999px;padding:0.1rem 0.5rem">
+                Free preview
+              </span>
+            )}
+            {!unlocked && (
+              <span style="font-size:0.75rem;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:0.1rem 0.5rem">
+                🔒 Locked
+              </span>
+            )}
+          </div>
+          {module.description && <p style="margin:0.4rem 0 0">{module.description}</p>}
+
+          <ol style="list-style:none;padding:0;margin:0.75rem 0 0">
+            {lessons.map((lesson) => {
+              const p = lessonCredit.get(lesson.id);
+              const done = p?.complete;
+              return (
+                <li style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-top:1px solid var(--border)">
+                  <span style="flex:1">
+                    {unlocked ? (
+                      <a href={`/learn/${course.slug}/${module.id}/${lesson.id}`}>
+                        {lesson.title}
+                      </a>
+                    ) : (
+                      <span class="muted">{lesson.title}</span>
+                    )}
+                  </span>
+                  <span class="muted" style="font-size:0.8rem">
+                    {done
+                      ? "✓ complete"
+                      : p && p.creditedSeconds > 0
+                        ? `${fmtMin(p.creditedSeconds)}/${fmtMin(lesson.durationSeconds)} min`
+                        : `${fmtMin(lesson.durationSeconds)} min`}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          {!unlocked && (
+            <p class="muted" style="margin:0.75rem 0 0">
+              This module is part of the paid course. Checkout arrives in M3 —
+              for now it can be comped for testing.
+            </p>
+          )}
+        </div>
+      );
+    })
+  }
+
+  <div class="panel">
+    <h2>Final exam</h2>
+    <p style="margin-top:0">
+      {seat.examUnlocked
+        ? "Unlocked. The exam itself (80% to pass) is built in M3."
+        : "Locked until the seat-time requirement above is met."}
+    </p>
+  </div>
+</Layout>
