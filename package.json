@@ -1,0 +1,30 @@
+{
+  "name": "chirosmarts-site",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler pages dev ./dist",
+    "deploy": "astro build && wrangler pages deploy ./dist",
+    "astro": "astro",
+    "typecheck": "astro check",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply chirosmarts --local",
+    "db:migrate:remote": "wrangler d1 migrations apply chirosmarts --remote",
+    "db:seed:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed.sql",
+    "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.6.0",
+    "astro": "^5.13.0",
+    "drizzle-orm": "^0.44.2",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "drizzle-kit": "^0.31.1",
+    "wrangler": "^4.20.0"
+  }
+}

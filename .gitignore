@@ -1,0 +1,21 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# secrets & local env — NEVER commit
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.env
+.env.*
+
+# cloudflare / wrangler local state
+.wrangler/
+
+# logs & os
+npm-debug.log*
+*.log
+.DS_Store
