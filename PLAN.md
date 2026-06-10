@@ -1,7 +1,7 @@
 # ChiroSmarts Platform — PLAN.md
 
 > Living planning doc. Updated every session so the owner can share project state with his technical advisor.
-> **Last updated:** 2026-06-10 — Session 1 (planning + scaffolding kickoff)
+> **Last updated:** 2026-06-10 — Session 1 (plan approved with adjustments; scaffolding M0)
 
 ---
 
@@ -9,60 +9,83 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M0 — Scaffold** (not started; awaiting plan approval) |
-| Repo | Fresh, empty, branch `claude/ecstatic-allen-xs1hlt` |
-| This session's goal | Clarifying questions → this plan → **wait for approval** → scaffold M0 only |
+| Current milestone | **M0 — Scaffold** (in progress) |
+| Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
+| Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, …) merged to `main` |
 
-**Build order is strict and one-at-a-time: M0 → M1 → M2 → M3 → M4 → M5. Confirm before moving between milestones.**
+**Build order is strict and one-at-a-time: M0 → M1 → M2 → M3 → M4 → M5 → M6. Confirm before moving between milestones.**
 
 ---
 
 ## 2. Decisions made
 
-### Locked this session (from kickoff Q&A)
-1. **Data layer: Drizzle ORM** (thin, typed). Used for schema definition, migration generation, and simple typed queries. The compliance-critical recompute logic (unique video-position coverage → credited minutes) is **hand-written SQL / app code** regardless of ORM, because interval-union is not expressible cleanly in SQLite.
-2. **Sessions: server-side D1 session table.** Opaque random token in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie; row in D1 with expiry. Enables server-side revocation and underpins the compliance rule "one active playback session per user."
-3. **Cloudflare provisioning: I document, owner runs.** I cannot access the CF account. The scaffold will include exact `wrangler` commands + dashboard steps to create the D1 database, R2 bucket, Stream, and Pages project. Owner runs them and pastes IDs into `wrangler.toml` + secrets.
-4. **Certificate instructor of record: "Jason Young, DC"**, stored as a **per-course config field** (`instructor_name`, plus optional `certifying_body_line`) so attribution is editable without code changes.
+### Locked (kickoff Q&A + approval adjustments)
+1. **Data layer: Drizzle ORM** (thin, typed) for schema, migrations, and simple queries. The compliance recompute (unique video-position coverage → credited minutes) is hand-written app code regardless.
+2. **Auth sessions: server-side D1 `sessions` table.** Opaque token in an `HttpOnly`/`Secure`/`SameSite=Lax` cookie. **Concurrent logins are allowed; sessions are never force-revoked.**
+3. **Single active playback device = short-lived `playback_leases`, NOT session revocation.** Starting playback acquires a lease (~90s TTL) keyed to `user_id` + `device_id`; each heartbeat renews it. A different device can begin playback only after the current lease expires (steals the stale lease). Many sessions, one active playback device at a time.
+4. **Cloudflare provisioning: I document, owner runs.** Scaffold ships exact `wrangler`/dashboard steps for D1, R2, Stream, Pages; owner runs them and pastes IDs into config/secrets.
+5. **Certificate instructor of record: "Jason Young, DC"**, stored as a per-course field (`instructor_name` + optional `certifying_body_line`).
+6. **`quiz_attempts` is the SOLE system of record for quiz data.** `events` must not duplicate quiz answers/scores — at most a thin pointer event (`quiz_attempt`, referencing `quiz_attempts.id`) for the unified timeline.
+7. **PDF library: `pdf-lib`** (pure JS, Workers-compatible). Confirmed for M4.
+8. **Compliance data is never auto-deleted.** `events`, `quiz_attempts`, `certificates`, `documents` are retained indefinitely (append-only / archival).
+9. **Refunds are manual in Stripe.** The app only handles the inbound refund webhook → revokes the affected enrollment. No in-app refund initiation.
 
 ### Inherited from brief (fixed — not relitigated)
-- Astro 5 SSR on Cloudflare (Workers/Pages); D1 / R2 / Stream; Stripe Checkout (test mode); Resend transactional + magic-link auth; Brevo deferred; TypeScript throughout; logic in Astro endpoints/actions (no separate API service); minimal deps; all times stored UTC, displayed America/Los_Angeles.
-- **`SITE_URL` env var from day one** — used for magic-link emails, Stripe redirect URLs, certificate verification links. Never hard-coded.
+Astro 5 SSR on Cloudflare; D1 / R2 / Stream; Stripe Checkout (test mode); Resend transactional + magic-link auth; Brevo deferred (capture marketing-consent now, structure attributes for later sync); TypeScript; logic in Astro endpoints/actions (no separate API service); minimal deps; times stored UTC, displayed America/Los_Angeles; **`SITE_URL` env var from day one** (magic links, Stripe redirects, cert verification links — never hard-coded).
 
 ### Approved dependency budget
-Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · a PDF lib for certificates (proposing `pdf-lib` — pure JS, Workers-compatible, no native/system deps; confirm at M4). **Anything else, I ask first.**
+Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **Anthropic SDK** (M6 only). The Anthropic API powers the M6 tutor. Anything else, I ask first.
 
 ---
 
-## 3. Proposed D1 schema
+## 3. Product decisions (resolved open questions)
 
-Design principles baked in:
-- **`events` is append-only.** Derived totals (seat time, completion, certified status, Brevo attributes) are **always recomputed**, never stored as mutable counters.
-- **Deferred features get columns/enums now, no behavior** — so subscriptions, library content, live-attendance credit, additional states/paths need migrations, not redesigns.
-- **Snapshots on issuance.** Certificates copy name/title/hours/instructor at issue time so later edits can't alter a historical certificate.
-- IDs are text UUIDs. Timestamps are UTC ISO-8601 text (or unix int) — convention finalized in scaffold.
+| Topic | Decision |
+|---|---|
+| **Course price** | **$149** (`price_cents = 14900`), stored per-course. |
+| **"First module free"** | The **entire Module 1, including its knowledge check, is free**. Paywall begins at **Module 2**. |
+| **Knowledge checks** | **Attempt-to-proceed**, no passing score required to advance. The **80% final exam is the only pass gate** (threshold per-course, default 0.80). |
+| **Oregon initial path** | account → 8-hour course → 4-hour hands-on with signed log → OBCE application → fingerprinting → state exam → certified → BLS within first year. |
+| **Oregon renewal path** | confirm renewal date → 6-hour CE bundle → submit to OBCE. |
+| **Certificate visual design** | Deferred to M4. |
+| **Data retention** | Compliance data never auto-deleted (see decision #8). |
+| **Refunds** | Manual in Stripe; app revokes enrollment on refund webhook (see decision #9). |
+
+---
+
+## 4. Proposed D1 schema
+
+Principles: `events` append-only; derived totals always recomputed, never stored as counters; deferred features get columns/enums now (no future migration); certificates snapshot values at issuance; IDs are text UUIDs; timestamps UTC.
 
 ### `users`
-`id` · `email` (unique) · `legal_name` (for certs) · `display_name?` · `phone?` · `birth_month` (1–12, renewal keying) · `clinic_name?` · `supervising_dc_name?` · `supervising_dc_license?` · `supervising_dc_email?` · `role` (`student｜clinic_admin｜site_admin`) · `marketing_consent` (bool) · `marketing_consent_at?` · `created_at` · `updated_at`
-> Brevo attributes (role, certified status, renewal month, courses completed, clinic) are **computed at sync time**, not stored — keeps the audit model honest.
+`id` · `email` (unique) · `legal_name` · `display_name?` · `phone?` · `birth_month` (1–12) · `clinic_name?` · `supervising_dc_name?` · `supervising_dc_license?` · `supervising_dc_email?` · `role` (`student｜clinic_admin｜site_admin`) · `marketing_consent` (bool) · `marketing_consent_at?` · `created_at` · `updated_at`
+> Brevo attributes (role, certified status, renewal month, courses completed, clinic) are computed at sync time, not stored.
 
 ### `magic_links`
-`id` · `email` · `token_hash` (we store a hash, email the raw token) · `intent` (`login｜signup`) · `expires_at` · `consumed_at?` · `created_at`
+`id` · `email` · `token_hash` · `intent` (`login｜signup`) · `expires_at` · `consumed_at?` · `created_at`
 
 ### `sessions`
 `id` (opaque token) · `user_id` · `created_at` · `expires_at` · `last_seen_at` · `user_agent?` · `ip?`
 
+### `playback_leases`  *(single active playback device)*
+`id` · `user_id` · `lesson_id` · `device_id` · `acquired_at` · `expires_at` · `last_renewed_at`
+> One live (non-expired) lease per user. Renewed by heartbeats; stale leases are stealable.
+
 ### `courses`
-`id` · `slug` (unique) · `title` · `description?` · `credit_hours` (real) · `topic_category` (`general｜vitals｜cultural_competency｜hipaa`) · `state` (`oregon`) · `audience` (`ca｜dc`) · `content_type` (`ce_course｜library_episode`) · `access_model` (`one_time_purchase｜subscription｜free`) · `price_cents` · `stripe_price_id?` · `status` (`draft｜published｜archived`) · `pass_threshold` (real, default `0.80`) · `max_playback_rate` (real, default `1.5`) · `instructor_name` (default `Jason Young, DC`) · `certifying_body_line?` · `created_at` · `updated_at`
+`id` · `slug` (unique) · `title` · `description?` · `credit_hours` (real) · `topic_category` (`general｜vitals｜cultural_competency｜hipaa`) · `state` (`oregon`) · `audience` (`ca｜dc`) · `content_type` (`ce_course｜library_episode`) · `access_model` (`one_time_purchase｜subscription｜free`) · `price_cents` (default `14900`) · `stripe_price_id?` · `status` (`draft｜published｜archived`) · `pass_threshold` (real, default `0.80`) · `max_playback_rate` (real, default `1.5`) · `instructor_name` (default `Jason Young, DC`) · `certifying_body_line?` · `created_at` · `updated_at`
 
 ### `modules`
-`id` · `course_id` · `position` (order) · `title` · `description?` · `is_free_preview` (bool — supports "first module free" paywall)
+`id` · `course_id` · `position` · `title` · `description?` · `is_free_preview` (bool — Module 1 = true)
 
 ### `lessons`
 `id` · `module_id` · `position` · `title` · `stream_video_uid?` · `duration_seconds` · `evidence_type` (`playback_heartbeat｜live_attendance` — latter deferred) · `created_at`
 
+### `lesson_transcripts`  *(M2 ingestion; serves captions now + M6 tutor retrieval later)*
+`id` · `lesson_id` · `chunk_index` (order) · `start_seconds` · `end_seconds` · `text` · `created_at`
+> One row per timestamped transcript chunk (from Riverside export). Deep-link targets for tutor citations come from `start_seconds`.
+
 ### `quizzes`
-`id` · `course_id` · `module_id?` (null = course-level) · `kind` (`knowledge_check｜final_exam`) · `title` · `pass_threshold?` (override; else course default) · `created_at`
+`id` · `course_id` · `module_id?` (null = course-level) · `kind` (`knowledge_check｜final_exam`) · `title` · `pass_threshold?` (override) · `created_at`
 
 ### `questions`
 `id` · `quiz_id` · `position` · `prompt` · `type` (`single_choice｜multi_choice｜true_false`) · `explanation?`
@@ -70,112 +93,104 @@ Design principles baked in:
 ### `answer_options`
 `id` · `question_id` · `position` · `text` · `is_correct` (bool)
 
-### `quiz_attempts`  *(append-only — failed attempts retained, never overwritten)*
+### `quiz_attempts`  *(SOLE system of record — append-only; failed attempts retained)*
 `id` · `user_id` · `quiz_id` · `attempt_number` · `score` (real 0–1) · `passed` (bool) · `answers` (json snapshot) · `started_at` · `submitted_at`
 
-### `path_templates`  *(roadmap templates — data, not code)*
+### `path_templates`
 `id` · `slug` (unique) · `name` · `description?` · `state` · `audience` · `status` (`draft｜published`)
 
 ### `path_template_steps`
-`id` · `template_id` · `position` · `key` (stable id, e.g. `hands_on_log`) · `title` · `description?` · `step_type` (`account｜course｜upload_log｜external_action｜exam｜bls｜custom`) · `course_id?` · `gating_rule` (json — e.g. `{requires_step_key, requires_certificate}`) · `evidence_required` (bool)
+`id` · `template_id` · `position` · `key` (stable, e.g. `hands_on_log`) · `title` · `description?` · `step_type` (`account｜course｜upload_log｜external_action｜exam｜bls｜custom`) · `course_id?` · `gating_rule` (json) · `evidence_required` (bool)
 
-### `user_paths`  *(a user's enrolled roadmap)*
+### `user_paths`
 `id` · `user_id` · `template_id` · `status` (`active｜complete`) · `started_at` · `completed_at?`
 
-### `user_steps`  *(instantiated per-user checklist rows; titles snapshotted)*
-`id` · `user_path_id` · `template_step_id` · `position` · `title` (snapshot) · `status` (`locked｜available｜in_progress｜complete｜waived`) · `evidence_ref?` (R2 key or note) · `completed_at?` · `updated_at`
+### `user_steps`
+`id` · `user_path_id` · `template_step_id` · `position` (snapshot) · `title` (snapshot) · `status` (`locked｜available｜in_progress｜complete｜waived`) · `evidence_ref?` · `completed_at?` · `updated_at`
 
 ### `enrollments`
 `id` · `user_id` · `course_id` · `status` (`pending｜active｜completed｜refunded`) · `payment_status` (`unpaid｜paid｜free｜comp`) · `stripe_checkout_session_id?` · `stripe_payment_intent_id?` · `amount_cents?` · `enrolled_at` · `activated_at?` · `completed_at?`
 
-### `events`  *(append-only audit trail — the state-board record)*
-`id` · `user_id?` · `type` · `course_id?` · `lesson_id?` · `quiz_id?` · `occurred_at` (UTC) ·
-**heartbeat-specific typed columns** (nullable, so seat-time recompute is a clean SQL pull): `position_start_seconds` · `position_end_seconds` · `wall_seconds` · `playback_rate` ·
-`payload` (json — everything else)
-> Event types: `login` · `session_started` · `lesson_started` · `lesson_heartbeat` · `lesson_completed` · `quiz_attempt` · `quiz_passed` · `enrollment_activated` · `certificate_issued`. Quiz attempts live structured in `quiz_attempts`; `events` carries a pointer for the unified timeline.
+### `events`  *(append-only audit trail)*
+`id` · `user_id?` · `type` · `course_id?` · `lesson_id?` · `quiz_id?` · `occurred_at` (UTC) · heartbeat columns: `position_start_seconds?` · `position_end_seconds?` · `wall_seconds?` · `playback_rate?` · `payload` (json, for non-heartbeat detail)
+> Types: `login` · `session_started` · `lesson_started` · `lesson_heartbeat` · `lesson_completed` · `quiz_attempt` (pointer only → `quiz_attempts.id`) · `enrollment_activated` · `enrollment_revoked` · `certificate_issued`.
 
 ### `certificates`
-`id` · `user_id` · `course_id` · `verification_code` (unique, public) · `legal_name_snapshot` · `course_title_snapshot` · `credit_hours_snapshot` · `instructor_snapshot` · `issued_at` (completion date) · `r2_key` (PDF) · `status` (`issued｜revoked｜reissued`) · `supersedes_id?` (reissue chain) · `created_at`
+`id` · `user_id` · `course_id` · `verification_code` (unique, public) · `legal_name_snapshot` · `course_title_snapshot` · `credit_hours_snapshot` · `instructor_snapshot` · `issued_at` · `r2_key` · `status` (`issued｜revoked｜reissued`) · `supersedes_id?` · `created_at`
 
-### `documents`  *(student vault — signed hands-on logs, etc.)*
-`id` · `user_id` · `type` (`hands_on_log｜other`) · `title` · `r2_key` · `verified_by?` (DC) · `notes?` · `uploaded_at`
-
----
-
-## 4. Seat-time computation (the compliance core — design note)
-
-This is the highest-risk piece, so flagging the approach now even though it lands in M2:
-- Each `lesson_heartbeat` event records `[position_start, position_end]` (content seconds), `wall_seconds`, `playback_rate`. Fired ~every 45s, only while playing in a focused tab, only one active session per user.
-- **Credited minutes = total length of the *union* of covered `[start,end]` intervals**, capped at `duration_seconds`. Rewatching never double-counts; credit can't exceed content length.
-- Implemented as a **pure, unit-tested function** `creditedSeconds(heartbeats, durationSeconds)` that merges intervals in app code (SQLite can't union intervals well). No stored totals — recomputed on demand from `events`.
-- **Final-exam gate:** sum of credited content-minutes across a course's lessons ≥ `course.credit_hours × 60`.
-- Policy knobs (`max_playback_rate`, the 45s cadence tolerance, gate threshold) are config/query params — changeable without schema changes.
+### `documents`  *(student vault)*
+`id` · `user_id` · `type` (`hands_on_log｜other`) · `title` · `r2_key` · `verified_by?` · `notes?` · `uploaded_at`
 
 ---
 
-## 5. Route map (M0–M2)
+## 5. Seat-time computation (compliance core — design note)
+
+- Each `lesson_heartbeat` records `[position_start, position_end]` (content seconds), `wall_seconds`, `playback_rate`. Fired ~45s, only while playing in a focused tab, only while holding the playback lease.
+- **Credited minutes = length of the union of covered intervals**, capped at `duration_seconds`. Rewatching never double-counts; credit ≤ content length.
+- Pure, unit-tested `creditedSeconds(heartbeats, durationSeconds)` merges intervals in app code (SQLite can't union intervals). No stored totals — recomputed from `events`.
+- **Final-exam gate:** Σ credited content-minutes across course lessons ≥ `credit_hours × 60`.
+- Policy knobs (`max_playback_rate`, cadence tolerance, gate threshold) are config/query params — no schema changes to adjust policy.
+
+---
+
+## 6. Route map (M0–M2)
 
 ### M0 — Scaffold
-- `GET /` — "hello" page proving SSR + that `SITE_URL` is wired from env.
+- `GET /` — "hello" page proving SSR + `SITE_URL` wired from env.
 - `GET /health` — JSON liveness (env present, D1 reachable).
 
 ### M1 — Auth + intake + roadmap
-- `GET /login` — request a magic link.
-- `POST /api/auth/request-link` — create `magic_links` row, send via Resend (link built from `SITE_URL`).
-- `GET /auth/callback?token=…` — verify token, create `sessions` row, set cookie; new users → `/intake`.
-- `POST /api/auth/logout` — destroy session.
-- `GET /intake` — post-signup form (legal name, path selection [initial｜renewal｜clinic owner], clinic, supervising DC optional, birth month, marketing-consent checkbox).
-- `POST /api/intake` — persist user, instantiate roadmap from chosen `path_template` → `user_paths` + `user_steps`.
-- `GET /dashboard` — roadmap view (ordered steps with status/gating).
-- **Middleware:** session resolution + route protection.
+- `GET /login` · `POST /api/auth/request-link` (Resend magic link built from `SITE_URL`) · `GET /auth/callback?token=…` (verify → create session → new users to `/intake`) · `POST /api/auth/logout`.
+- `GET /intake` + `POST /api/intake` (legal name, path selection [initial｜renewal｜clinic owner], clinic, supervising DC optional, birth month, marketing-consent) → instantiate roadmap (`user_paths` + `user_steps`).
+- `GET /dashboard` — roadmap view.
+- Session-resolution + route-protection middleware.
 
-### M2 — Course player + seat time
-- `GET /learn/[courseSlug]` — course overview, gated by enrollment (first module previewable).
-- `GET /learn/[courseSlug]/[moduleId]/[lessonId]` — lesson page, Stream embed.
-- `POST /api/stream/token` — mint a signed Stream playback token for an entitled user/lesson.
-- `POST /api/lessons/[id]/heartbeat` — append `lesson_heartbeat` event (validated with zod).
+### M2 — Course player + seat time + transcripts
+- `GET /learn/[courseSlug]` — overview, enrollment-gated (Module 1 previewable).
+- `GET /learn/[courseSlug]/[moduleId]/[lessonId]` — lesson page, Stream embed + captions.
+- `POST /api/stream/token` — signed Stream playback token for entitled user/lesson.
+- `POST /api/playback/lease` — acquire/renew playback lease.
+- `POST /api/lessons/[id]/heartbeat` — append heartbeat event (validates lease).
 - `GET /api/lessons/[id]/progress` — credited minutes + resume position (recomputed).
-- `scripts/upload-to-stream` — CLI: upload a local Riverside export to Stream, register it as a lesson.
+- `scripts/upload-to-stream` — CLI: upload Riverside video → Stream, **ingest transcript into `lesson_transcripts` (chunked by timestamp), attach captions to the Stream video**, register the lesson.
 
 ---
 
-## 6. Proposed changes / refinements to the milestone breakdown
+## 7. Refinements to the milestone breakdown (no reordering)
 
-1. **Pull "single active session" + a tested seat-time function forward conceptually.** The D1 session model (M1) is the substrate the M2 single-active-playback rule needs, and `creditedSeconds()` deserves unit tests the moment it exists. No reordering of milestones — just naming the dependency so M1's session table is built session-revocation-aware.
-2. **Heartbeat fields as typed columns, not only JSON.** Deviates slightly from a pure JSON `payload`; rationale: the seat-time recompute query is the audit deliverable and benefits from indexable typed columns. Other event types stay in `payload`.
-3. **Certificate verification route is public + unauthenticated** by design (`/verify/[code]`, lands M4) — surfacing now because it shapes the `certificates.verification_code` uniqueness/abuse considerations.
-4. **`quiz_attempts` as its own append-only table** (not just events). Cleaner structured retention of failed attempts; `events` still gets a pointer row for the timeline.
-5. Everything else: **build the brief as written.** No milestone reordering proposed.
-
----
-
-## 7. Open questions (non-blocking — assumptions noted; will confirm before the relevant milestone)
-
-| # | Question | Needed by | Working assumption |
-|---|---|---|---|
-| Q1 | Exact **price** of the initial CA certification course (and any renewal CE price)? | M3 | Placeholder in seed; confirm before paywall. |
-| Q2 | "First module free, paywall after" — is the **entire first module** (all its lessons) the free preview, or just lesson 1? | M3 | First **module** free; rest paywalled. (`is_free_preview` on module.) |
-| Q3 | Do **module knowledge checks gate progression** (must pass to advance), or are they ungraded practice? | M3 | Ungraded/practice; only the **final exam** gates certification. Confirm. |
-| Q4 | **Exact roadmap steps** for the Oregon initial path beyond the brief's example (OBCE application URL, fingerprint vendor, BLS provider, exam logistics) — and whether any are just informational links vs. evidence-required. | M1 | Build the brief's example sequence; steps are pure data, easily edited. |
-| Q5 | Certificate/PDF **visual design** — logo, layout, any required board language or license numbers on the cert face? | M4 | Clean text template w/ verification code + `instructor_name`; confirm before M4. |
-| Q6 | **Data retention / audit window** the board expects (how long events/certs must be retained)? | Policy | Retain indefinitely (append-only); revisit. |
-| Q7 | **Refund handling** — does a Stripe refund auto-revoke enrollment/cert, or manual admin action? | M3/M5 | Manual admin action for v1. |
+1. Build `sessions` concurrency-friendly; enforce single playback via `playback_leases` (decision #3), not session kill.
+2. Heartbeat fields as typed columns (indexable for the audit query); other events in `payload`.
+3. `quiz_attempts` is the sole quiz record; `events` carries only a pointer (decision #6).
+4. Public, unauthenticated cert verification route (`/verify/[code]`, M4).
+5. `creditedSeconds()` ships as a pure, unit-tested function in M2.
+6. **M2 transcript ingestion is a hard prerequisite for M6** — `lesson_transcripts` lands now so M6 needs no migration.
 
 ---
 
-## 8. What happens after you approve this plan
+## 8. M6 — AI course tutor (post-launch, after M0–M5 ship)
 
-I scaffold **M0 only**:
-- Astro 5 SSR + Cloudflare adapter project, TypeScript.
-- `wrangler.toml` for local dev (D1/R2/Stream bindings) + a **provisioning checklist** (the CF commands you'll run).
-- Drizzle schema (the tables above) + first D1 migration.
-- Seed script: one fake published course (with a module/lesson/quiz) + one fake student user + the Oregon-initial `path_template`.
-- `SITE_URL` wired as an env var; `.dev.vars` for local secrets (git-ignored); required env vars documented in `README.md`.
-- `CLAUDE.md` capturing stack rules + domain model + compliance requirements.
-- Deployable "hello" `/` page (targets the auto-generated `*.pages.dev` subdomain once you run the provisioning steps).
-- Small, frequent commits.
-
-Then I stop and confirm before M1.
+- Chat sidebar on lesson pages, powered by the **Anthropic API**, retrieval over the enrolled course's `lesson_transcripts` chunks **only**.
+- **Hard scoping:** answers exclusively from the enrolled course's transcripts; every answer **cites lesson + timestamp** and citations **deep-link the player** to that moment; out-of-scope questions — including any clinical advice — are politely declined. Positioned as a study companion.
+- Only prerequisite (M2 transcript ingestion) is captured now. **Do not build before M0–M5 ship.**
 
 ---
-*Reminder of working agreement: ambiguous **product** decisions → I ask. Ambiguous **technical** decisions → I propose 2 options + a recommendation. Never commit secrets. Plain-language recap + local test steps at the end of each block.*
+
+## 9. Git / workflow
+
+- `main` holds the approved, integrated state.
+- Each milestone gets a named branch off `main`: `m0-scaffold`, `m1-auth`, `m2-player`, … merged back on completion.
+- Small, frequent commits; never commit secrets (`.dev.vars` local, env vars documented in `README.md`).
+- Product ambiguity → ask. Technical ambiguity → 2 options + recommendation. Plain-language recap + local test steps at the end of each block.
+
+---
+
+## 10. M0 scaffold checklist (this session)
+
+- [ ] Astro 5 SSR + Cloudflare adapter, TypeScript.
+- [ ] `wrangler.toml` (D1/R2/Stream bindings) + CF provisioning checklist.
+- [ ] Drizzle schema (all tables above) + first D1 migration.
+- [ ] Seed: one published $149 course (module/lesson/quiz) + one student user + Oregon initial & renewal `path_templates`.
+- [ ] `SITE_URL` env var; `.dev.vars` (git-ignored); env vars documented in `README.md`.
+- [ ] `CLAUDE.md` (stack rules + domain model + compliance requirements).
+- [ ] Deployable "hello" `/` page (targets `*.pages.dev` after provisioning).
+- [ ] Small commits on `m0-scaffold`; stop and confirm before M1.
