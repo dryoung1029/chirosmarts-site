@@ -6,6 +6,7 @@ import { hasActiveEnrollment } from "@/lib/entitlement";
 import { getCourseSeatTime } from "@/lib/progress";
 import { getModuleQuiz, getFinalExam, hasPassed } from "@/lib/quiz";
 import { getActiveCertificate, issueAndEmailCertificate } from "@/lib/certificate";
+import { listCourseResources } from "@/lib/course-resources";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
@@ -50,6 +51,11 @@ if (!certificate && finalPassed && user.legalName.trim()) {
   certificate = issued?.certificate ?? null;
 }
 const needsLegalName = finalPassed && !certificate && !user.legalName.trim();
+
+// Downloadable course resources (e.g. the Vitals practice-log PDF).
+const resources = (await listCourseResources(db, course.id)).filter(
+  (r) => r.visibility === "public" || enrolled,
+);
 ---
 
 <Layout title={course.title} showNav={true}>
@@ -60,6 +66,25 @@ const needsLegalName = finalPassed && !certificate && !user.legalName.trim();
   <p style="margin:0 0 1rem">
     <a class="btn" href={`/learn/${course.slug}/tutor`}>💬 Ask the course tutor</a>
   </p>
+
+  {
+    resources.length > 0 && (
+      <div class="panel">
+        <h2 style="margin-top:0">Downloads</h2>
+        <ul style="list-style:none;padding:0;margin:0">
+          {resources.map((r) => (
+            <li style="padding:0.35rem 0;border-top:1px solid var(--border)">
+              📄{" "}
+              <a href={`/learn/${course.slug}/resources/${r.id}`}>{r.title}</a>
+              {r.type === "practice_log_template" && (
+                <span class="muted" style="font-size:0.85rem"> — print and track your practice</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   {Astro.url.searchParams.get("comped") && (
     <div class="notice ok">You're enrolled (comped — test mode, no charge). The full course is unlocked.</div>

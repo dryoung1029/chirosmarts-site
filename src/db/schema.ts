@@ -169,6 +169,13 @@ export const courses = sqliteTable("courses", {
   title: text("title").notNull(),
   description: text("description"),
   creditHours: real("credit_hours").notNull().default(0),
+  // Exam-unlock floor in CONTENT minutes (union-coverage credited time). NULL =
+  // no explicit floor; the gate then relies on per-lesson coverage only. Kept
+  // separate from creditHours (the certificate figure) so a course can grant
+  // more credit than its video runtime — e.g. Vitals, where credit includes
+  // off-video practice logged on paper. Never let this exceed runtime (the gate
+  // clamps it) or the exam would be unreachable.
+  requiredSeatMinutes: integer("required_seat_minutes"),
   topicCategory: text("topic_category", {
     enum: ["general", "vitals", "cultural_competency", "hipaa"],
   })
@@ -528,4 +535,32 @@ export const documents = sqliteTable(
     uploadedAt: text("uploaded_at").notNull().default(nowUtc),
   },
   (t) => [index("documents_user_idx").on(t.userId)],
+);
+
+// Course-level downloadable assets the course PROVIDES to students — e.g. the
+// blank Vitals practice-log PDF the student prints and fills in. Distinct from
+// `documents` (the student's own uploaded, completed evidence). Stored in R2.
+export const courseResources = sqliteTable(
+  "course_resources",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id),
+    type: text("type", {
+      enum: ["practice_log_template", "handout", "other"],
+    })
+      .notNull()
+      .default("other"),
+    title: text("title").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull().default("application/pdf"),
+    r2Key: text("r2_key").notNull(),
+    // `enrolled` = entitled students only; `public` = anyone (e.g. a syllabus).
+    visibility: text("visibility", { enum: ["enrolled", "public"] })
+      .notNull()
+      .default("enrolled"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [index("course_resources_course_idx").on(t.courseId)],
 );

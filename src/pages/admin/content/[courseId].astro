@@ -4,6 +4,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getCourseStructure } from "@/lib/courses";
+import { listCourseResources } from "@/lib/course-resources";
 
 const db = getDb(Astro.locals.runtime.env);
 const courseId = Astro.params.courseId!;
@@ -15,6 +16,7 @@ const course = await db
 if (!course) return Astro.redirect("/admin/content", 302);
 
 const structure = await getCourseStructure(db, courseId);
+const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
 ---
@@ -63,6 +65,62 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
     </div>
     <button type="submit">Save course</button>
   </form>
+
+  <!-- Course resources (downloadable assets, e.g. the Vitals practice log) -->
+  <div class="panel">
+    <h2 style="margin-top:0">Resources</h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Files students can download (practice logs, handouts). Distinct from the
+      evidence students upload.
+    </p>
+    {
+      resources.length === 0 ? (
+        <p class="muted" style="margin:0">No resources yet.</p>
+      ) : (
+        <ul style="list-style:none;padding:0;margin:0 0 1rem">
+          {resources.map((r) => (
+            <li style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;border-top:1px solid var(--border);font-size:0.9rem">
+              <span style="flex:1">
+                <strong style="color:var(--text)">{r.title}</strong>
+                <span class="muted"> · {r.type} · {r.visibility} · {r.fileName}</span>
+              </span>
+              <form
+                method="POST"
+                action={`/api/admin/resources/${r.id}/delete`}
+                style="margin:0"
+                onsubmit="return confirm('Delete this resource?')"
+              >
+                <button class="link" type="submit" style="color:#f87171">Delete</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    <form
+      method="POST"
+      action={`/api/admin/courses/${course.id}/resources`}
+      enctype="multipart/form-data"
+    >
+      <div class="row">
+        <div style="flex:2">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="Practice-vitals log (printable)" required />
+        </div>
+        <div>
+          <label>Type</label>
+          <select name="type">
+            <option value="practice_log_template">Practice log</option>
+            <option value="handout">Handout</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <label>File (PDF, max 20 MB)</label>
+      <input type="file" name="file" accept="application/pdf,.pdf" required />
+      <button type="submit" style="margin-top:0.75rem">Upload resource</button>
+    </form>
+  </div>
 
   <!-- Modules + lessons -->
   <h2 style="margin-top:1.5rem">Modules &amp; lessons</h2>

@@ -1,6 +1,7 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { getDb } from "@/db/client";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
 import {
   getClinicForOwner,
@@ -14,6 +15,22 @@ const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
 const roadmap = await getUserRoadmap(db, user.id);
+
+// Courses the student is enrolled in (multi-course "Your courses" grid).
+const myCourses = await db
+  .select({
+    slug: schema.courses.slug,
+    title: schema.courses.title,
+    creditHours: schema.courses.creditHours,
+    status: schema.enrollments.status,
+  })
+  .from(schema.enrollments)
+  .innerJoin(schema.courses, eq(schema.enrollments.courseId, schema.courses.id))
+  .where(eq(schema.enrollments.userId, user.id))
+  .all();
+const activeCourses = myCourses.filter(
+  (c) => c.status === "active" || c.status === "completed",
+);
 
 // Clinic-owner management data (only for clinic_admin accounts).
 const params = Astro.url.searchParams;
@@ -68,6 +85,36 @@ const statusColor: Record<string, string> = {
       ? `Your CA renewal is keyed to your birth month (${months[user.birthMonth]}).`
       : "Your account is set up."}
   </p>
+
+  <div class="panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <h2 style="margin:0">Your courses</h2>
+      <a href="/courses" style="font-size:0.9rem">Browse catalog →</a>
+    </div>
+    {
+      activeCourses.length === 0 ? (
+        <p class="muted" style="margin:0.75rem 0 0">
+          You're not enrolled in any courses yet. <a href="/courses">Browse the catalog</a> to get started.
+        </p>
+      ) : (
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-top:0.75rem">
+          {activeCourses.map((c) => (
+            <a
+              href={`/learn/${c.slug}`}
+              class="panel"
+              style="margin:0;text-decoration:none;display:flex;flex-direction:column;gap:0.35rem"
+            >
+              <span style="font-weight:600;color:var(--text)">{c.title}</span>
+              <span class="muted" style="font-size:0.85rem">
+                {c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} ·{" "}
+                {c.status === "completed" ? "✓ Completed" : "In progress"}
+              </span>
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </div>
 
   {
     clinic && seats && (

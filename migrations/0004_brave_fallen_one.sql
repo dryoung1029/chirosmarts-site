@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `required_seat_minutes` integer;

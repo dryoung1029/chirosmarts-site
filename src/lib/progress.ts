@@ -74,6 +74,7 @@ export interface CourseSeatTime {
   totalContentSeconds: number; // summed lesson durations
   watchedFraction: number; // 0..1 across the whole course
   completionThreshold: number; // unlock threshold per lesson
+  requiredSeconds: number; // explicit content-minutes floor for the exam (0 = none)
   examUnlocked: boolean;
   perLesson: (LessonProgress & { fraction: number; meetsThreshold: boolean })[];
 }
@@ -85,15 +86,24 @@ export interface CourseSeatTime {
 export const COMPLETION_THRESHOLD = 0.9;
 
 /**
- * Course-wide seat time + the final-exam gate. The exam unlocks only when the
- * student has watched ≥ COMPLETION_THRESHOLD of unique content in every lesson —
- * so skipping a module keeps the exam locked, regardless of total runtime.
+ * Course-wide seat time + the final-exam gate. The exam unlocks when the student
+ * has (a) watched ≥ COMPLETION_THRESHOLD of unique content in EVERY lesson (the
+ * no-skip rule, runtime-based) AND (b) accrued at least the course's explicit
+ * `requiredSeatMinutes` content-minutes, when one is set. The minutes floor is
+ * clamped to total runtime so it can never make the exam unreachable, and is
+ * decoupled from `creditHours` (the certificate figure) — a course may grant
+ * more credit than it has video (e.g. Vitals, with off-video practice).
  */
 export async function getCourseSeatTime(
   db: Db,
   userId: string,
   courseId: string,
 ): Promise<CourseSeatTime> {
+  const course = await db
+    .select({ requiredSeatMinutes: schema.courses.requiredSeatMinutes })
+    .from(schema.courses)
+    .where(eq(schema.courses.id, courseId))
+    .get();
   const structure = await getCourseStructure(db, courseId);
   const perLesson: CourseSeatTime["perLesson"] = [];
   let total = 0;
@@ -115,13 +125,21 @@ export async function getCourseSeatTime(
       totalDuration += p.durationSeconds;
     }
   }
+  // Explicit content-minutes floor, clamped to runtime so the gate stays reachable.
+  const requiredSeconds = Math.min(
+    course?.requiredSeatMinutes != null ? course.requiredSeatMinutes * 60 : 0,
+    totalDuration,
+  );
   const examUnlocked =
-    perLesson.length > 0 && perLesson.every((p) => p.meetsThreshold);
+    perLesson.length > 0 &&
+    perLesson.every((p) => p.meetsThreshold) &&
+    total >= requiredSeconds;
   return {
     creditedSeconds: total,
     totalContentSeconds: totalDuration,
     watchedFraction: totalDuration > 0 ? total / totalDuration : 0,
     completionThreshold: COMPLETION_THRESHOLD,
+    requiredSeconds,
     examUnlocked,
     perLesson,
   };

@@ -159,3 +159,82 @@ VALUES
    'To take an accurate blood pressure, seat the patient with their back supported and feet flat, rest the arm at heart level, choose a correctly sized cuff, and place it about one inch above the elbow crease before inflating.'),
   ('lt_lsn_welcome_3', 'lsn_welcome', 3, 70, 96,
    'Throughout the course you will find knowledge checks at the end of each module and a final exam. The passing threshold is eighty percent, and your attempts are recorded for compliance.');
+
+-- ===========================================================================
+-- Additional standalone CE courses (multi-course catalog). Single module each.
+-- Placeholder content — author real lessons/quizzes via the M5 admin editor and
+-- upload video + transcripts via the upload-to-stream script.
+-- ===========================================================================
+
+-- Vitals: short video, but credit includes off-video practice logged on paper,
+-- so credit_hours (1.0) deliberately exceeds video runtime. required_seat_minutes
+-- (5) is the exam floor and is decoupled from the certificate's credit figure.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_vitals', 'vitals-monitoring',
+   'Taking & Recording Vital Signs',
+   'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
+   1, 5, 'vitals', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 4900, 'published', 0.8, 1.5,
+   'Jason Young, DC');
+
+INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
+  ('mod_vitals', 'crs_vitals', 1, 'Vital Signs — Measurement & Documentation', 'Blood pressure, pulse, respiration, temperature.', 0);
+
+INSERT OR REPLACE INTO lessons
+  (id, module_id, position, title, stream_video_uid, duration_seconds, evidence_type)
+VALUES
+  ('lsn_vitals', 'mod_vitals', 1, 'Vital Signs — Measurement & Documentation', NULL, 600, 'playback_heartbeat');
+
+INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title, pass_threshold) VALUES
+  ('qz_vitals_final', 'crs_vitals', NULL, 'final_exam', 'Vitals Final Exam', 0.8);
+
+INSERT OR REPLACE INTO questions (id, quiz_id, position, prompt, type, explanation) VALUES
+  ('qv_1', 'qz_vitals_final', 1, 'A blood-pressure cuff should be placed about how far above the elbow crease?', 'single_choice', 'About one inch (2–3 cm) above the antecubital crease.'),
+  ('qv_2', 'qz_vitals_final', 2, 'The patient should be seated with feet flat and arm supported at heart level when taking blood pressure.', 'true_false', 'True — improper positioning skews the reading.');
+
+INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_correct) VALUES
+  ('ov_1a', 'qv_1', 1, 'One inch above the crease', 1),
+  ('ov_1b', 'qv_1', 2, 'Directly over the crease', 0),
+  ('ov_1c', 'qv_1', 3, 'On the forearm', 0),
+  ('ov_2a', 'qv_2', 1, 'True', 1),
+  ('ov_2b', 'qv_2', 2, 'False', 0);
+
+-- HIPAA: single-module certification. required_seat_minutes left NULL (gate uses
+-- per-lesson coverage only). credit_hours = 1.0.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_hipaa', 'hipaa-essentials',
+   'HIPAA Essentials for Chiropractic Assistants',
+   'A single-module HIPAA certification covering protected health information, the minimum-necessary rule, and front-desk privacy practices.',
+   1, NULL, 'hipaa', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 4900, 'published', 0.8, 1.5,
+   'Jason Young, DC');
+
+INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
+  ('mod_hipaa', 'crs_hipaa', 1, 'HIPAA Essentials', 'PHI, minimum necessary, and privacy at the front desk.', 0);
+
+INSERT OR REPLACE INTO lessons
+  (id, module_id, position, title, stream_video_uid, duration_seconds, evidence_type)
+VALUES
+  ('lsn_hipaa', 'mod_hipaa', 1, 'HIPAA Essentials', NULL, 600, 'playback_heartbeat');
+
+INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title, pass_threshold) VALUES
+  ('qz_hipaa_final', 'crs_hipaa', NULL, 'final_exam', 'HIPAA Final Exam', 0.8);
+
+INSERT OR REPLACE INTO questions (id, quiz_id, position, prompt, type, explanation) VALUES
+  ('qh_1', 'qz_hipaa_final', 1, 'Which law governs the privacy of protected health information (PHI)?', 'single_choice', 'HIPAA — the Health Insurance Portability and Accountability Act.'),
+  ('qh_2', 'qz_hipaa_final', 2, 'The minimum-necessary rule means you should access only the PHI needed for the task at hand.', 'true_false', 'True — access and disclosure are limited to what the task requires.');
+
+INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_correct) VALUES
+  ('oh_1a', 'qh_1', 1, 'HIPAA', 1),
+  ('oh_1b', 'qh_1', 2, 'OSHA', 0),
+  ('oh_1c', 'qh_1', 3, 'FERPA', 0),
+  ('oh_2a', 'qh_2', 1, 'True', 1),
+  ('oh_2b', 'qh_2', 2, 'False', 0);

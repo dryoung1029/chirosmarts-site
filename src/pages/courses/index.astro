@@ -1,0 +1,80 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq, asc } from "drizzle-orm";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const user = Astro.locals.user;
+
+const courses = await db
+  .select()
+  .from(schema.courses)
+  .where(eq(schema.courses.status, "published"))
+  .orderBy(asc(schema.courses.priceCents))
+  .all();
+
+// Which of these the signed-in user already has.
+const enrolled = new Set<string>();
+if (user) {
+  const rows = await db
+    .select({ courseId: schema.enrollments.courseId, status: schema.enrollments.status })
+    .from(schema.enrollments)
+    .where(eq(schema.enrollments.userId, user.id))
+    .all();
+  for (const r of rows) {
+    if (r.status === "active" || r.status === "completed") enrolled.add(r.courseId);
+  }
+}
+
+const topicLabel: Record<string, string> = {
+  general: "CA Training",
+  vitals: "Vitals",
+  cultural_competency: "Cultural Competency",
+  hipaa: "HIPAA",
+};
+const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
+---
+
+<Layout title="Courses" showNav={true}>
+  <h1>Course catalog</h1>
+  <p class="muted" style="margin-top:0">
+    State-compliant continuing education for Oregon Chiropractic Assistants.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:1.25rem">
+    {
+      courses.map((c) => (
+        <div class="panel" style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
+          <span style="align-self:flex-start;font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;background:#23303f;color:var(--muted)">
+            {topicLabel[c.topicCategory] ?? c.topicCategory}
+          </span>
+          <a href={`/courses/${c.slug}`} style="font-weight:600;color:var(--text);text-decoration:none;font-size:1.05rem">
+            {c.title}
+          </a>
+          {c.description && (
+            <p class="muted" style="margin:0;font-size:0.9rem;flex:1">{c.description}</p>
+          )}
+          <div class="muted" style="font-size:0.85rem">
+            {c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} · {usd(c.priceCents)}
+          </div>
+          {
+            enrolled.has(c.id) ? (
+              <a class="btn" href={`/learn/${c.slug}`} style="margin:0">Go to course →</a>
+            ) : user ? (
+              <form method="POST" action="/api/checkout/course" style="margin:0">
+                <input type="hidden" name="courseId" value={c.id} />
+                <button type="submit" style="margin:0;width:100%">Enroll — {usd(c.priceCents)}</button>
+              </form>
+            ) : (
+              <a class="btn" href={`/login?next=${encodeURIComponent(`/courses/${c.slug}`)}`} style="margin:0">
+                Sign in to enroll
+              </a>
+            )
+          }
+        </div>
+      ))
+    }
+    {courses.length === 0 && <div class="panel"><p style="margin:0">No courses are available yet.</p></div>}
+  </div>
+</Layout>
