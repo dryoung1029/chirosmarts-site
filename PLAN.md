@@ -9,12 +9,21 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M2 — Course player + seat time + transcripts** (built + verified locally; awaiting review). **M3 — Quizzes + Stripe** is next. |
+| Current milestone | **M4 — Certificates + verification** (built + deployed). M0–M3 shipped. **M5 — Admin** is next. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### M4 — what shipped this build (certificates + verification)
+- **`src/lib/certificate.ts`**: idempotent issuance with snapshotted legal name / course title / credit hours / instructor / date. Two IDs per cert — `certNumber` human serial (`CS-YYYY-NNNN`, sequential per year) + random unguessable `verificationCode` (public lookup). Legal-name guard: no name on file → issuance deferred until intake completed.
+- **PDF (pdf-lib)**: landscape Letter, accent border, **logo wordmark** drawn in-doc, recipient/course/credit/date/instructor, **anti-duplication tiled diagonal watermark** (`CHIROSMARTS · VERIFIED · CS-…`), and a **QR** (drawn from the qrcode module matrix — no PNG dep) linking to the verify page. Stored in R2 (`DOCS`).
+- **Issuance hook**: passing the final exam issues + emails the certificate (Resend, PDF attached). Failures never roll back the passing attempt; the course page **self-heals** (lazy idempotent issue) on next visit if a name was added later or issuance errored.
+- **Public verification**: `/verify` (code entry) + `/verify/[code]` (valid / revoked / not-found, shows snapshotted values) + `/certificate/[code].pdf` (public PDF by code, revoked withheld). No auth — publicly verifiable by design.
+- **Logo**: `src/components/Logo.astro` SVG wordmark (placeholder spine glyph) in the site header + landing page. Swap one file when final art is ready.
+- **Schema**: added `certificates.cert_number` (unique) — migration `0003`, applied local + remote.
+- **New dep**: `qrcode` (approved). `pdf-lib` (pre-approved) now in use.
 
 ### M2 — what shipped this build (course player + seat time + transcripts)
 - **`creditedSeconds()` compliance core** (`src/lib/seat-time.ts`): pure, dependency-free union-of-coverage with per-endpoint clamping; rewatch never double-counts, credit capped at duration, reversed/seek-back intervals dropped. **17 unit tests** (vitest). Seat time is always RECOMPUTED from `events`, never stored.
@@ -73,7 +82,7 @@ Owner chose to **build a real clinic roadmap template** (M1.5, above): clinic ow
 Astro 5 SSR on Cloudflare; D1 / R2 / Stream; Stripe Checkout (test mode); Resend transactional + magic-link auth; Brevo deferred (capture marketing-consent now, structure attributes for later sync); TypeScript; logic in Astro endpoints/actions (no separate API service); minimal deps; times stored UTC, displayed America/Los_Angeles; **`SITE_URL` env var from day one** (magic links, Stripe redirects, cert verification links — never hard-coded).
 
 ### Approved dependency budget
-Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **Anthropic SDK** (M6 only). The Anthropic API powers the M6 tutor. Anything else, I ask first.
+Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **qrcode** (M4, cert QR) · **Anthropic SDK** (M6 only). The Anthropic API powers the M6 tutor. Anything else, I ask first.
 
 ---
 
@@ -86,7 +95,8 @@ Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-k
 | **Knowledge checks** | **Attempt-to-proceed**, no passing score required to advance. The **80% final exam is the only pass gate** (threshold per-course, default 0.80). |
 | **Oregon initial path** | account → 8-hour course → 4-hour hands-on with signed log → OBCE application → fingerprinting → state exam → certified → BLS within first year. |
 | **Oregon renewal path** | confirm renewal date → 6-hour CE bundle → submit to OBCE. |
-| **Certificate visual design** | Deferred to M4. |
+| **Certificate visual design** | ✅ M4: landscape PDF, logo wordmark, tiled watermark, QR + dual IDs (human serial + random verify code). Placeholder logo art pending final brand asset. |
+| **Exam gate** | Changed from fixed-hours to **% of content watched** (≥90% of every lesson, `COMPLETION_THRESHOLD` in `progress.ts`) — stays correct as lessons change. `credit_hours` retained for the certificate face. |
 | **Data retention** | Compliance data never auto-deleted (see decision #8). |
 | **Refunds** | Manual in Stripe; app revokes enrollment on refund webhook (see decision #9). |
 

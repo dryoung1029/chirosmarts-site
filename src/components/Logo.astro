@@ -1,0 +1,42 @@
+---
+/**
+ * ChiroSmarts wordmark. Placeholder brand mark — a spine-column glyph inside a
+ * rounded badge, next to the wordmark. Swap the artwork here (and the pdf-lib
+ * drawing in src/lib/certificate.ts) when the final logo is ready.
+ */
+interface Props {
+  height?: number; // px height of the mark; text scales with it
+  mono?: boolean; // single-color (for footers / muted contexts)
+}
+const { height = 28, mono = false } = Astro.props;
+const accent = mono ? "currentColor" : "#0ea5e9";
+const fontSize = Math.round(height * 0.62);
+---
+
+<span
+  class="cs-logo"
+  style={`display:inline-flex;align-items:center;gap:0.5rem;height:${height}px;line-height:1`}
+>
+  <svg
+    width={height}
+    height={height}
+    viewBox="0 0 40 40"
+    fill="none"
+    aria-hidden="true"
+    style="flex:none"
+  >
+    <rect x="1" y="1" width="38" height="38" rx="10" fill={accent}></rect>
+    <!-- stylized spinal column: stacked vertebrae -->
+    <g stroke="#fff" stroke-width="3" stroke-linecap="round">
+      <line x1="20" y1="9" x2="20" y2="31"></line>
+      <line x1="14" y1="13" x2="26" y2="13"></line>
+      <line x1="13" y1="20" x2="27" y2="20"></line>
+      <line x1="14" y1="27" x2="26" y2="27"></line>
+    </g>
+  </svg>
+  <span
+    style={`font-weight:700;font-size:${fontSize}px;letter-spacing:-0.01em;color:currentColor;white-space:nowrap`}
+  >
+    Chiro<span style={`color:${accent}`}>Smarts</span>
+  </span>
+</span>

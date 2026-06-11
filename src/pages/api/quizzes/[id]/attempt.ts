@@ -14,6 +14,7 @@ import { schema } from "@/db/client";
 import { getQuiz, submitAttempt } from "@/lib/quiz";
 import { canAccessModule, hasActiveEnrollment } from "@/lib/entitlement";
 import { getCourseSeatTime } from "@/lib/progress";
+import { issueAndEmailCertificate } from "@/lib/certificate";
 import { logEvent } from "@/lib/events";
 import { nowIso } from "@/lib/time";
 import type { AnswerMap } from "@/lib/quiz-scoring";
@@ -71,11 +72,12 @@ export const POST: APIRoute = async ({ request, locals, params, redirect }) => {
   const result = await submitAttempt(db, user.id, quizId, answers);
   if (!result) return redirect(`/learn/${course.slug}`, 302);
 
-  // Passing the final exam completes the enrollment (certificate = M4).
+  // Passing the final exam completes the enrollment and issues the certificate.
   if (quiz.kind === "final_exam" && result.passed) {
+    const completedAt = nowIso();
     await db
       .update(schema.enrollments)
-      .set({ status: "completed", completedAt: nowIso() })
+      .set({ status: "completed", completedAt })
       .where(
         and(
           eq(schema.enrollments.userId, user.id),
@@ -88,6 +90,21 @@ export const POST: APIRoute = async ({ request, locals, params, redirect }) => {
       courseId: course.id,
       payload: { quizAttemptId: result.attemptId, score: result.score },
     });
+
+    // Issue + email the certificate (idempotent). Failures must not roll back
+    // the passing attempt — the student earned it; the course page self-heals on
+    // the next visit. If they have no legal name yet, issuance is skipped until
+    // they add one.
+    try {
+      await issueAndEmailCertificate(locals.runtime.env, db, {
+        userId: user.id,
+        courseId: course.id,
+        email: user.email,
+        issuedAt: completedAt,
+      });
+    } catch (e) {
+      console.error("[certificate] issuance failed", e);
+    }
   }
 
   return redirect(`${backToQuiz}?attempt=${result.attemptId}`, 303);

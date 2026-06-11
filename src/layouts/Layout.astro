@@ -5,6 +5,7 @@ interface Props {
 }
 const { title, showNav = false } = Astro.props;
 const user = Astro.locals.user;
+import Logo from "@/components/Logo.astro";
 ---
 
 <!doctype html>
@@ -103,7 +104,7 @@ const user = Astro.locals.user;
     {
       showNav && (
         <nav class="nav">
-          <strong><a href="/dashboard" style="text-decoration:none;color:inherit">ChiroSmarts</a></strong>
+          <a href="/dashboard" style="text-decoration:none;color:inherit"><Logo height={30} /></a>
           {user && (
             <form method="POST" action="/api/auth/logout">
               <span class="muted" style="margin-right:1rem">{user.email}</span>

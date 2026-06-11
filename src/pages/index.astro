@@ -1,5 +1,6 @@
 ---
 // Public landing page.
+import Logo from "@/components/Logo.astro";
 ---
 
 <!doctype html>
@@ -47,7 +48,9 @@
   </head>
   <body>
     <main>
-      <h1>ChiroSmarts</h1>
+      <div style="display:flex;justify-content:center;margin-bottom:0.75rem">
+        <Logo height={46} />
+      </div>
       <p>
         State-compliant Oregon Chiropractic Assistant training &amp; continuing
         education.
