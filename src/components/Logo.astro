@@ -1,42 +1,56 @@
 ---
 /**
- * ChiroSmarts wordmark. Placeholder brand mark — a spine-column glyph inside a
- * rounded badge, next to the wordmark. Swap the artwork here (and the pdf-lib
- * drawing in src/lib/certificate.ts) when the final logo is ready.
+ * ChiroSmarts wordmark — vector recreation of the brand logo: a geometric
+ * "CHIRO" whose O is a lightbulb, with "smarts" beneath in a lighter tone.
+ *
+ * Uses `currentColor` throughout so it adapts to light/dark surfaces (the site
+ * is dark-themed; the certificate is white). The geometric font falls back
+ * across Century Gothic → Questrial (loaded in the page <head>) → Jost.
+ *
+ * When the final raster/vector art is committed, swap this component's body for
+ * an <img>/inline-SVG of the real file — nothing else references the artwork.
  */
 interface Props {
-  height?: number; // px height of the mark; text scales with it
-  mono?: boolean; // single-color (for footers / muted contexts)
+  height?: number; // px height of the full mark
 }
-const { height = 28, mono = false } = Astro.props;
-const accent = mono ? "currentColor" : "#0ea5e9";
-const fontSize = Math.round(height * 0.62);
+const { height = 40 } = Astro.props;
+const f1 = Math.round(height * 0.6); // CHIR
+const f2 = Math.round(height * 0.34); // smarts
+const bulbW = Math.round(height * 0.62);
+const geometric =
+  "'Century Gothic','Questrial','Jost','Twentieth Century',system-ui,sans-serif";
 ---
 
 <span
   class="cs-logo"
-  style={`display:inline-flex;align-items:center;gap:0.5rem;height:${height}px;line-height:1`}
+  role="img"
+  aria-label="ChiroSmarts"
+  style={`display:inline-flex;align-items:stretch;height:${height}px;color:currentColor;font-family:${geometric}`}
 >
+  <span
+    style={`display:flex;flex-direction:column;justify-content:space-between;height:100%`}
+  >
+    <span style={`font-size:${f1}px;line-height:0.9;letter-spacing:0.06em;font-weight:500`}>CHIR</span>
+    <span style={`font-size:${f2}px;line-height:0.9;letter-spacing:0.05em;opacity:0.5`}>smarts</span>
+  </span>
   <svg
-    width={height}
+    width={bulbW}
     height={height}
-    viewBox="0 0 40 40"
+    viewBox="0 0 64 104"
     fill="none"
     aria-hidden="true"
-    style="flex:none"
+    style="flex:none;overflow:visible"
   >
-    <rect x="1" y="1" width="38" height="38" rx="10" fill={accent}></rect>
-    <!-- stylized spinal column: stacked vertebrae -->
-    <g stroke="#fff" stroke-width="3" stroke-linecap="round">
-      <line x1="20" y1="9" x2="20" y2="31"></line>
-      <line x1="14" y1="13" x2="26" y2="13"></line>
-      <line x1="13" y1="20" x2="27" y2="20"></line>
-      <line x1="14" y1="27" x2="26" y2="27"></line>
-    </g>
+    <!-- glass globe = the "O" -->
+    <circle
+      cx="32"
+      cy="31"
+      r="27"
+      stroke="currentColor"
+      stroke-width="4.5"></circle>
+    <!-- screw base / cap, aligned beside "smarts" -->
+    <line x1="20" y1="66" x2="44" y2="66" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></line>
+    <line x1="22" y1="76" x2="42" y2="76" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></line>
+    <path d="M25 86 q7 11 14 0" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></path>
   </svg>
-  <span
-    style={`font-weight:700;font-size:${fontSize}px;letter-spacing:-0.01em;color:currentColor;white-space:nowrap`}
-  >
-    Chiro<span style={`color:${accent}`}>Smarts</span>
-  </span>
 </span>

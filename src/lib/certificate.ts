@@ -258,7 +258,7 @@ export async function renderCertificatePdf(
   });
 
   // --- Logo wordmark, top-center ---
-  drawWordmark(page, helvBold, width / 2, height - 92);
+  drawWordmark(page, helvBold, helv, width / 2, height - 96);
 
   // --- Heading ---
   centerText("Certificate of Completion", height - 165, 30, helvBold, INK);
@@ -375,49 +375,64 @@ function formatCredits(hours: number): string {
   return `${h} ${hours === 1 ? "hour" : "hours"}`;
 }
 
-/** Accent badge + "ChiroSmarts" wordmark, centered on (cx, baselineY). */
+/**
+ * ChiroSmarts wordmark — vector recreation of the brand logo: "CHIRO" whose O is
+ * a lightbulb, "smarts" beneath in grey. Drawn directly (no font embedding) so
+ * it matches the on-site SVG. Centered horizontally on `cx`; `y` is the CHIR
+ * baseline.
+ */
 function drawWordmark(
   page: PDFPage,
-  bold: PDFFont,
+  font: PDFFont,
+  light: PDFFont,
   cx: number,
   y: number,
 ): void {
-  const size = 26;
-  const word1 = "Chiro";
-  const word2 = "Smarts";
-  const w1 = bold.widthOfTextAtSize(word1, size);
-  const w2 = bold.widthOfTextAtSize(word2, size);
-  const badge = 34;
-  const gap = 10;
-  const total = badge + gap + w1 + w2;
-  let x = cx - total / 2;
+  const f1 = 30; // CHIR
+  const word = "CHIR";
+  const w1 = font.widthOfTextAtSize(word, f1);
+  const r = f1 * 0.37; // bulb glass radius ≈ cap height / 2
+  const gap = 5;
+  const total = w1 + gap + r * 2;
+  const startX = cx - total / 2;
 
-  // badge
-  page.drawRectangle({
-    x,
-    y: y - 6,
-    width: badge,
-    height: badge,
-    color: ACCENT,
-    borderColor: ACCENT,
+  // CHIR
+  page.drawText(word, { x: startX, y, size: f1, font, color: INK });
+
+  // lightbulb "O"
+  const glassCx = startX + w1 + gap + r;
+  const glassCy = y + f1 * 0.36; // cap vertical center above baseline
+  page.drawCircle({
+    x: glassCx,
+    y: glassCy,
+    size: r,
+    borderColor: INK,
+    borderWidth: 2.6,
   });
-  // spine glyph
-  const bx = x + badge / 2;
-  const top = y + badge - 12;
-  const bot = y - 1;
-  page.drawLine({ start: { x: bx, y: bot }, end: { x: bx, y: top }, thickness: 3, color: rgb(1, 1, 1) });
-  for (const ly of [top - 4, (top + bot) / 2, bot + 4]) {
-    page.drawLine({
-      start: { x: bx - 8, y: ly },
-      end: { x: bx + 8, y: ly },
-      thickness: 3,
-      color: rgb(1, 1, 1),
-    });
-  }
-  // wordmark
-  x += badge + gap;
-  page.drawText(word1, { x, y, size, font: bold, color: INK });
-  page.drawText(word2, { x: x + w1, y, size, font: bold, color: ACCENT });
+  // screw base, just under the glass
+  const baseY = glassCy - r - 3;
+  page.drawLine({
+    start: { x: glassCx - r * 0.55, y: baseY },
+    end: { x: glassCx + r * 0.55, y: baseY },
+    thickness: 2.6,
+    color: INK,
+  });
+  page.drawLine({
+    start: { x: glassCx - r * 0.42, y: baseY - 4 },
+    end: { x: glassCx + r * 0.42, y: baseY - 4 },
+    thickness: 2.6,
+    color: INK,
+  });
+
+  // smarts (beneath CHIR)
+  const f2 = f1 * 0.58;
+  page.drawText("smarts", {
+    x: startX + 2,
+    y: y - f2 - 3,
+    size: f2,
+    font: light,
+    color: MUTED,
+  });
 }
 
 /** Tiled, rotated, faint repeating wordmark across the whole page. */
