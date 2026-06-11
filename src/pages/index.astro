@@ -1,15 +1,5 @@
 ---
-import { getSiteUrl } from "@/lib/env";
-
-const env = Astro.locals.runtime?.env;
-// Read SITE_URL from the environment (never hard-coded). In `astro dev` the
-// Cloudflare platform proxy supplies it from .dev.vars.
-let siteUrl = "(runtime not available)";
-try {
-  if (env) siteUrl = getSiteUrl(env);
-} catch (e) {
-  siteUrl = `⚠ ${(e as Error).message}`;
-}
+// Public landing page.
 ---
 
 <!doctype html>
@@ -17,7 +7,7 @@ try {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChiroSmarts — coming soon</title>
+    <title>ChiroSmarts — Oregon Chiropractic Assistant training</title>
     <style>
       :root { color-scheme: light dark; }
       body {
@@ -29,20 +19,29 @@ try {
         background: #0f172a;
         color: #e2e8f0;
       }
-      main { text-align: center; padding: 2rem; max-width: 36rem; }
+      main { text-align: center; padding: 2rem; max-width: 40rem; }
       h1 { font-size: 2rem; margin-bottom: 0.5rem; }
-      p { color: #94a3b8; line-height: 1.5; }
-      code {
-        background: #1e293b;
-        padding: 0.15rem 0.4rem;
-        border-radius: 0.3rem;
-        color: #7dd3fc;
-      }
-      .badge {
+      p { color: #94a3b8; line-height: 1.55; }
+      .cta {
         display: inline-block;
-        margin-top: 1.5rem;
-        font-size: 0.8rem;
-        color: #64748b;
+        margin-top: 0.5rem;
+        background: #0ea5e9;
+        color: #fff;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        text-decoration: none;
+      }
+      .disclaimer {
+        margin: 1.75rem auto 0;
+        max-width: 34rem;
+        text-align: left;
+        background: #0b2942;
+        border: 1px solid #1e496b;
+        color: #cfe8ff;
+        border-radius: 10px;
+        padding: 1rem 1.15rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
       }
     </style>
   </head>
@@ -50,20 +49,18 @@ try {
     <main>
       <h1>ChiroSmarts</h1>
       <p>
-        Oregon Chiropractic Assistant training &amp; continuing education.
-        The new platform is being built — milestone&nbsp;M0 (scaffold).
+        State-compliant Oregon Chiropractic Assistant training &amp; continuing
+        education.
       </p>
-      <p>
-        <a
-          href="/login"
-          style="display:inline-block;margin-top:0.5rem;background:#0ea5e9;color:#fff;padding:0.6rem 1.2rem;border-radius:8px;text-decoration:none"
-          >Sign in / Create account</a
-        >
+      <p><a class="cta" href="/login">Sign in / Create account</a></p>
+
+      <p class="disclaimer">
+        <strong>Please note:</strong> ChiroSmarts training and its final exam
+        confirm that you have completed and understood the coursework. They are
+        <strong>not</strong> the certification exam. Becoming a certified Oregon
+        Chiropractic Assistant requires passing the separate certification exam
+        administered through the NBCE.
       </p>
-      <p style="font-size:0.85rem;">
-        Serving from <code>{siteUrl}</code>
-      </p>
-      <span class="badge">SSR on Cloudflare · status: M1 (auth + roadmap)</span>
     </main>
   </body>
 </html>
