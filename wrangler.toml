@@ -12,21 +12,31 @@ pages_build_output_dir = "./dist"
 
 # Public, non-secret vars. SITE_URL must always come from the environment
 # (used for magic-link emails, Stripe redirects, certificate verification links).
-# Locally this is overridden by `.dev.vars`.
+# This is the PRODUCTION value; local `astro dev` overrides it via `.dev.vars`.
 [vars]
-SITE_URL = "http://localhost:4322"
+SITE_URL = "https://chirosmarts-site.pages.dev"
 
 # --- D1 (database) ---
 [[d1_databases]]
 binding = "DB"
 database_name = "chirosmarts"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "05f1cac3-0a6f-4b49-82f1-46d87f064445"
 migrations_dir = "./migrations"
 
 # --- R2 (documents: certificate PDFs, signed hands-on logs) ---
 [[r2_buckets]]
 binding = "DOCS"
 bucket_name = "chirosmarts-docs"
+
+# --- KV (required by the Astro Cloudflare adapter) ---
+# The adapter auto-enables `astro:session` backed by Workers KV and expects a
+# binding named SESSION; without it the DEPLOYED worker errors ("Invalid binding
+# SESSION"). We do NOT use astro:session — auth runs on the D1 `sessions` table —
+# so this namespace exists only to satisfy the adapter and stays empty.
+# Create it with:  wrangler kv namespace create SESSION
+[[kv_namespaces]]
+binding = "SESSION"
+id = "f2e867ee7e5040b3a67d71120ca61e24"
 
 # Cloudflare Stream is not a wrangler binding — it is accessed via the
 # Cloudflare API using CF_ACCOUNT_ID + CF_STREAM_API_TOKEN (see .dev.vars).

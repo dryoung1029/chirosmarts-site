@@ -80,49 +80,56 @@ npm run db:migrate:remote
 Migrations are plain SQL in `./migrations` and are applied with Wrangler, so the
 exact same SQL runs locally and on Cloudflare.
 
-## Cloudflare setup (run these once, then paste IDs into `wrangler.toml`)
+## Cloudflare setup + deploy
 
-These commands require `wrangler login`. They create the resources this app
-binds to. (The build runs without them; they're needed to deploy and to use
-remote D1/R2/Stream.)
+### One-shot (recommended)
+
+`scripts/cloudflare-setup.sh` provisions everything (D1, R2, and the KV
+namespace the Astro adapter requires), writes the resulting IDs into
+`wrangler.toml`, runs the remote migrations, builds, and deploys. It is
+idempotent — re-running reuses existing resources.
 
 ```bash
-# Authenticate
+# Authenticate interactively…
 npx wrangler login
+CLOUDFLARE_ACCOUNT_ID=<your-account-id> bash scripts/cloudflare-setup.sh
 
-# D1 database — copy the printed database_id into wrangler.toml ([[d1_databases]].database_id)
-npx wrangler d1 create chirosmarts
-
-# R2 bucket for documents (cert PDFs, signed hands-on logs)
-npx wrangler r2 bucket create chirosmarts-docs
-
-# Apply schema to the remote D1 and seed it
-npm run db:migrate:remote
-npm run db:seed:remote
-
-# Cloudflare Stream: enable it in the dashboard. Create an API token with
-# Stream:Edit, and a signing key for signed playback URLs. Put the values in
-# your deployed secrets (below). Stream is accessed via API, not a binding.
+# …or non-interactively with an API token (account scopes: D1:Edit,
+# Workers KV Storage:Edit, Workers R2 Storage:Edit, Cloudflare Pages:Edit,
+# Account Settings:Read):
+CLOUDFLARE_API_TOKEN=<token> CLOUDFLARE_ACCOUNT_ID=<id> bash scripts/cloudflare-setup.sh
 ```
 
-### Deploy to the pages.dev subdomain
+Resource IDs (`database_id`, KV `id`) are **not secrets** and are committed in
+`wrangler.toml`. API keys are **never** committed — set them as deployed secrets:
 
 ```bash
-# Build + deploy (creates the Pages project on first run)
-npm run deploy
+npx wrangler pages secret put RESEND_API_KEY --project-name chirosmarts-site
+npx wrangler pages secret put STRIPE_SECRET_KEY --project-name chirosmarts-site
+# …one per secret in .dev.vars.example. With no RESEND_API_KEY, sign-in links
+# are written to the Worker log (view with: wrangler pages deployment tail).
 
-# Set deployed secrets (repeat per secret; do NOT put these in wrangler.toml)
-npx wrangler pages secret put RESEND_API_KEY
-npx wrangler pages secret put STRIPE_SECRET_KEY
-# ...etc for each secret in .dev.vars.example
-
-# Set the deployed SITE_URL to the assigned subdomain, e.g.
-#   https://chirosmarts-site.pages.dev
-# (update wrangler.toml [vars].SITE_URL or set it as a Pages env var)
+# Seed the demo catalog on the remote DB if you want the course live:
+npm run db:seed:remote
 ```
 
-The custom domain attaches at launch; until then everything targets the
-auto-generated `*.pages.dev` URL via `SITE_URL`.
+### Manual equivalents
+
+```bash
+npx wrangler d1 create chirosmarts            # → paste database_id into wrangler.toml
+npx wrangler kv namespace create SESSION      # → paste id into wrangler.toml (adapter needs it)
+npx wrangler r2 bucket create chirosmarts-docs
+npm run db:migrate:remote
+npm run deploy                                # build + wrangler pages deploy ./dist
+```
+
+`SITE_URL` in `wrangler.toml` is the production value
+(`https://chirosmarts-site.pages.dev`); local `astro dev` overrides it via
+`.dev.vars`. The custom domain attaches at launch; until then everything targets
+the auto-generated `*.pages.dev` URL. **Cloudflare Stream** (signed playback) is
+accessed via API, not a binding — create a Stream API token + signing key and
+add them as deployed secrets when you upload the first videos (M2 player works
+with the dev simulator until then).
 
 ## Useful scripts
 

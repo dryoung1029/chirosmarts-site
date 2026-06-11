@@ -5,21 +5,27 @@ import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
 import { markIntakeComplete } from "@/lib/auth/users";
 import { instantiatePath, type PathChoice } from "@/lib/roadmap";
+import { createClinicForOwner } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
 import { nowIso } from "@/lib/time";
 
-const intakeSchema = z.object({
-  legalName: z.string().trim().min(1, "Please enter your legal name."),
-  displayName: z.string().trim().optional(),
-  path: z.enum(["initial", "renewal", "clinic_owner"]),
-  birthMonth: z.coerce.number().int().min(1).max(12),
-  clinicName: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  supervisingDcName: z.string().trim().optional(),
-  supervisingDcLicense: z.string().trim().optional(),
-  supervisingDcEmail: z.string().trim().optional(),
-  marketingConsent: z.string().optional(), // "yes" when checked
-});
+const intakeSchema = z
+  .object({
+    legalName: z.string().trim().min(1, "Please enter your legal name."),
+    displayName: z.string().trim().optional(),
+    path: z.enum(["initial", "renewal", "clinic_owner"]),
+    birthMonth: z.coerce.number().int().min(1).max(12),
+    clinicName: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    supervisingDcName: z.string().trim().optional(),
+    supervisingDcLicense: z.string().trim().optional(),
+    supervisingDcEmail: z.string().trim().optional(),
+    marketingConsent: z.string().optional(), // "yes" when checked
+  })
+  .refine((d) => d.path !== "clinic_owner" || !!d.clinicName, {
+    path: ["clinicName"],
+    message: "Clinic name is required for clinic-owner accounts.",
+  });
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const user = locals.user;
@@ -58,6 +64,23 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   await markIntakeComplete(db, user.id);
   await instantiatePath(db, user.id, d.path as PathChoice);
+
+  // Clinic owners get a clinic (with the owner as the first member) so they can
+  // buy seats and invite their CAs from the dashboard.
+  if (d.path === "clinic_owner" && d.clinicName) {
+    const clinic = await createClinicForOwner(
+      db,
+      user.id,
+      user.email,
+      d.clinicName,
+    );
+    await logEvent(db, {
+      userId: user.id,
+      type: "clinic_created",
+      payload: { clinicId: clinic.id, name: clinic.name },
+    });
+  }
+
   await logEvent(db, {
     userId: user.id,
     type: "intake_completed",

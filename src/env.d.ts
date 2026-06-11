@@ -18,8 +18,10 @@ interface CloudflareEnv {
   STRIPE_WEBHOOK_SECRET?: string;
   CF_ACCOUNT_ID?: string;
   CF_STREAM_API_TOKEN?: string;
+  CF_STREAM_CUSTOMER_CODE?: string; // customer-<code> playback subdomain
   CF_STREAM_SIGNING_KEY_ID?: string;
   CF_STREAM_SIGNING_KEY_PEM?: string;
+  CF_STREAM_SIGNING_KEY_JWK?: string; // base64-encoded JWK (RSA private key)
   ANTHROPIC_API_KEY?: string;
 }
 

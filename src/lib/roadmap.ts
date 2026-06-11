@@ -17,7 +17,7 @@ import { nowIso } from "@/lib/time";
 export const PATH_CHOICE_TO_SLUG: Record<string, string | null> = {
   initial: "oregon-ca-initial",
   renewal: "oregon-ca-renewal",
-  clinic_owner: null, // no CA roadmap yet — see PLAN.md open question
+  clinic_owner: "oregon-clinic-owner", // clinic-management roadmap (seats + invites)
 };
 
 export type PathChoice = keyof typeof PATH_CHOICE_TO_SLUG;

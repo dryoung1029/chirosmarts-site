@@ -9,10 +9,34 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M1 — Auth + intake + roadmap** (built on `m1-auth`, verified locally; awaiting review) |
+| Current milestone | **M2 — Course player + seat time + transcripts** (built + verified locally; awaiting review). **M3 — Quizzes + Stripe** is next. |
 | M0 | ✅ merged to `main` |
+| M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
+| M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
-| Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, …) merged to `main` |
+| Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### M2 — what shipped this build (course player + seat time + transcripts)
+- **`creditedSeconds()` compliance core** (`src/lib/seat-time.ts`): pure, dependency-free union-of-coverage with per-endpoint clamping; rewatch never double-counts, credit capped at duration, reversed/seek-back intervals dropped. **17 unit tests** (vitest). Seat time is always RECOMPUTED from `events`, never stored.
+- **Signed Stream playback** (`src/lib/stream.ts`, `POST /api/stream/token`): RS256 JWT minted in-Worker from a Stream signing key — no per-request Stream API call. Entitlement-checked; dev fallback when keys absent.
+- **Single-device lease** (`src/lib/playback-lease.ts`, `POST /api/playback/lease`): 90s TTL keyed to `user_id`+`device_id`; heartbeats renew, stale leases are stealable, a live lease on another device returns **409**.
+- **Heartbeat** (`POST /api/lessons/[id]/heartbeat`): append-only `lesson_heartbeat` events (typed position/wall/rate columns); lease-guarded; rejects playback rate over the per-course cap (400).
+- **Progress + resume** (`src/lib/progress.ts`, `GET /api/lessons/[id]/progress`): recomputed credited seconds, resume position, completion; course-wide sum drives the **final-exam gate** (`credited ≥ credit_hours × 3600`).
+- **Player UI**: `/learn/[courseSlug]` overview (enrollment-gated, Module 1 previewable, progress bar + gate state) and the lesson page with a client engine (`public/lesson-player.js`) — heartbeats fire ~every 20s only while playing in a focused tab; seeks/pauses break coverage runs; resume-to-position. Real Cloudflare Stream adapter **plus a local dev simulator** so seat-time is testable without uploading video.
+- **Transcript ingestion** (`src/lib/transcript.ts`, **8 unit tests**) + **`scripts/upload-to-stream.ts`**: uploads video to Stream, waits for ready/duration, attaches WebVTT captions, ingests cues into `lesson_transcripts` (one row per cue — M6 prerequisite), and registers the lesson. Has `--dry-run`.
+- **Env additions**: `CF_STREAM_CUSTOMER_CODE`, `CF_STREAM_SIGNING_KEY_JWK`. **Dev tooling**: `vitest` (approved), `npm run test`, `npm run stream:upload`.
+- **Verified locally** (curl + vitest, port 4322): 25/25 unit tests; heartbeat→recompute with rewatch (no double-count); full coverage → complete; lease 409 across devices; rate-cap 400; exam gate locks at 8h and unlocks at threshold; cross-course lesson URL → redirect; append-only events retained; `astro check` + build clean; upload-to-stream dry-run SQL correct.
+
+### M1.5 — what shipped this build (clinic-owner path)
+Owner decisions: **build a real clinic roadmap template**; staff CAs join by **invite-by-email (self-claim)**; seats are a **bulk pool**.
+- **Schema delta**: `clinics` (owner, name, `seats_purchased`) + `clinic_members` (owner/CA rows, invite token hash, `invited｜active｜removed`). Migration `0002_clinics.sql`.
+- **Clinic roadmap template** `oregon-clinic-owner` seeded (set up clinic → buy seats → invite CAs → track to certification). Intake `clinic_owner` now provisions a clinic + instantiates this path (clinic name required).
+- **Invite-by-email**: owner invites a CA → reserves a seat → emails a one-time claim link (`/clinic/join?token=…`). The token proves email ownership, so claiming both authenticates the CA and links membership (same model as a magic link). Dev fallback surfaces the claim link when `RESEND_API_KEY` is unset.
+- **Bulk seat pool**: seats consumed = CA members in (`invited｜active`), **recomputed never stored**. `seats_purchased` is the only stored figure. Seat purchase is **comped in test mode** when `STRIPE_SECRET_KEY` is unset (mirrors the email dev fallback); routes to Stripe Checkout in M3.
+- **Owner dashboard**: seat summary, buy-seats, invite form (disabled at 0 seats), CA roster with status + per-CA onboarding state, revoke-pending-invite (frees the seat).
+- **Append-only events**: `clinic_created`, `clinic_seats_granted`, `clinic_invite_sent`, `clinic_invite_accepted`, `clinic_invite_revoked`.
+- **Verified locally** (curl, port 4322): owner intake→clinic, comp seats, invite→claim→roster shows "Joined", seat exhaustion blocked, duplicate-invite blocked, revoke frees a seat. `astro check` clean.
+- **Dev tooling added**: `@astrojs/check` + `typescript` (dev-only, for the project's existing `typecheck` script).
 
 ### M1 — what shipped this build
 - **Magic-link auth** (`/login` → emailed one-time link → `/auth/callback`). Tokens are random, only their SHA-256 hash is stored, single-use, 15-min expiry. Login & signup are the same flow (no account-enumeration). Dev fallback: with no `RESEND_API_KEY`, the link is logged to the console and shown on the login page.
@@ -25,8 +49,8 @@
 - **Schema delta**: added `users.intake_completed_at`; `legal_name` now defaults to `""` (filled at intake). Migration `0001_add_intake_completed_at.sql`.
 - **Verified locally** (curl, port 4322): guard redirect, request-link, callback→session, intake gate, intake submit, dashboard roadmap (initial + renewal), single-use token reuse blocked, logout.
 
-### Open product question raised in M1
-- **Clinic-owner path:** there is no clinic roadmap template yet, so clinic owners are set to `clinic_admin` and land on a dashboard placeholder. Confirm desired behavior (own onboarding path? seat management? — currently a deferred feature). Defaulted, not invented.
+### Resolved — clinic-owner path (was the M1 open question)
+Owner chose to **build a real clinic roadmap template** (M1.5, above): clinic owners are `clinic_admin`, get the `oregon-clinic-owner` roadmap, buy a **bulk seat pool**, and invite CAs by **email self-claim**. A CA's certification path is whatever they pick at their own intake (initial); clinic membership is independent of it.
 
 **Build order is strict and one-at-a-time: M0 → M1 → M2 → M3 → M4 → M5 → M6. Confirm before moving between milestones.**
 
@@ -85,6 +109,14 @@ Principles: `events` append-only; derived totals always recomputed, never stored
 ### `playback_leases`  *(single active playback device)*
 `id` · `user_id` · `lesson_id` · `device_id` · `acquired_at` · `expires_at` · `last_renewed_at`
 > One live (non-expired) lease per user. Renewed by heartbeats; stale leases are stealable.
+
+### `clinics`  *(M1.5 — clinic-owner path)*
+`id` · `owner_user_id` · `name` · `seats_purchased` (int, default 0 — the only stored seat figure) · `created_at` · `updated_at`
+> Seats *consumed* are recomputed from `clinic_members`, never stored.
+
+### `clinic_members`  *(M1.5)*
+`id` · `clinic_id` · `user_id?` (null until claimed) · `email` · `role` (`owner｜ca`) · `status` (`invited｜active｜removed`) · `invite_token_hash?` (sha-256; null for owner/claimed) · `invite_expires_at?` · `invited_at` · `claimed_at?` · `created_at`
+> One `owner` row per clinic; each invited CA is a `ca` row. Seat consumed by CA rows in (`invited｜active`).
 
 ### `courses`
 `id` · `slug` (unique) · `title` · `description?` · `credit_hours` (real) · `topic_category` (`general｜vitals｜cultural_competency｜hipaa`) · `state` (`oregon`) · `audience` (`ca｜dc`) · `content_type` (`ce_course｜library_episode`) · `access_model` (`one_time_purchase｜subscription｜free`) · `price_cents` (default `14900`) · `stripe_price_id?` · `status` (`draft｜published｜archived`) · `pass_threshold` (real, default `0.80`) · `max_playback_rate` (real, default `1.5`) · `instructor_name` (default `Jason Young, DC`) · `certifying_body_line?` · `created_at` · `updated_at`
