@@ -194,11 +194,19 @@ const statusColor: Record<string, string> = {
               >
                 {s.status === "complete" ? "✓" : s.position}
               </span>
-              <span style="flex:1">{s.title}</span>
+              <span style="flex:1">
+                {s.href ? <a href={s.href}>{s.title}</a> : s.title}
+              </span>
               <span
                 style={`font-size:0.8rem;color:${statusColor[s.status]}`}
               >
-                {statusLabel[s.status] ?? s.status}
+                {s.href && s.status !== "complete" ? (
+                  <a href={s.href} style={`color:${statusColor[s.status]}`}>
+                    {statusLabel[s.status] ?? s.status} →
+                  </a>
+                ) : (
+                  statusLabel[s.status] ?? s.status
+                )}
               </span>
             </li>
           ))}

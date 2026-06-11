@@ -103,12 +103,40 @@ export async function getUserRoadmap(db: Db, userId: string) {
       .from(schema.pathTemplates)
       .where(eq(schema.pathTemplates.id, p.templateId))
       .get();
-    const steps = await db
+    const rows = await db
       .select()
       .from(schema.userSteps)
       .where(eq(schema.userSteps.userPathId, p.id))
       .orderBy(asc(schema.userSteps.position))
       .all();
+
+    // Augment each step with a link target where one makes sense — today that's
+    // course steps, which point at the course player (unless still locked).
+    const steps = [];
+    for (const step of rows) {
+      let href: string | null = null;
+      const tstep = await db
+        .select({
+          stepType: schema.pathTemplateSteps.stepType,
+          courseId: schema.pathTemplateSteps.courseId,
+        })
+        .from(schema.pathTemplateSteps)
+        .where(eq(schema.pathTemplateSteps.id, step.templateStepId))
+        .get();
+      if (
+        tstep?.stepType === "course" &&
+        tstep.courseId &&
+        step.status !== "locked"
+      ) {
+        const course = await db
+          .select({ slug: schema.courses.slug })
+          .from(schema.courses)
+          .where(eq(schema.courses.id, tstep.courseId))
+          .get();
+        if (course) href = `/learn/${course.slug}`;
+      }
+      steps.push({ ...step, href });
+    }
     result.push({ path: p, template, steps });
   }
   return result;
