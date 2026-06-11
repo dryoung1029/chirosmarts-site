@@ -60,12 +60,7 @@ export const POST: APIRoute = async ({ request, locals, params, redirect }) => {
     if (!(await hasActiveEnrollment(db, user.id, course.id))) {
       return redirect(`/learn/${course.slug}`, 302);
     }
-    const seat = await getCourseSeatTime(
-      db,
-      user.id,
-      course.id,
-      course.creditHours,
-    );
+    const seat = await getCourseSeatTime(db, user.id, course.id);
     if (!seat.examUnlocked) {
       return redirect(`${backToQuiz}?locked=1`, 303);
     }

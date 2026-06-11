@@ -16,13 +16,12 @@ if (!course) return Astro.redirect("/dashboard", 302);
 
 const structure = await getCourseStructure(db, course.id);
 const enrolled = await hasActiveEnrollment(db, user.id, course.id);
-const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+const seat = await getCourseSeatTime(db, user.id, course.id);
 
 const fmtMin = (s: number) => (s / 60).toFixed(0);
-const requiredMin = (course.creditHours * 60).toFixed(0);
-const pct = seat.requiredSeconds
-  ? Math.min(100, Math.round((seat.creditedSeconds / seat.requiredSeconds) * 100))
-  : 0;
+const pct = Math.round(seat.watchedFraction * 100);
+const thresholdPct = Math.round(seat.completionThreshold * 100);
+const lessonsRemaining = seat.perLesson.filter((p) => !p.meetsThreshold).length;
 
 // Quick lookup: per-lesson credited seconds.
 const lessonCredit = new Map(seat.perLesson.map((p) => [p.lessonId, p]));
@@ -53,17 +52,17 @@ const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : fal
   <div class="panel">
     <h2>Your progress</h2>
     <p style="margin-top:0">
-      Credited content time:{" "}
-      <strong style="color:var(--text)">{fmtMin(seat.creditedSeconds)} min</strong>{" "}
-      of {requiredMin} min required ({course.creditHours} credit hours).
+      Course content watched:{" "}
+      <strong style="color:var(--text)">{pct}%</strong>{" "}
+      ({fmtMin(seat.creditedSeconds)} of {fmtMin(seat.totalContentSeconds)} min).
     </p>
     <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
       <div style={`height:100%;width:${pct}%;background:var(--accent)`}></div>
     </div>
     <p class="muted" style="margin:0.75rem 0 0">
       {seat.examUnlocked
-        ? "✓ Seat-time requirement met — the final exam is unlocked."
-        : "The final exam unlocks once you reach the required content time across all lessons."}
+        ? "✓ You've watched the required content — the final exam is unlocked."
+        : `The final exam unlocks once you've watched at least ${thresholdPct}% of every lesson${lessonsRemaining > 0 ? ` (${lessonsRemaining} lesson${lessonsRemaining === 1 ? "" : "s"} to go)` : ""}.`}
     </p>
   </div>
 

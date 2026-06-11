@@ -39,10 +39,11 @@ if (quiz.moduleId) {
   if (!(await hasActiveEnrollment(db, user.id, course.id))) {
     return Astro.redirect(`/learn/${courseSlug}`, 302);
   }
-  const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+  const seat = await getCourseSeatTime(db, user.id, course.id);
   if (!seat.examUnlocked) {
     locked = true;
-    lockReason = `The final exam unlocks once you've completed the required content time (${(course.creditHours * 60).toFixed(0)} minutes). You're at ${(seat.creditedSeconds / 60).toFixed(0)} minutes.`;
+    const remaining = seat.perLesson.filter((p) => !p.meetsThreshold).length;
+    lockReason = `The final exam unlocks once you've watched at least ${Math.round(seat.completionThreshold * 100)}% of every lesson. You have ${remaining} lesson${remaining === 1 ? "" : "s"} still to finish.`;
   }
 }
 
