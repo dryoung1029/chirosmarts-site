@@ -494,7 +494,8 @@ export const certificates = sqliteTable(
     courseId: text("course_id")
       .notNull()
       .references(() => courses.id),
-    verificationCode: text("verification_code").notNull().unique(), // public lookup
+    verificationCode: text("verification_code").notNull().unique(), // public lookup (random, unguessable)
+    certNumber: text("cert_number").unique(), // human-readable serial, e.g. CS-2026-0001
     legalNameSnapshot: text("legal_name_snapshot").notNull(),
     courseTitleSnapshot: text("course_title_snapshot").notNull(),
     creditHoursSnapshot: real("credit_hours_snapshot").notNull(),

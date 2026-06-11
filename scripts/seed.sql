@@ -30,16 +30,23 @@ VALUES
    'ce_course', 'one_time_purchase', 14900, 'published', 0.8, 1.5,
    'Jason Young, DC');
 
--- Module 1 (free preview) and Module 2 (paywalled)
+-- Modules: Module 1 free preview; paywall begins at Module 2.
+-- (stream_video_uid values are real Cloudflare Stream IDs — not secrets;
+-- playback is gated by signed tokens. Replace titles via M5 admin later.)
 INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
-  ('mod_intro', 'crs_or_ca_initial', 1, 'Welcome & Orientation', 'Free preview module.', 1),
-  ('mod_scope', 'crs_or_ca_initial', 2, 'Scope of Practice', 'Paywall begins here.', 0);
+  ('mod_intro', 'crs_or_ca_initial', 1, 'Module 1 — Welcome & Orientation', 'Free preview module.', 1),
+  ('mod_scope', 'crs_or_ca_initial', 2, 'Module 2 — Scope of Practice', 'Paywall begins here.', 0),
+  ('mod_3',     'crs_or_ca_initial', 3, 'Module 3', NULL, 0),
+  ('mod_4',     'crs_or_ca_initial', 4, 'Module 4', NULL, 0);
 
--- A lesson in Module 1
+-- One lesson (video) per module.
 INSERT OR REPLACE INTO lessons
   (id, module_id, position, title, stream_video_uid, duration_seconds, evidence_type)
 VALUES
-  ('lsn_welcome', 'mod_intro', 1, 'Welcome to ChiroSmarts', NULL, 600, 'playback_heartbeat');
+  ('lsn_welcome', 'mod_intro', 1, 'Module 1 — Welcome & Orientation', 'bac9bcf3e19dae03b2e3337119aa34e0', 3139, 'playback_heartbeat'),
+  ('lsn_mod2',    'mod_scope', 1, 'Module 2 — Scope of Practice',      '3bf8a9082418fd63c108f248f2db4419', 2858, 'playback_heartbeat'),
+  ('lsn_mod3',    'mod_3',     1, 'Module 3',                          '37ee2d77b8e13d02da0a71bfcc01505c', 3230, 'playback_heartbeat'),
+  ('lsn_mod4',    'mod_4',     1, 'Module 4',                          '5dee0067b3bf63c439bb438ee9603e9f', 2218, 'playback_heartbeat');
 
 -- Module 1 knowledge check (attempt-to-proceed; no passing score required)
 INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title) VALUES

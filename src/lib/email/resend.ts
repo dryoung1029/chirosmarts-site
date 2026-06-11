@@ -16,6 +16,7 @@ export interface SendEmailArgs {
   subject: string;
   html: string;
   text: string;
+  attachments?: { filename: string; content: string }[]; // content = base64
 }
 
 export interface SendEmailResult {
@@ -53,6 +54,7 @@ export async function sendEmail(
         subject: args.subject,
         html: args.html,
         text: args.text,
+        ...(args.attachments ? { attachments: args.attachments } : {}),
       }),
     });
 

@@ -122,7 +122,12 @@ let adapter; // set after token resolution
 
 async function tick() {
   const playing = adapter.isPlaying();
-  const focused = document.hasFocus() && document.visibilityState === "visible";
+  // Tab must be visible. We deliberately do NOT use document.hasFocus(): the
+  // Stream player is a cross-origin iframe, so interacting with it (play/seek)
+  // moves focus INTO the iframe and would make hasFocus() report the page as
+  // unfocused — which previously froze seat-time while the user was actively
+  // watching or scrubbing. Visibility is the right anti-background-tab gate.
+  const focused = document.visibilityState === "visible";
   const rate = adapter.getRate();
   const pos = adapter.getCurrentTime();
 
@@ -276,8 +281,11 @@ function StreamAdapter(mount, iframeUrl) {
       const player = window.Stream(iframe);
       let resumed = false;
       player.addEventListener("loadedmetadata", () => {
-        if (!resumed && cfg.resumeSeconds > 0) {
-          player.currentTime = cfg.resumeSeconds;
+        if (!resumed) {
+          // Resume where they left off — but never park them at the very end
+          // (a finished video would otherwise reopen stuck on the last frame).
+          const r = cfg.resumeSeconds;
+          if (r > 5 && r < cfg.durationSeconds - 15) player.currentTime = r;
           resumed = true;
         }
         if (player.playbackRate > cfg.maxPlaybackRate) {

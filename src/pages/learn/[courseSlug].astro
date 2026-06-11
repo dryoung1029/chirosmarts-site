@@ -5,6 +5,7 @@ import { getCourseBySlug, getCourseStructure } from "@/lib/courses";
 import { hasActiveEnrollment } from "@/lib/entitlement";
 import { getCourseSeatTime } from "@/lib/progress";
 import { getModuleQuiz, getFinalExam, hasPassed } from "@/lib/quiz";
+import { getActiveCertificate, issueAndEmailCertificate } from "@/lib/certificate";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
@@ -16,13 +17,12 @@ if (!course) return Astro.redirect("/dashboard", 302);
 
 const structure = await getCourseStructure(db, course.id);
 const enrolled = await hasActiveEnrollment(db, user.id, course.id);
-const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+const seat = await getCourseSeatTime(db, user.id, course.id);
 
 const fmtMin = (s: number) => (s / 60).toFixed(0);
-const requiredMin = (course.creditHours * 60).toFixed(0);
-const pct = seat.requiredSeconds
-  ? Math.min(100, Math.round((seat.creditedSeconds / seat.requiredSeconds) * 100))
-  : 0;
+const pct = Math.round(seat.watchedFraction * 100);
+const thresholdPct = Math.round(seat.completionThreshold * 100);
+const lessonsRemaining = seat.perLesson.filter((p) => !p.meetsThreshold).length;
 
 // Quick lookup: per-lesson credited seconds.
 const lessonCredit = new Map(seat.perLesson.map((p) => [p.lessonId, p]));
@@ -36,6 +36,20 @@ for (const { module } of structure) {
 }
 const finalExam = await getFinalExam(db, course.id);
 const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : false;
+
+// Certificate (issued when the final exam is passed). Self-heal: if they passed
+// but have no certificate yet (e.g. legal name added after the exam, or a prior
+// issuance error), issue + email it now. Idempotent.
+let certificate = (await getActiveCertificate(db, user.id, course.id)) ?? null;
+if (!certificate && finalPassed && user.legalName.trim()) {
+  const issued = await issueAndEmailCertificate(env, db, {
+    userId: user.id,
+    courseId: course.id,
+    email: user.email,
+  });
+  certificate = issued?.certificate ?? null;
+}
+const needsLegalName = finalPassed && !certificate && !user.legalName.trim();
 ---
 
 <Layout title={course.title} showNav={true}>
@@ -53,17 +67,17 @@ const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : fal
   <div class="panel">
     <h2>Your progress</h2>
     <p style="margin-top:0">
-      Credited content time:{" "}
-      <strong style="color:var(--text)">{fmtMin(seat.creditedSeconds)} min</strong>{" "}
-      of {requiredMin} min required ({course.creditHours} credit hours).
+      Course content watched:{" "}
+      <strong style="color:var(--text)">{pct}%</strong>{" "}
+      ({fmtMin(seat.creditedSeconds)} of {fmtMin(seat.totalContentSeconds)} min).
     </p>
     <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
       <div style={`height:100%;width:${pct}%;background:var(--accent)`}></div>
     </div>
     <p class="muted" style="margin:0.75rem 0 0">
       {seat.examUnlocked
-        ? "✓ Seat-time requirement met — the final exam is unlocked."
-        : "The final exam unlocks once you reach the required content time across all lessons."}
+        ? "✓ You've watched the required content — the final exam is unlocked."
+        : `The final exam unlocks once you've watched at least ${thresholdPct}% of every lesson${lessonsRemaining > 0 ? ` (${lessonsRemaining} lesson${lessonsRemaining === 1 ? "" : "s"} to go)` : ""}.`}
     </p>
   </div>
 
@@ -144,6 +158,11 @@ const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : fal
 
   <div class="panel">
     <h2>Final exam {finalPassed && <span style="color:var(--ok);font-size:0.9rem">· ✓ passed</span>}</h2>
+    <div class="notice" style="background:#0b2942;border:1px solid #1e496b;color:#cfe8ff">
+      <strong>Not the certification exam.</strong> This confirms you understood the
+      training material. It does <strong>not</strong> certify you — Oregon CA
+      certification requires the separate exam administered through the NBCE.
+    </div>
     {
       !finalExam ? (
         <p style="margin-top:0">The final exam isn't published yet.</p>
@@ -162,4 +181,39 @@ const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : fal
       )
     }
   </div>
+
+  {
+    certificate && (
+      <div class="panel" style="border-color:#1e7a48">
+        <h2 style="color:#22c55e;margin-bottom:0.25rem">🎓 Certificate earned</h2>
+        <p style="margin-top:0">
+          Certificate <strong>{certificate.certNumber}</strong> — issued to{" "}
+          {certificate.legalNameSnapshot}. A copy was emailed to you.
+        </p>
+        <p style="margin:0">
+          <a class="btn" href={`/certificate/${certificate.verificationCode}.pdf`}>
+            Download certificate (PDF)
+          </a>
+        </p>
+        <p class="muted" style="margin:0.75rem 0 0;font-size:0.9rem">
+          Verification code <strong>{certificate.verificationCode}</strong> ·{" "}
+          <a href={`/verify/${certificate.verificationCode}`}>public verify page</a>
+        </p>
+      </div>
+    )
+  }
+
+  {
+    needsLegalName && (
+      <div class="panel" style="border-color:var(--warn)">
+        <h2 style="color:var(--warn)">One step left for your certificate</h2>
+        <p style="margin-top:0">
+          You passed the final exam, but we need your full legal name before we
+          can issue your certificate.{" "}
+          <a href="/intake">Add your legal name</a> and it will be issued
+          automatically.
+        </p>
+      </div>
+    )
+  }
 </Layout>

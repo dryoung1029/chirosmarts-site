@@ -39,10 +39,11 @@ if (quiz.moduleId) {
   if (!(await hasActiveEnrollment(db, user.id, course.id))) {
     return Astro.redirect(`/learn/${courseSlug}`, 302);
   }
-  const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+  const seat = await getCourseSeatTime(db, user.id, course.id);
   if (!seat.examUnlocked) {
     locked = true;
-    lockReason = `The final exam unlocks once you've completed the required content time (${(course.creditHours * 60).toFixed(0)} minutes). You're at ${(seat.creditedSeconds / 60).toFixed(0)} minutes.`;
+    const remaining = seat.perLesson.filter((p) => !p.meetsThreshold).length;
+    lockReason = `The final exam unlocks once you've watched at least ${Math.round(seat.completionThreshold * 100)}% of every lesson. You have ${remaining} lesson${remaining === 1 ? "" : "s"} still to finish.`;
   }
 }
 
@@ -78,6 +79,21 @@ const correctById = new Map(
       : "Knowledge check — answer to continue. There's no passing score required here."}
   </p>
 
+  {
+    isFinal && (
+      <div
+        class="notice"
+        style="background:#0b2942;border:1px solid #1e496b;color:#cfe8ff"
+      >
+        <strong>This is not the certification exam.</strong> This exam only
+        confirms you understood the ChiroSmarts training material. It does
+        <strong> not</strong> certify you as a Chiropractic Assistant — Oregon CA
+        certification requires passing the separate certification exam
+        administered through the NBCE.
+      </div>
+    )
+  }
+
   {locked && <div class="notice warn">{lockReason}</div>}
 
   {
@@ -86,7 +102,7 @@ const correctById = new Map(
         You scored <strong>{(justAttempt.score * 100).toFixed(0)}%</strong>
         {isFinal
           ? justAttempt.passed
-            ? " — passed! Your enrollment is marked complete. Your certificate will be available in a later build (M4)."
+            ? " — passed! You've completed the ChiroSmarts training (this is not certification — see the note above). Your completion certificate will be available in a later build (M4)."
             : " — not passing yet. Review and try again."
           : " — knowledge check recorded. You can continue."}
       </div>
