@@ -61,6 +61,31 @@ INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_corre
 INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title, pass_threshold) VALUES
   ('qz_final', 'crs_or_ca_initial', NULL, 'final_exam', 'Final Exam', 0.8);
 
+-- Placeholder final-exam questions (replace with real content via M5 admin).
+INSERT OR REPLACE INTO questions (id, quiz_id, position, prompt, type, explanation) VALUES
+  ('qf_1', 'qz_final', 1, 'How many total hours are required for Oregon initial CA certification?', 'single_choice', 'Twelve total: 8 didactic + 4 supervised hands-on.'),
+  ('qf_2', 'qz_final', 2, 'A Chiropractic Assistant may adjust the spine when the supervising DC is busy.', 'true_false', 'False — spinal adjustment is outside a CA''s scope of practice.'),
+  ('qf_3', 'qz_final', 3, 'Which of these are within a CA''s typical scope? (select all that apply)', 'multi_choice', 'CAs take vitals and prepare patients; they do not diagnose or adjust.'),
+  ('qf_4', 'qz_final', 4, 'Patient health information must be kept confidential under which law?', 'single_choice', 'HIPAA governs protected health information.'),
+  ('qf_5', 'qz_final', 5, 'Within what period must a new Oregon CA obtain BLS certification?', 'single_choice', 'Within the first year of certification.');
+
+INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_correct) VALUES
+  ('of_1a', 'qf_1', 1, '8 hours', 0),
+  ('of_1b', 'qf_1', 2, '12 hours', 1),
+  ('of_1c', 'qf_1', 3, '16 hours', 0),
+  ('of_2a', 'qf_2', 1, 'True', 0),
+  ('of_2b', 'qf_2', 2, 'False', 1),
+  ('of_3a', 'qf_3', 1, 'Take and record vital signs', 1),
+  ('of_3b', 'qf_3', 2, 'Prepare patients for the DC', 1),
+  ('of_3c', 'qf_3', 3, 'Diagnose conditions', 0),
+  ('of_3d', 'qf_3', 4, 'Perform spinal adjustments', 0),
+  ('of_4a', 'qf_4', 1, 'HIPAA', 1),
+  ('of_4b', 'qf_4', 2, 'OSHA', 0),
+  ('of_4c', 'qf_4', 3, 'FERPA', 0),
+  ('of_5a', 'qf_5', 1, 'Within the first year', 1),
+  ('of_5b', 'qf_5', 2, 'Within five years', 0),
+  ('of_5c', 'qf_5', 3, 'Never required', 0);
+
 -- ---------------------------------------------------------------------------
 -- Path template: Oregon CA initial certification roadmap
 -- ---------------------------------------------------------------------------

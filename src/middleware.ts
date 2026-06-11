@@ -19,6 +19,7 @@ const PUBLIC_PATHS = new Set<string>([
   "/api/auth/request-link",
   "/auth/callback",
   "/clinic/join", // clinic invite claim (token authenticates the CA)
+  "/api/stripe/webhook", // server-to-server; trust comes from the signature
 ]);
 
 function isPublic(pathname: string): boolean {

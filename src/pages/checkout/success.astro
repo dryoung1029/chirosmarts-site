@@ -1,0 +1,37 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb } from "@/db/client";
+import { getCourseBySlug } from "@/lib/courses";
+import { hasActiveEnrollment } from "@/lib/entitlement";
+
+const user = Astro.locals.user!;
+const db = getDb(Astro.locals.runtime.env);
+const slug = Astro.url.searchParams.get("course");
+const course = slug ? await getCourseBySlug(db, slug) : null;
+
+// The webhook activates the enrollment; it may lag a beat behind this redirect.
+const active = course ? await hasActiveEnrollment(db, user.id, course.id) : false;
+---
+
+<Layout title="Payment received" showNav={true}>
+  <div class="panel">
+    <h1>Thank you — payment received</h1>
+    {
+      course ? (
+        <>
+          <p>
+            You're enrolled in <strong>{course.title}</strong>.
+            {active
+              ? " Your access is active."
+              : " Your access will be active within a few seconds once payment is confirmed."}
+          </p>
+          <p style="margin-top:1rem">
+            <a class="btn" href={`/learn/${course.slug}`}>Start the course →</a>
+          </p>
+        </>
+      ) : (
+        <p><a href="/dashboard">Back to your dashboard →</a></p>
+      )
+    }
+  </div>
+</Layout>

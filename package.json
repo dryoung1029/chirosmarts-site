@@ -23,6 +23,7 @@
     "@astrojs/cloudflare": "^12.6.0",
     "astro": "^5.13.0",
     "drizzle-orm": "^0.44.2",
+    "stripe": "^22.2.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {

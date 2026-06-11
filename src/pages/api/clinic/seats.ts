@@ -8,9 +8,15 @@
  */
 import type { APIRoute } from "astro";
 import { getDb } from "@/db/client";
+import { getSiteUrl } from "@/lib/env";
 import { requireOwnedClinic } from "@/lib/clinic-guard";
 import { grantSeats } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
+import { isStripeConfigured, createSeatsCheckout } from "@/lib/stripe";
+import { schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+
+const SEAT_PRICE_CENTS = 14900; // per-seat = the course price ($149)
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const env = locals.runtime.env;
@@ -28,8 +34,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     );
   }
 
-  // Stripe lands in M3; until then comp the seats so the flow is testable.
-  if (!env.STRIPE_SECRET_KEY) {
+  // Dev/comp path: no Stripe key → grant seats immediately (test mode).
+  if (!isStripeConfigured(env)) {
     await grantSeats(db, clinic, count);
     await logEvent(db, {
       userId: locals.user!.id,
@@ -39,9 +45,21 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     return redirect(`/dashboard?seats=${count}`, 303);
   }
 
-  // M3: create a Stripe Checkout session for `count` seats and redirect to it.
-  return redirect(
-    `/dashboard?error=${encodeURIComponent("Seat purchase checkout is coming in M3.")}`,
-    303,
-  );
+  // Stripe Checkout for `count` seats; the webhook grants them on payment.
+  const owner = await db
+    .select({ email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, locals.user!.id))
+    .get();
+  const site = getSiteUrl(env);
+  const url = await createSeatsCheckout(env, {
+    unitPriceCents: SEAT_PRICE_CENTS,
+    quantity: count,
+    customerEmail: owner?.email,
+    clientReferenceId: locals.user!.id,
+    metadata: { kind: "seats", clinicId: clinic.id, count: String(count) },
+    successUrl: `${site}/dashboard?seats=${count}`,
+    cancelUrl: `${site}/dashboard?error=${encodeURIComponent("Seat purchase canceled.")}`,
+  });
+  return redirect(url, 303);
 };

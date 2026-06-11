@@ -1,0 +1,154 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb } from "@/db/client";
+import { schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { getCourseBySlug } from "@/lib/courses";
+import { getQuizWithQuestions, getAttempts } from "@/lib/quiz";
+import { canAccessModule, hasActiveEnrollment } from "@/lib/entitlement";
+import { getCourseSeatTime } from "@/lib/progress";
+import { scoreAttempt, type AnswerMap } from "@/lib/quiz-scoring";
+
+const user = Astro.locals.user!;
+const db = getDb(Astro.locals.runtime.env);
+const { courseSlug, quizId } = Astro.params;
+
+const course = await getCourseBySlug(db, courseSlug!);
+if (!course) return Astro.redirect("/dashboard", 302);
+
+const loaded = await getQuizWithQuestions(db, quizId!);
+if (!loaded || loaded.quiz.courseId !== course.id) {
+  return Astro.redirect(`/learn/${courseSlug}`, 302);
+}
+const { quiz, questions } = loaded;
+const isFinal = quiz.kind === "final_exam";
+
+// --- Entitlement + gate ---
+let locked = false;
+let lockReason = "";
+if (quiz.moduleId) {
+  const module = await db
+    .select()
+    .from(schema.modules)
+    .where(eq(schema.modules.id, quiz.moduleId))
+    .get();
+  if (!module || !(await canAccessModule(db, user.id, module))) {
+    return Astro.redirect(`/learn/${courseSlug}`, 302);
+  }
+} else {
+  if (!(await hasActiveEnrollment(db, user.id, course.id))) {
+    return Astro.redirect(`/learn/${courseSlug}`, 302);
+  }
+  const seat = await getCourseSeatTime(db, user.id, course.id, course.creditHours);
+  if (!seat.examUnlocked) {
+    locked = true;
+    lockReason = `The final exam unlocks once you've completed the required content time (${(course.creditHours * 60).toFixed(0)} minutes). You're at ${(seat.creditedSeconds / 60).toFixed(0)} minutes.`;
+  }
+}
+
+const attempts = await getAttempts(db, user.id, quizId!);
+const passedEver = attempts.some((a) => a.passed);
+const threshold = quiz.passThreshold ?? course.passThreshold;
+
+// If we just submitted, re-grade that attempt for per-question feedback.
+const justAttemptId = Astro.url.searchParams.get("attempt");
+let feedback: ReturnType<typeof scoreAttempt> | null = null;
+let justAttempt = attempts.find((a) => a.id === justAttemptId) ?? null;
+if (justAttempt) {
+  feedback = scoreAttempt(
+    questions.map((q) => ({
+      id: q.id,
+      type: q.type,
+      options: q.options.map((o) => ({ id: o.id, isCorrect: o.isCorrect })),
+    })),
+    (justAttempt.answers as AnswerMap) ?? {},
+  );
+}
+const correctById = new Map(
+  feedback?.perQuestion.map((p) => [p.questionId, p.correct]) ?? [],
+);
+---
+
+<Layout title={quiz.title} showNav={true}>
+  <p style="margin:0"><a href={`/learn/${courseSlug}`}>← {course.title}</a></p>
+  <h1>{quiz.title}</h1>
+  <p class="muted" style="margin-top:0">
+    {isFinal
+      ? `Final exam — you need ${(threshold * 100).toFixed(0)}% to pass.`
+      : "Knowledge check — answer to continue. There's no passing score required here."}
+  </p>
+
+  {locked && <div class="notice warn">{lockReason}</div>}
+
+  {
+    justAttempt && (
+      <div class={`notice ${justAttempt.passed || !isFinal ? "ok" : "err"}`}>
+        You scored <strong>{(justAttempt.score * 100).toFixed(0)}%</strong>
+        {isFinal
+          ? justAttempt.passed
+            ? " — passed! Your enrollment is marked complete. Your certificate will be available in a later build (M4)."
+            : " — not passing yet. Review and try again."
+          : " — knowledge check recorded. You can continue."}
+      </div>
+    )
+  }
+
+  {
+    attempts.length > 0 && (
+      <p class="muted">
+        {attempts.length} attempt{attempts.length === 1 ? "" : "s"} ·
+        best {(Math.max(...attempts.map((a) => a.score)) * 100).toFixed(0)}%
+        {passedEver && " · ✓ passed"}
+      </p>
+    )
+  }
+
+  {
+    !locked && (
+      <form method="POST" action={`/api/quizzes/${quizId}/attempt`}>
+        {questions.map((q) => (
+          <div class="panel">
+            <p style="color:var(--text);margin:0 0 0.75rem">
+              {q.position}. {q.prompt}
+            </p>
+            {q.options.map((o) => (
+              <label
+                class="check"
+                style={`margin:0.3rem 0;${
+                  feedback ? (o.isCorrect ? "color:var(--ok)" : "") : ""
+                }`}
+              >
+                <input
+                  type={q.type === "multi_choice" ? "checkbox" : "radio"}
+                  name={`q:${q.id}`}
+                  value={o.id}
+                />
+                <span>
+                  {o.text}
+                  {feedback && o.isCorrect && " ✓"}
+                </span>
+              </label>
+            ))}
+            {feedback && q.explanation && (
+              <p class="muted" style="margin:0.5rem 0 0">
+                {correctById.get(q.id) ? "Correct. " : ""}
+                {q.explanation}
+              </p>
+            )}
+          </div>
+        ))}
+        <button type="submit">
+          {attempts.length > 0 ? "Submit again" : "Submit answers"}
+        </button>
+      </form>
+    )
+  }
+
+  {
+    !isFinal && (passedEver || attempts.length > 0) && (
+      <p style="margin-top:1rem">
+        <a class="btn" href={`/learn/${courseSlug}`}>Continue the course →</a>
+      </p>
+    )
+  }
+</Layout>
