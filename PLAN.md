@@ -9,12 +9,36 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M6 — AI course tutor** (built + deployed). M0–M5 shipped. **All milestones complete** — set `ANTHROPIC_API_KEY` in prod to switch the tutor on. |
+| Current milestone | **Multi-course expansion** — Phases 1–3 + pricing model + legal pages built. Phase 4 (per-course clinic seat pools) pending DDL review. M0–M6 shipped. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### Multi-course expansion — Phases 1–3 (shipped)
+- **Phase 1 — exam gate / `required_seat_minutes`.** New nullable `courses.required_seat_minutes` (content-minutes floor, clamped to runtime so never unsatisfiable), **decoupled from `credit_hours`** (cert figure only). Note: the live gate never actually used `credit_hours × 60` — it was already per-lesson-90% coverage; this adds the explicit floor + admin knob. Seeded single-module **Vitals** ($39, `rsm=5`, credit 1h) and **HIPAA** ($35) courses.
+- **Phase 2 — catalog + multi-course.** Public `/courses` catalog + `/courses/[slug]` landing (only content is gated, Q6). Dashboard "Your courses" grid. Checkout + webhook generalized to a **course-id list** (bundle-ready).
+- **Phase 3 — course resources.** `course_resources` table (R2-backed) for assets the course PROVIDES (e.g. the Vitals practice-log PDF) — admin upload/delete in the content editor, entitlement-gated download route, downloads section on the course page. Distinct from `documents` (student's uploaded evidence).
+
+### Pricing model (Item 1 — shipped)
+- Price card lives in the DB (`courses.price_cents`) as the **single source of truth**; **zero hard-coded prices** in code (removed the clinic `SEAT_PRICE_CENTS` and the schema `$149` default). Seeded: CA $149, Renewal Bundle $89, Cultural Competency $29, Vitals $39, HIPAA $35, CBT $49. Not-yet-authored courses created **`status='draft'`** with their prices.
+- **Per-course pricing, no per-hour/hours-bank concept.** Clinic seat price = the course's current DB price × count (dynamic Stripe amounts).
+- **Bundles as data:** a bundle is one saleable `courses` row; `bundle_items(bundle_course_id, child_course_id)` maps it to constituents; checkout/webhook `expandFulfillment()` enrolls the children. Renewal Bundle → vitals + cultural competency. Verified: buying the bundle enrolls the constituents, not the bundle SKU.
+- Display: whole dollars on marketing surfaces, cents at checkout/receipts (Stripe). Price changes log a `course_price_changed` event (admin editor); **historical purchases keep the price paid** — never recalculated. No subscription products (the `accessModel='subscription'` enum stays unused).
+
+### Legal pages (Item 2 — shipped, pending real text)
+- `/terms` + `/privacy` rendered from `src/content/legal/*.md` (content collection) — owner edits via commit; "Last updated" from frontmatter. **`legal-policies.md` was not in the repo**, so the bodies are visible placeholders (no invented legal text). Placeholders (`[LEGAL ENTITY NAME]`, `[CONTACT EMAIL]`, `[EFFECTIVE DATE]`) + version strings centralized in `src/config/legal.ts`.
+- Footer links both pages on every page. Checkout entry points show "By purchasing you agree to the Terms of Service"; intake shows a required "By creating an account you agree to the Terms of Service and Privacy Policy" line (in addition to the optional marketing checkbox). `terms_accepted` event (with `termsVersion`) written at signup and at each purchase, so future policy updates can require re-acceptance (no re-acceptance UX built).
+- **Before first real payment:** owner must paste the real ToS/Privacy text and set the `src/config/legal.ts` constants.
+
+### Phase 4 — per-course clinic seat pools (APPROVED design, DDL pending review)
+Decisions locked for the build (NOT yet implemented — DDL produced separately for review):
+- **Normalized `seat_assignments(memberId, courseId, status, enrollmentId, …)`**; `clinic_members` stays one row per person and keeps the invite/claim machinery. Assigning an **already-active** member requires **no invite**. (Rationale: annual renewal re-grants courses yearly; per-person-per-course-per-year roster rows would explode.)
+- Per-course `clinic_seat_pools(clinicId, courseId, seats_purchased)`; consumed seats **recomputed** from assignments. Backfill the existing single `clinics.seats_purchased` into a pool row for `crs_or_ca_initial`.
+- New enrollment `payment_status='clinic_seat'` (distinct value, not `comp`).
+- **Seat lifecycle (record):** unclaimed invites **expire after 30 days and free the seat**; **claimed seats are permanently consumed**; a member **leaving the clinic never revokes their enrollments or certificates**.
+- **Refunds (record):** clinic-seat enrollments are **non-refundable at the student level**; refund webhooks **log an event for manual handling — no automatic pool shrinking**.
 
 ### M6 — what shipped this build (AI course tutor)
 - **Model**: Claude Haiku 4.5 via the official `@anthropic-ai/sdk` (the one approved M6 dep), called from `src/lib/tutor.ts`. `ANTHROPIC_API_KEY` is a prod secret — without it the tutor replies "not configured yet" (retrieval + UI still work).

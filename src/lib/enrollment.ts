@@ -12,6 +12,24 @@ import { logEvent } from "@/lib/events";
 
 export type Enrollment = typeof schema.enrollments.$inferSelect;
 
+/**
+ * Expand a purchased course id into the course ids that should actually be
+ * enrolled. A bundle (a course with `bundle_items`) fulfils to its constituent
+ * courses; a normal course fulfils to itself. Used by both the comp path and the
+ * Stripe webhook so one bundle purchase grants every constituent course.
+ */
+export async function expandFulfillment(
+  db: Db,
+  courseId: string,
+): Promise<string[]> {
+  const children = await db
+    .select({ childCourseId: schema.bundleItems.childCourseId })
+    .from(schema.bundleItems)
+    .where(eq(schema.bundleItems.bundleCourseId, courseId))
+    .all();
+  return children.length > 0 ? children.map((c) => c.childCourseId) : [courseId];
+}
+
 async function find(
   db: Db,
   userId: string,

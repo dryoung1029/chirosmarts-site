@@ -178,7 +178,7 @@ VALUES
    'Taking & Recording Vital Signs',
    'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
    1, 5, 'vitals', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 4900, 'published', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 3900, 'published', 0.8, 1.5,
    'Jason Young, DC');
 
 INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
@@ -214,7 +214,7 @@ VALUES
    'HIPAA Essentials for Chiropractic Assistants',
    'A single-module HIPAA certification covering protected health information, the minimum-necessary rule, and front-desk privacy practices.',
    1, NULL, 'hipaa', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 4900, 'published', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 3500, 'published', 0.8, 1.5,
    'Jason Young, DC');
 
 INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
@@ -238,3 +238,54 @@ INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_corre
   ('oh_1c', 'qh_1', 3, 'FERPA', 0),
   ('oh_2a', 'qh_2', 1, 'True', 1),
   ('oh_2b', 'qh_2', 2, 'False', 0);
+
+-- ===========================================================================
+-- Catalog price card (PLAN.md Item 1). Courses not yet authored exist as DRAFT
+-- rows so the price card lives in the DB from day one. Prices are the single
+-- source of truth (courses.price_cents); nothing is hard-coded in app code.
+-- ===========================================================================
+
+-- Cultural Competency (standalone) — $29
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_cultural', 'cultural-competency',
+   'Cultural Competency',
+   'Standalone cultural competency CE for chiropractic assistants.',
+   1, NULL, 'cultural_competency', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 2900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- CBT in Chiropractic Practice — $49
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_cbt', 'cbt-chiropractic-practice',
+   'CBT in Chiropractic Practice',
+   'Cognitive behavioral techniques applied in the chiropractic setting.',
+   1, NULL, 'general', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 4900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- Annual Renewal Bundle (6 hr, incl. vitals + cultural competency) — $89.
+-- A single saleable row whose fulfilment activates its constituent courses.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_renewal_bundle', 'annual-renewal-bundle',
+   'Annual Renewal Bundle (6 hr)',
+   'The annual CE bundle for renewing Oregon CAs — includes vitals and cultural competency.',
+   6, NULL, 'general', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 8900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- Bundle constituents: buying the bundle enrolls the student in these courses.
+INSERT OR REPLACE INTO bundle_items (id, bundle_course_id, child_course_id) VALUES
+  ('bi_renewal_vitals',   'crs_renewal_bundle', 'crs_vitals'),
+  ('bi_renewal_cultural', 'crs_renewal_bundle', 'crs_cultural');

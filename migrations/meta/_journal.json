@@ -43,6 +43,13 @@
       "when": 1781219739802,
       "tag": "0005_groovy_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1781220914727,
+      "tag": "0006_abnormal_celestials",
+      "breakpoints": true
     }
   ]
 }

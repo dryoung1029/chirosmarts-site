@@ -16,7 +16,10 @@ import { isStripeConfigured, createSeatsCheckout } from "@/lib/stripe";
 import { schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 
-const SEAT_PRICE_CENTS = 14900; // per-seat = the course price ($149)
+// Pre-Phase-4: clinic seats grant the CA initial course. Per-seat price = that
+// course's current price (read from the DB — never hard-coded). Phase 4 makes
+// this per-course (the owner picks which course's seats to buy).
+const SEAT_COURSE_ID = "crs_or_ca_initial";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const env = locals.runtime.env;
@@ -46,6 +49,18 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   // Stripe Checkout for `count` seats; the webhook grants them on payment.
+  // Seat price = the seat course's current DB price (dynamic, never hard-coded).
+  const seatCourse = await db
+    .select({ priceCents: schema.courses.priceCents })
+    .from(schema.courses)
+    .where(eq(schema.courses.id, SEAT_COURSE_ID))
+    .get();
+  if (!seatCourse) {
+    return redirect(
+      `/dashboard?error=${encodeURIComponent("Seat course is unavailable.")}`,
+      303,
+    );
+  }
   const owner = await db
     .select({ email: schema.users.email })
     .from(schema.users)
@@ -53,7 +68,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     .get();
   const site = getSiteUrl(env);
   const url = await createSeatsCheckout(env, {
-    unitPriceCents: SEAT_PRICE_CENTS,
+    unitPriceCents: seatCourse.priceCents,
     quantity: count,
     customerEmail: owner?.email,
     clientReferenceId: locals.user!.id,

@@ -82,5 +82,10 @@ const canceled = Astro.url.searchParams.get("canceled");
         </a>
       )
     }
+    {!isEnrolled && (
+      <p class="muted" style="margin:0;font-size:0.82rem;flex-basis:100%">
+        By purchasing you agree to the <a href="/terms">Terms of Service</a>.
+      </p>
+    )}
   </div>
 </Layout>

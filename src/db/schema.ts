@@ -194,7 +194,10 @@ export const courses = sqliteTable("courses", {
   })
     .notNull()
     .default("one_time_purchase"),
-  priceCents: integer("price_cents").notNull().default(14900), // $149
+  // Per-course price in cents — the single source of truth for every display
+  // surface. No price is ever hard-coded in app code (catalog/checkout/seats all
+  // read this). Default 0 so a row without an explicit price is obviously unset.
+  priceCents: integer("price_cents").notNull().default(0),
   stripePriceId: text("stripe_price_id"),
   status: text("status", { enum: ["draft", "published", "archived"] })
     .notNull()
@@ -563,4 +566,26 @@ export const courseResources = sqliteTable(
     createdAt: text("created_at").notNull().default(nowUtc),
   },
   (t) => [index("course_resources_course_idx").on(t.courseId)],
+);
+
+// A bundle is a single saleable `courses` row (one price, one purchase) whose
+// fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
+// maps a bundle course to its children; checkout/webhook fulfilment expands the
+// purchased course id into this list. No per-hour or hours-bank concept — a
+// bundle is just "buy this SKU → get these courses".
+export const bundleItems = sqliteTable(
+  "bundle_items",
+  {
+    id: text("id").primaryKey(),
+    bundleCourseId: text("bundle_course_id")
+      .notNull()
+      .references(() => courses.id),
+    childCourseId: text("child_course_id")
+      .notNull()
+      .references(() => courses.id),
+  },
+  (t) => [
+    uniqueIndex("bundle_items_pair_idx").on(t.bundleCourseId, t.childCourseId),
+    index("bundle_items_bundle_idx").on(t.bundleCourseId),
+  ],
 );

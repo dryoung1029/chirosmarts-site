@@ -10,10 +10,13 @@ import { inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
 import { getSiteUrl } from "@/lib/env";
+import { logEvent } from "@/lib/events";
+import { LEGAL } from "@/config/legal";
 import { isStripeConfigured, createCourseCheckout } from "@/lib/stripe";
 import {
   ensurePendingEnrollment,
   activateEnrollment,
+  expandFulfillment,
 } from "@/lib/enrollment";
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
@@ -48,13 +51,26 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const first = buyable[0];
   const isSingle = buyable.length === 1;
 
+  // Record terms acceptance at each purchase (PLAN.md Item 2).
+  await logEvent(db, {
+    userId: user.id,
+    type: "terms_accepted",
+    payload: {
+      context: "purchase",
+      termsVersion: LEGAL.termsVersion,
+      courseIds: buyable.map((c) => c.id),
+    },
+  });
+
   // Dev/comp path: no Stripe key → grant access immediately (test mode).
+  // Bundles expand to their constituent courses.
   if (!isStripeConfigured(env)) {
     for (const c of buyable) {
-      await activateEnrollment(db, user.id, c.id, {
-        paymentStatus: "comp",
-        amountCents: c.priceCents,
-      });
+      for (const targetId of await expandFulfillment(db, c.id)) {
+        await activateEnrollment(db, user.id, targetId, {
+          paymentStatus: "comp",
+        });
+      }
     }
     return redirect(
       isSingle ? `/learn/${first.slug}?comped=1` : `/dashboard?comped=1`,

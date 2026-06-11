@@ -13,7 +13,11 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
 import { constructWebhookEvent } from "@/lib/stripe";
-import { activateEnrollment, revokeEnrollmentByPaymentIntent } from "@/lib/enrollment";
+import {
+  activateEnrollment,
+  expandFulfillment,
+  revokeEnrollmentByPaymentIntent,
+} from "@/lib/enrollment";
 import { grantSeats } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
 
@@ -55,11 +59,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
         .map((s) => s.trim())
         .filter(Boolean);
       for (const courseId of courseIds) {
-        await activateEnrollment(db, meta.userId, courseId, {
-          paymentStatus: "paid",
-          stripeCheckoutSessionId: session.id,
-          stripePaymentIntentId: session.payment_intent ?? undefined,
-        });
+        // Bundles expand to their constituent courses (one purchase → many).
+        for (const targetId of await expandFulfillment(db, courseId)) {
+          await activateEnrollment(db, meta.userId, targetId, {
+            paymentStatus: "paid",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent ?? undefined,
+          });
+        }
       }
     } else if (meta.kind === "seats" && meta.clinicId && meta.count) {
       const clinic = await db

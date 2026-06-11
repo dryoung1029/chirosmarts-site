@@ -7,7 +7,9 @@ const { title, showNav = false } = Astro.props;
 const user = Astro.locals.user;
 import Logo from "@/components/Logo.astro";
 import { isAdmin } from "@/lib/admin";
+import { LEGAL } from "@/config/legal";
 const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
+const legalEntity = LEGAL.entityName;
 ---
 
 <!doctype html>
@@ -124,5 +126,11 @@ const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
     <main class="wrap">
       <slot />
     </main>
+    <footer class="wrap" style="margin-top:2rem;padding:1.25rem 0;border-top:1px solid var(--border);color:var(--muted);font-size:0.85rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
+      <span>© {new Date().getFullYear()} {legalEntity}</span>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/courses">Courses</a>
+    </footer>
   </body>
 </html>

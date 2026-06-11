@@ -37,14 +37,25 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
     <input type="text" name="description" value={course.description ?? ""} />
     <div class="row">
       <div>
+        <label>Price (USD)</label>
+        <input type="text" name="priceDollars" value={(course.priceCents / 100).toFixed(2)} />
+      </div>
+      <div>
         <label>Credit hours</label>
         <input type="text" name="creditHours" value={String(course.creditHours)} />
       </div>
       <div>
-        <label>Instructor name</label>
-        <input type="text" name="instructorName" value={course.instructorName} />
+        <label>Required seat minutes</label>
+        <input
+          type="text"
+          name="requiredSeatMinutes"
+          value={course.requiredSeatMinutes == null ? "" : String(course.requiredSeatMinutes)}
+          placeholder="blank = none"
+        />
       </div>
     </div>
+    <label>Instructor name</label>
+    <input type="text" name="instructorName" value={course.instructorName} />
     <div class="row">
       <div>
         <label>Pass threshold (0–1)</label>
