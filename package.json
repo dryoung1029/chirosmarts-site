@@ -20,6 +20,7 @@
     "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@astrojs/cloudflare": "^12.6.0",
     "astro": "^5.13.0",
     "drizzle-orm": "^0.44.2",

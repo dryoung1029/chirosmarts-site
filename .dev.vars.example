@@ -37,5 +37,6 @@ CF_STREAM_SIGNING_KEY_ID=""
 CF_STREAM_SIGNING_KEY_PEM=""
 CF_STREAM_SIGNING_KEY_JWK=""
 
-# --- Anthropic API (M6 AI tutor only; unused until then) ---
+# --- Anthropic API (M6 AI course tutor — Claude Haiku 4.5) ---
+# Without a key the tutor still runs but answers "not configured yet".
 ANTHROPIC_API_KEY=""

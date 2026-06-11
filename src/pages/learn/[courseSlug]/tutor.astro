@@ -1,0 +1,40 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import TutorPanel from "@/components/TutorPanel.astro";
+import { getDb } from "@/db/client";
+import { getCourseBySlug, getCourseStructure } from "@/lib/courses";
+import { canAccessModule } from "@/lib/entitlement";
+
+const user = Astro.locals.user!;
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const { courseSlug } = Astro.params;
+const course = await getCourseBySlug(db, courseSlug!);
+if (!course) return Astro.redirect("/dashboard", 302);
+
+// Must be able to access at least one module (free preview or enrolled).
+const structure = await getCourseStructure(db, course.id);
+let hasAccess = false;
+for (const { module } of structure) {
+  if (await canAccessModule(db, user.id, module)) {
+    hasAccess = true;
+    break;
+  }
+}
+if (!hasAccess) return Astro.redirect(`/learn/${courseSlug}`, 302);
+---
+
+<Layout title={`Tutor · ${course.title}`} showNav={true}>
+  <p style="margin:0"><a href={`/learn/${courseSlug}`}>← {course.title}</a></p>
+  <h1>Ask the course tutor</h1>
+  <p class="muted" style="margin-top:0">
+    The tutor answers from this course's lesson videos only, and cites the exact
+    lesson and timestamp. It won't give clinical advice or answer questions
+    outside the course.
+  </p>
+
+  <div class="panel">
+    <TutorPanel courseSlug={courseSlug!} />
+  </div>
+</Layout>

@@ -9,12 +9,21 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M5 — Admin** (built + deployed). M0–M4 shipped. **M6 — AI tutor** is the final milestone. |
+| Current milestone | **M6 — AI course tutor** (built + deployed). M0–M5 shipped. **All milestones complete** — set `ANTHROPIC_API_KEY` in prod to switch the tutor on. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### M6 — what shipped this build (AI course tutor)
+- **Model**: Claude Haiku 4.5 via the official `@anthropic-ai/sdk` (the one approved M6 dep), called from `src/lib/tutor.ts`. `ANTHROPIC_API_KEY` is a prod secret — without it the tutor replies "not configured yet" (retrieval + UI still work).
+- **Retrieval over `lesson_transcripts` ONLY**: keyword match scoped to the modules the student is **entitled** to (free-preview for non-enrolled, all once enrolled) — no paywall leakage. No new infra/embeddings; fine at this corpus size.
+- **Grounding + guardrails**: system prompt answers only from numbered sources, cites `[n]`, declines out-of-scope + clinical/medical advice, says so when the material doesn't cover it. Off-topic questions short-circuit before any API call (cost saver).
+- **Citations deep-link** to `/learn/{slug}/{moduleId}/{lessonId}?t={sec}`; the player (`public/lesson-player.js`) now honors `?t=` to seek (Stream + sim adapters).
+- **Both placements**: course page `/learn/[slug]/tutor` + per-lesson sidebar, sharing `TutorPanel.astro` + `public/tutor-panel.js` and the `POST /api/tutor` backend. Roadmap links to the tutor page.
+- **Audit**: every question logs an append-only `tutor_query` event (question + cited lessons).
+- Seeded a sample transcript for the free-preview lesson (demo + `tutor.test.ts`). **Verified** via `wrangler pages dev`: entitlement-scoped retrieval, on-topic vs off-topic paths, deep-link seek, event logging, both pages render.
 
 ### M5 — what shipped this build (admin)
 - **Admin access**: `ADMIN_EMAILS` env allowlist → `isAdmin` (role OR allowlist) in `src/lib/admin.ts`; middleware guards `/admin` + `/api/admin`; login auto-promotes matching accounts to `site_admin`. Owner's email is in `wrangler.toml [vars]`.

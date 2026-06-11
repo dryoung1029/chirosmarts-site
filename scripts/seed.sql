@@ -143,3 +143,19 @@ VALUES
   ('pts_c_seats',    'pt_clinic_owner', 2, 'buy_seats', 'Purchase training seats', 'Buy a pool of CA training seats for your staff.', 'external_action', NULL, 0),
   ('pts_c_invite',   'pt_clinic_owner', 3, 'invite_cas', 'Invite your CAs', 'Invite each Chiropractic Assistant by email to claim a seat.', 'custom', NULL, 0),
   ('pts_c_track',    'pt_clinic_owner', 4, 'track_progress', 'Track them to certification', 'Follow each CA''s progress through the initial certification.', 'custom', NULL, 0);
+
+-- ---------------------------------------------------------------------------
+-- Sample transcript for the free-preview lesson (M6 tutor demo + local tests).
+-- Real transcripts are ingested from Riverside exports via upload-to-stream.
+-- ---------------------------------------------------------------------------
+INSERT OR REPLACE INTO lesson_transcripts
+  (id, lesson_id, chunk_index, start_seconds, end_seconds, text)
+VALUES
+  ('lt_lsn_welcome_0', 'lsn_welcome', 0, 0, 18,
+   'Welcome to the Oregon Chiropractic Assistant certification course. In this orientation we cover how the course works, how your seat time is tracked, and what you need to do to earn your certificate.'),
+  ('lt_lsn_welcome_1', 'lsn_welcome', 1, 18, 42,
+   'Your seat time is measured from the unique content you actually watch. Rewatching a section never counts twice, and the final exam unlocks only after you have completed the required content minutes for the course.'),
+  ('lt_lsn_welcome_2', 'lsn_welcome', 2, 42, 70,
+   'To take an accurate blood pressure, seat the patient with their back supported and feet flat, rest the arm at heart level, choose a correctly sized cuff, and place it about one inch above the elbow crease before inflating.'),
+  ('lt_lsn_welcome_3', 'lsn_welcome', 3, 70, 96,
+   'Throughout the course you will find knowledge checks at the end of each module and a final exam. The passing threshold is eighty percent, and your attempts are recorded for compliance.');

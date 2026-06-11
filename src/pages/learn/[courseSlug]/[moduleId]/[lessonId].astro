@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import TutorPanel from "@/components/TutorPanel.astro";
 import { getDb } from "@/db/client";
 import { getLessonContext } from "@/lib/courses";
 import { canAccessModule } from "@/lib/entitlement";
@@ -25,10 +26,18 @@ const progress = await getLessonProgress(
   ctx.lesson.durationSeconds,
 );
 
+// Deep-link seek: tutor citations link here with ?t=<seconds>.
+const tParam = Number(Astro.url.searchParams.get("t"));
+const seekStart =
+  Number.isFinite(tParam) && tParam > 0
+    ? Math.min(tParam, ctx.lesson.durationSeconds)
+    : null;
+
 const config = {
   lessonId: ctx.lesson.id,
   durationSeconds: ctx.lesson.durationSeconds,
   resumeSeconds: progress.resumeSeconds,
+  seekStart,
   maxPlaybackRate: ctx.course.maxPlaybackRate,
   hasVideo: !!ctx.lesson.streamVideoUid,
 };
@@ -65,6 +74,14 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
       Credit reflects unique content watched — rewatching never double-counts, and
       time counts only while the video is playing in this focused tab on one device.
     </p>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-bottom:0.25rem">Course tutor</h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Stuck on something? Ask about any lesson in this course.
+    </p>
+    <TutorPanel courseSlug={courseSlug!} compact={true} />
   </div>
 
   <script type="application/json" id="lesson-config" set:html={JSON.stringify(config)} />

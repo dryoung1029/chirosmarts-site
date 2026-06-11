@@ -185,7 +185,10 @@ window.addEventListener("pagehide", () => flushRun(adapter?.getRate() || 1));
 
 // --- Adapters --------------------------------------------------------------
 function SimAdapter(mount) {
-  let current = Math.min(cfg.resumeSeconds || 0, cfg.durationSeconds);
+  let current = Math.min(
+    cfg.seekStart != null ? cfg.seekStart : cfg.resumeSeconds || 0,
+    cfg.durationSeconds,
+  );
   let playing = false;
   let rate = 1;
   const dur = cfg.durationSeconds;
@@ -282,10 +285,15 @@ function StreamAdapter(mount, iframeUrl) {
       let resumed = false;
       player.addEventListener("loadedmetadata", () => {
         if (!resumed) {
-          // Resume where they left off — but never park them at the very end
-          // (a finished video would otherwise reopen stuck on the last frame).
-          const r = cfg.resumeSeconds;
-          if (r > 5 && r < cfg.durationSeconds - 15) player.currentTime = r;
+          if (cfg.seekStart != null) {
+            // Deep link from a tutor citation — jump straight to the timestamp.
+            player.currentTime = Math.min(cfg.seekStart, cfg.durationSeconds);
+          } else {
+            // Resume where they left off — but never park them at the very end
+            // (a finished video would otherwise reopen stuck on the last frame).
+            const r = cfg.resumeSeconds;
+            if (r > 5 && r < cfg.durationSeconds - 15) player.currentTime = r;
+          }
           resumed = true;
         }
         if (player.playbackRate > cfg.maxPlaybackRate) {

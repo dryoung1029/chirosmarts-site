@@ -57,6 +57,10 @@ const needsLegalName = finalPassed && !certificate && !user.legalName.trim();
   <h1>{course.title}</h1>
   {course.description && <p style="margin-top:0">{course.description}</p>}
 
+  <p style="margin:0 0 1rem">
+    <a class="btn" href={`/learn/${course.slug}/tutor`}>💬 Ask the course tutor</a>
+  </p>
+
   {Astro.url.searchParams.get("comped") && (
     <div class="notice ok">You're enrolled (comped — test mode, no charge). The full course is unlocked.</div>
   )}
