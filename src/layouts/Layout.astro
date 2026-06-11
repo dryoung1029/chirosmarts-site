@@ -6,6 +6,8 @@ interface Props {
 const { title, showNav = false } = Astro.props;
 const user = Astro.locals.user;
 import Logo from "@/components/Logo.astro";
+import { isAdmin } from "@/lib/admin";
+const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
 ---
 
 <!doctype html>
@@ -106,10 +108,15 @@ import Logo from "@/components/Logo.astro";
         <nav class="nav">
           <a href="/dashboard" style="text-decoration:none;color:inherit"><Logo height={30} /></a>
           {user && (
-            <form method="POST" action="/api/auth/logout">
-              <span class="muted" style="margin-right:1rem">{user.email}</span>
-              <button class="link" type="submit">Sign out</button>
-            </form>
+            <div style="display:flex;align-items:center;gap:1rem">
+              {userIsAdmin && (
+                <a href="/admin" style="font-size:0.9rem">Admin</a>
+              )}
+              <form method="POST" action="/api/auth/logout" style="display:flex;align-items:center;gap:1rem">
+                <span class="muted">{user.email}</span>
+                <button class="link" type="submit">Sign out</button>
+              </form>
+            </div>
           )}
         </nav>
       )

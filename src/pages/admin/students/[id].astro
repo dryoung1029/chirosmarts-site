@@ -1,0 +1,232 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { desc, eq } from "drizzle-orm";
+import { getCourseSeatTime } from "@/lib/progress";
+import { listCertificates } from "@/lib/certificate";
+import { formatPacific } from "@/lib/time";
+
+const db = getDb(Astro.locals.runtime.env);
+const userId = Astro.params.id!;
+
+const student = await db
+  .select()
+  .from(schema.users)
+  .where(eq(schema.users.id, userId))
+  .get();
+if (!student) return Astro.redirect("/admin/students", 302);
+
+// Enrollments + course, with seat-time audit and certificates per course.
+const enrollRows = await db
+  .select({ e: schema.enrollments, c: schema.courses })
+  .from(schema.enrollments)
+  .innerJoin(schema.courses, eq(schema.enrollments.courseId, schema.courses.id))
+  .where(eq(schema.enrollments.userId, userId))
+  .all();
+
+const courseAudits = await Promise.all(
+  enrollRows.map(async ({ e, c }) => ({
+    enrollment: e,
+    course: c,
+    seat: await getCourseSeatTime(db, userId, c.id),
+    certs: await listCertificates(db, userId, c.id),
+  })),
+);
+
+// Quiz attempts (append-only record), newest first, with quiz labels.
+const attempts = await db
+  .select()
+  .from(schema.quizAttempts)
+  .where(eq(schema.quizAttempts.userId, userId))
+  .orderBy(desc(schema.quizAttempts.submittedAt))
+  .all();
+const quizRows = await db.select().from(schema.quizzes).all();
+const quizMap = new Map(quizRows.map((q) => [q.id, q]));
+
+// Recent raw audit events.
+const events = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.userId, userId))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(40)
+  .all();
+
+const fmtMin = (s: number) => (s / 60).toFixed(1);
+const flash = Astro.url.searchParams.get("done");
+---
+
+<Layout title={`${student.legalName || student.email} · Admin`} showNav={true}>
+  <AdminNav active="students" />
+  <p style="margin:0"><a href="/admin/students">← All students</a></p>
+  <h1 style="margin-bottom:0.25rem">{student.legalName?.trim() || "— no legal name —"}</h1>
+  <p class="muted" style="margin-top:0">
+    {student.email} · role: {student.role} ·{" "}
+    intake {student.intakeCompletedAt ? formatPacific(student.intakeCompletedAt, { dateStyle: "medium" }) : "not completed"}
+  </p>
+
+  {flash && (
+    <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>
+  )}
+
+  {!student.legalName?.trim() && (
+    <div class="panel" style="border-color:var(--warn)">
+      <strong style="color:var(--warn)">No legal name on file.</strong>
+      <span class="muted"> Certificates can't be issued until the student completes intake with their legal name.</span>
+    </div>
+  )}
+
+  <!-- Per-course seat-time audit -->
+  {
+    courseAudits.length === 0 ? (
+      <div class="panel"><p style="margin:0">No enrollments.</p></div>
+    ) : (
+      courseAudits.map(({ enrollment, course, seat, certs }) => (
+        <div class="panel">
+          <h2 style="margin-bottom:0.25rem">{course.title}</h2>
+          <p class="muted" style="margin-top:0;font-size:0.9rem">
+            Enrollment: {enrollment.status} · payment: {enrollment.paymentStatus}
+            {enrollment.completedAt && ` · completed ${formatPacific(enrollment.completedAt, { dateStyle: "medium" })}`}
+          </p>
+
+          <p style="margin:0.5rem 0">
+            Content watched:{" "}
+            <strong style="color:var(--text)">{Math.round(seat.watchedFraction * 100)}%</strong>{" "}
+            ({fmtMin(seat.creditedSeconds)} of {fmtMin(seat.totalContentSeconds)} min) ·{" "}
+            exam gate:{" "}
+            <strong style={seat.examUnlocked ? "color:var(--ok)" : "color:var(--warn)"}>
+              {seat.examUnlocked ? "unlocked" : "locked"}
+            </strong>
+          </p>
+
+          <table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:0.5rem">
+            <thead>
+              <tr style="text-align:left;color:var(--muted)">
+                <th style="padding:0.3rem 0.4rem">Lesson</th>
+                <th style="padding:0.3rem 0.4rem">Credited</th>
+                <th style="padding:0.3rem 0.4rem">Length</th>
+                <th style="padding:0.3rem 0.4rem">%</th>
+                <th style="padding:0.3rem 0.4rem">≥90%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {seat.perLesson.map((p) => (
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:0.3rem 0.4rem">{p.title}</td>
+                  <td style="padding:0.3rem 0.4rem">{fmtMin(p.creditedSeconds)}m</td>
+                  <td style="padding:0.3rem 0.4rem">{fmtMin(p.durationSeconds)}m</td>
+                  <td style="padding:0.3rem 0.4rem">{Math.round(p.fraction * 100)}%</td>
+                  <td style="padding:0.3rem 0.4rem">{p.meetsThreshold ? "✓" : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Certificates for this course */}
+          <div style="margin-top:1rem">
+            <h3 style="font-size:1rem;margin:0 0 0.5rem">Certificates</h3>
+            {certs.length === 0 ? (
+              <p class="muted" style="margin:0;font-size:0.9rem">None issued.</p>
+            ) : (
+              certs.map((cert) => (
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.75rem;padding:0.5rem 0;border-top:1px solid var(--border);font-size:0.9rem">
+                  <code>{cert.certNumber}</code>
+                  <span
+                    style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.8rem;${
+                      cert.status === "issued"
+                        ? "background:#0b2e1a;color:#4ade80"
+                        : cert.status === "revoked"
+                          ? "background:#3a1212;color:#f87171"
+                          : "background:#2a2410;color:#fbbf24"
+                    }`}
+                  >
+                    {cert.status}
+                  </span>
+                  <span class="muted">{formatPacific(cert.issuedAt, { dateStyle: "medium" })}</span>
+                  <a href={`/certificate/${cert.verificationCode}.pdf`}>PDF</a>
+                  <a href={`/verify/${cert.verificationCode}`}>verify</a>
+                  <span style="flex:1" />
+                  {cert.status === "issued" && (
+                    <>
+                      <form method="POST" action={`/api/admin/certificates/${cert.id}/reissue`} style="margin:0">
+                        <button class="link" type="submit">Reissue</button>
+                      </form>
+                      <form
+                        method="POST"
+                        action={`/api/admin/certificates/${cert.id}/revoke`}
+                        style="margin:0"
+                        onsubmit="return confirm('Revoke this certificate? It will show as invalid on the public verify page.')"
+                      >
+                        <button class="link" type="submit" style="color:#f87171">Revoke</button>
+                      </form>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ))
+    )
+  }
+
+  <!-- Quiz attempts -->
+  <div class="panel">
+    <h2>Quiz attempts <span class="muted" style="font-size:0.9rem">(append-only)</span></h2>
+    {
+      attempts.length === 0 ? (
+        <p style="margin:0">No attempts.</p>
+      ) : (
+        <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+          <thead>
+            <tr style="text-align:left;color:var(--muted)">
+              <th style="padding:0.3rem 0.4rem">Quiz</th>
+              <th style="padding:0.3rem 0.4rem">Kind</th>
+              <th style="padding:0.3rem 0.4rem">#</th>
+              <th style="padding:0.3rem 0.4rem">Score</th>
+              <th style="padding:0.3rem 0.4rem">Result</th>
+              <th style="padding:0.3rem 0.4rem">Submitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            {attempts.map((a) => {
+              const quiz = quizMap.get(a.quizId);
+              return (
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:0.3rem 0.4rem">{quiz?.title ?? a.quizId}</td>
+                  <td style="padding:0.3rem 0.4rem">{quiz?.kind ?? "—"}</td>
+                  <td style="padding:0.3rem 0.4rem">{a.attemptNumber}</td>
+                  <td style="padding:0.3rem 0.4rem">{Math.round(a.score * 100)}%</td>
+                  <td style={`padding:0.3rem 0.4rem;${a.passed ? "color:var(--ok)" : "color:#f87171"}`}>
+                    {a.passed ? "pass" : "fail"}
+                  </td>
+                  <td style="padding:0.3rem 0.4rem">{formatPacific(a.submittedAt, { dateStyle: "short", timeStyle: "short" })}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )
+    }
+  </div>
+
+  <!-- Raw event trail -->
+  <div class="panel">
+    <h2>Recent activity</h2>
+    {
+      events.length === 0 ? (
+        <p style="margin:0">No events.</p>
+      ) : (
+        <ul style="list-style:none;padding:0;margin:0;font-size:0.85rem">
+          {events.map((ev) => (
+            <li style="padding:0.3rem 0;border-top:1px solid var(--border);display:flex;gap:0.75rem">
+              <span class="muted" style="white-space:nowrap">{formatPacific(ev.occurredAt, { dateStyle: "short", timeStyle: "short" })}</span>
+              <code>{ev.type}</code>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</Layout>

@@ -1,0 +1,104 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { sql, eq, desc } from "drizzle-orm";
+import { formatPacific } from "@/lib/time";
+
+const db = getDb(Astro.locals.runtime.env);
+
+const totalUsers = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.users)
+  .get();
+const activeEnrollments = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.enrollments)
+  .where(eq(schema.enrollments.status, "active"))
+  .get();
+const completedEnrollments = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.enrollments)
+  .where(eq(schema.enrollments.status, "completed"))
+  .get();
+const certsIssued = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.certificates)
+  .where(eq(schema.certificates.status, "issued"))
+  .get();
+
+// Recent certificates (issued or otherwise) with the recipient email.
+const recentCerts = await db
+  .select({
+    id: schema.certificates.id,
+    certNumber: schema.certificates.certNumber,
+    name: schema.certificates.legalNameSnapshot,
+    course: schema.certificates.courseTitleSnapshot,
+    status: schema.certificates.status,
+    issuedAt: schema.certificates.issuedAt,
+    userId: schema.certificates.userId,
+  })
+  .from(schema.certificates)
+  .orderBy(desc(schema.certificates.createdAt))
+  .limit(8)
+  .all();
+
+const stats = [
+  { label: "Accounts", value: totalUsers?.n ?? 0 },
+  { label: "Active enrollments", value: activeEnrollments?.n ?? 0 },
+  { label: "Completed", value: completedEnrollments?.n ?? 0 },
+  { label: "Certificates issued", value: certsIssued?.n ?? 0 },
+];
+---
+
+<Layout title="Admin" showNav={true}>
+  <AdminNav active="overview" />
+  <h1>Admin overview</h1>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin:1.25rem 0">
+    {
+      stats.map((s) => (
+        <div class="panel" style="margin:0;text-align:center">
+          <div style="font-size:2rem;font-weight:700;color:var(--text)">{s.value}</div>
+          <div class="muted" style="font-size:0.9rem">{s.label}</div>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="panel">
+    <h2>Recent certificates</h2>
+    {
+      recentCerts.length === 0 ? (
+        <p style="margin:0">No certificates issued yet.</p>
+      ) : (
+        <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
+          <thead>
+            <tr style="text-align:left;color:var(--muted)">
+              <th style="padding:0.4rem 0.5rem">Number</th>
+              <th style="padding:0.4rem 0.5rem">Recipient</th>
+              <th style="padding:0.4rem 0.5rem">Issued</th>
+              <th style="padding:0.4rem 0.5rem">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentCerts.map((c) => (
+              <tr style="border-top:1px solid var(--border)">
+                <td style="padding:0.4rem 0.5rem"><code>{c.certNumber}</code></td>
+                <td style="padding:0.4rem 0.5rem">
+                  <a href={`/admin/students/${c.userId}`}>{c.name}</a>
+                </td>
+                <td style="padding:0.4rem 0.5rem">{formatPacific(c.issuedAt, { dateStyle: "medium" })}</td>
+                <td style="padding:0.4rem 0.5rem">{c.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+    }
+  </div>
+
+  <p class="muted" style="font-size:0.9rem">
+    <a href="/admin/students">View all students →</a>
+  </p>
+</Layout>

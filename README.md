@@ -56,6 +56,7 @@ Public, non-secret vars live in `wrangler.toml` (`[vars]`). Secrets live in
 | Variable | Where | Purpose |
 |---|---|---|
 | `SITE_URL` | wrangler `[vars]` / `.dev.vars` | Public site URL for magic links, Stripe redirects, cert verification. **Never hard-code URLs.** |
+| `ADMIN_EMAILS` | wrangler `[vars]` / `.dev.vars` | Comma-separated emails granted the admin area (`/admin`). Matching accounts are promoted to `site_admin` on login. |
 | `RESEND_API_KEY` | secret | Transactional + compliance email (magic links). If empty, sign-in links print to the dev console + login page so you can test without a key. |
 | `EMAIL_FROM` | var | From address for transactional email (default `onboarding@resend.dev` for Resend testing). |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | secret | Payments (M3). Test mode throughout the build. |

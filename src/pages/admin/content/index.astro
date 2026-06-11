@@ -1,0 +1,55 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+
+const db = getDb(Astro.locals.runtime.env);
+const courses = await db.select().from(schema.courses).all();
+const modules = await db.select().from(schema.modules).all();
+const lessons = await db.select().from(schema.lessons).all();
+
+const modByCourse = new Map<string, number>();
+for (const m of modules) modByCourse.set(m.courseId, (modByCourse.get(m.courseId) ?? 0) + 1);
+const moduleCourse = new Map(modules.map((m) => [m.id, m.courseId]));
+const lessonByCourse = new Map<string, number>();
+for (const l of lessons) {
+  const cid = moduleCourse.get(l.moduleId);
+  if (cid) lessonByCourse.set(cid, (lessonByCourse.get(cid) ?? 0) + 1);
+}
+---
+
+<Layout title="Content · Admin" showNav={true}>
+  <AdminNav active="content" />
+  <h1>Courses</h1>
+  <p class="muted" style="margin-top:0">
+    Edit course, module, and lesson metadata. Video stays managed via the upload
+    script; quiz authoring is not in this view.
+  </p>
+
+  {
+    courses.map((c) => (
+      <div class="panel" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:14rem">
+          <div style="font-weight:600;color:var(--text)">{c.title}</div>
+          <div class="muted" style="font-size:0.88rem">
+            /{c.slug} · {c.creditHours}h · {modByCourse.get(c.id) ?? 0} modules ·{" "}
+            {lessonByCourse.get(c.id) ?? 0} lessons
+          </div>
+        </div>
+        <span
+          style={`padding:0.15rem 0.6rem;border-radius:6px;font-size:0.8rem;${
+            c.status === "published"
+              ? "background:#0b2e1a;color:#4ade80"
+              : c.status === "archived"
+                ? "background:#3a1212;color:#f87171"
+                : "background:#23303f;color:var(--muted)"
+          }`}
+        >
+          {c.status}
+        </span>
+        <a class="btn" href={`/admin/content/${c.id}`} style="margin:0">Edit →</a>
+      </div>
+    ))
+  }
+  {courses.length === 0 && <div class="panel"><p style="margin:0">No courses yet.</p></div>}
+</Layout>

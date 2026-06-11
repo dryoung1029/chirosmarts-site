@@ -10,6 +10,7 @@ interface CloudflareEnv {
 
   // Public vars
   SITE_URL: string;
+  ADMIN_EMAILS?: string; // comma-separated emails auto-promoted to site_admin
 
   // Secrets (set via .dev.vars locally, wrangler secrets in prod)
   RESEND_API_KEY?: string;

@@ -9,12 +9,20 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M4 — Certificates + verification** (built + deployed). M0–M3 shipped. **M5 — Admin** is next. |
+| Current milestone | **M5 — Admin** (built + deployed). M0–M4 shipped. **M6 — AI tutor** is the final milestone. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### M5 — what shipped this build (admin)
+- **Admin access**: `ADMIN_EMAILS` env allowlist → `isAdmin` (role OR allowlist) in `src/lib/admin.ts`; middleware guards `/admin` + `/api/admin`; login auto-promotes matching accounts to `site_admin`. Owner's email is in `wrangler.toml [vars]`.
+- **Overview** (`/admin`): account/enrollment/completion/cert counts + recent certificates.
+- **Students** (`/admin/students`): searchable roster; **audit** (`/admin/students/[id]`) — per-course seat-time breakdown (per-lesson credited vs length, %, ≥90% gate), append-only quiz attempts, certificate list with download/verify, and the raw recent-event trail.
+- **Content** (`/admin/content`): course list + editor for course/module/lesson metadata (titles, description, credit hours, instructor, pass threshold, max rate, status, free-preview, positions). Zod-validated update endpoints. Video stays via the upload script; quiz authoring deferred.
+- **Certificate lifecycle**: revoke + reissue endpoints/actions; reissue supersedes the old (`reissued`) and mints+emails a fresh cert; `getActiveCertificate` now returns only `issued`; verify page shows valid/revoked/superseded.
+- **Verified** with a forged local admin session via `wrangler pages dev`: all pages render 200, metadata save round-trips, guard redirects non-admins, Astro CSRF origin-check active.
 
 ### M4 — what shipped this build (certificates + verification)
 - **`src/lib/certificate.ts`**: idempotent issuance with snapshotted legal name / course title / credit hours / instructor / date. Two IDs per cert — `certNumber` human serial (`CS-YYYY-NNNN`, sequential per year) + random unguessable `verificationCode` (public lookup). Legal-name guard: no name on file → issuance deferred until intake completed.

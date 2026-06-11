@@ -15,6 +15,8 @@ pages_build_output_dir = "./dist"
 # This is the PRODUCTION value; local `astro dev` overrides it via `.dev.vars`.
 [vars]
 SITE_URL = "https://chirosmarts-site.pages.dev"
+# Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
+ADMIN_EMAILS = "dryoung1029@gmail.com"
 
 # --- D1 (database) ---
 [[d1_databases]]

@@ -1,0 +1,119 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { getCourseStructure } from "@/lib/courses";
+
+const db = getDb(Astro.locals.runtime.env);
+const courseId = Astro.params.courseId!;
+const course = await db
+  .select()
+  .from(schema.courses)
+  .where(eq(schema.courses.id, courseId))
+  .get();
+if (!course) return Astro.redirect("/admin/content", 302);
+
+const structure = await getCourseStructure(db, courseId);
+const flash = Astro.url.searchParams.get("done");
+const fmtMin = (s: number) => (s / 60).toFixed(1);
+---
+
+<Layout title={`Edit ${course.title} · Admin`} showNav={true}>
+  <AdminNav active="content" />
+  <p style="margin:0"><a href="/admin/content">← All courses</a></p>
+  <h1>Edit course</h1>
+  {flash && <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>}
+
+  <!-- Course metadata -->
+  <form class="panel" method="POST" action={`/api/admin/courses/${course.id}`}>
+    <h2>Course</h2>
+    <p class="muted" style="margin-top:0;font-size:0.88rem">Slug: <code>{course.slug}</code> (fixed)</p>
+    <label>Title</label>
+    <input type="text" name="title" value={course.title} required />
+    <label>Description</label>
+    <input type="text" name="description" value={course.description ?? ""} />
+    <div class="row">
+      <div>
+        <label>Credit hours</label>
+        <input type="text" name="creditHours" value={String(course.creditHours)} />
+      </div>
+      <div>
+        <label>Instructor name</label>
+        <input type="text" name="instructorName" value={course.instructorName} />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Pass threshold (0–1)</label>
+        <input type="text" name="passThreshold" value={String(course.passThreshold)} />
+      </div>
+      <div>
+        <label>Max playback rate</label>
+        <input type="text" name="maxPlaybackRate" value={String(course.maxPlaybackRate)} />
+      </div>
+      <div>
+        <label>Status</label>
+        <select name="status">
+          {["draft", "published", "archived"].map((s) => (
+            <option value={s} selected={course.status === s}>{s}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+    <button type="submit">Save course</button>
+  </form>
+
+  <!-- Modules + lessons -->
+  <h2 style="margin-top:1.5rem">Modules &amp; lessons</h2>
+  {
+    structure.map(({ module, lessons }) => (
+      <div class="panel">
+        <form method="POST" action={`/api/admin/modules/${module.id}`}>
+          <div class="row" style="align-items:flex-end">
+            <div style="flex:0 0 5rem">
+              <label>Position</label>
+              <input type="text" name="position" value={String(module.position)} />
+            </div>
+            <div style="flex:3">
+              <label>Module title</label>
+              <input type="text" name="title" value={module.title} required />
+            </div>
+          </div>
+          <label>Description</label>
+          <input type="text" name="description" value={module.description ?? ""} />
+          <label class="check" style="margin-top:0.75rem">
+            <input type="checkbox" name="isFreePreview" checked={module.isFreePreview} />
+            <span>Free preview (no paywall)</span>
+          </label>
+          <button type="submit" style="margin-top:0.75rem">Save module</button>
+        </form>
+
+        <div style="margin-top:1rem;padding-left:0.5rem;border-left:2px solid var(--border)">
+          {lessons.length === 0 ? (
+            <p class="muted" style="margin:0;font-size:0.9rem">No lessons.</p>
+          ) : (
+            lessons.map((l) => (
+              <form
+                method="POST"
+                action={`/api/admin/lessons/${l.id}`}
+                style="display:flex;gap:0.5rem;align-items:flex-end;margin:0 0 0.5rem"
+              >
+                <div style="flex:0 0 4rem">
+                  <label style="margin:0">Pos</label>
+                  <input type="text" name="position" value={String(l.position)} />
+                </div>
+                <div style="flex:1">
+                  <label style="margin:0">Lesson title</label>
+                  <input type="text" name="title" value={l.title} required />
+                </div>
+                <span class="muted" style="font-size:0.82rem;white-space:nowrap">{fmtMin(l.durationSeconds)}m</span>
+                <button type="submit" style="margin:0">Save</button>
+              </form>
+            ))
+          )}
+        </div>
+      </div>
+    ))
+  }
+</Layout>
