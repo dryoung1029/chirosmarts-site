@@ -1,0 +1,86 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getDb } from "@/db/client";
+import { getUserRoadmap } from "@/lib/roadmap";
+
+const user = Astro.locals.user!;
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const roadmap = await getUserRoadmap(db, user.id);
+
+const months = [
+  "", "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const statusLabel: Record<string, string> = {
+  complete: "Done",
+  available: "Up next",
+  in_progress: "In progress",
+  locked: "Locked",
+  waived: "Waived",
+};
+const statusColor: Record<string, string> = {
+  complete: "var(--ok)",
+  available: "var(--accent)",
+  in_progress: "var(--warn)",
+  locked: "var(--muted)",
+  waived: "var(--muted)",
+};
+---
+
+<Layout title="Your roadmap" showNav={true}>
+  <h1>Welcome back, {user.displayName || user.legalName || "there"}</h1>
+  <p>
+    {user.birthMonth
+      ? `Your CA renewal is keyed to your birth month (${months[user.birthMonth]}).`
+      : "Your account is set up."}
+  </p>
+
+  {
+    roadmap.length === 0 && (
+      <div class="panel">
+        <h2>No roadmap yet</h2>
+        <p>
+          {user.role === "clinic_admin"
+            ? "Clinic owner accounts don't have a certification roadmap yet — that's coming soon. In the meantime you can browse courses."
+            : "You don't have an active roadmap. If this seems wrong, contact support."}
+        </p>
+      </div>
+    )
+  }
+
+  {
+    roadmap.map(({ template, steps }) => (
+      <div class="panel">
+        <h2>{template?.name ?? "Roadmap"}</h2>
+        {template?.description && <p style="margin-top:0">{template.description}</p>}
+        <ol style="list-style:none;padding:0;margin:0.5rem 0 0">
+          {steps.map((s) => (
+            <li
+              style="display:flex;align-items:center;gap:0.75rem;padding:0.7rem 0;border-top:1px solid var(--border)"
+            >
+              <span
+                aria-hidden="true"
+                style={`flex:0 0 auto;width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;font-size:0.8rem;border:2px solid ${statusColor[s.status]};color:${statusColor[s.status]}`}
+              >
+                {s.status === "complete" ? "✓" : s.position}
+              </span>
+              <span style="flex:1">{s.title}</span>
+              <span
+                style={`font-size:0.8rem;color:${statusColor[s.status]}`}
+              >
+                {statusLabel[s.status] ?? s.status}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    ))
+  }
+
+  <p class="muted">
+    More is coming: your course player and progress tracking arrive in the next
+    build (M2).
+  </p>
+</Layout>

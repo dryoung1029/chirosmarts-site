@@ -9,9 +9,24 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M0 — Scaffold** (in progress) |
+| Current milestone | **M1 — Auth + intake + roadmap** (built on `m1-auth`, verified locally; awaiting review) |
+| M0 | ✅ merged to `main` |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, …) merged to `main` |
+
+### M1 — what shipped this build
+- **Magic-link auth** (`/login` → emailed one-time link → `/auth/callback`). Tokens are random, only their SHA-256 hash is stored, single-use, 15-min expiry. Login & signup are the same flow (no account-enumeration). Dev fallback: with no `RESEND_API_KEY`, the link is logged to the console and shown on the login page.
+- **D1 sessions** (`cs_session` cookie, HttpOnly/SameSite=Lax, Secure when SITE_URL is https). Concurrent logins allowed; sessions never force-revoked. Session token hashed at rest.
+- **Middleware** (`src/middleware.ts`): resolves `locals.user`, guards private routes → `/login`, funnels un-onboarded users → `/intake`.
+- **Intake** (`/intake` → `/api/intake`): legal name, preferred name, path choice, birth month, clinic, phone, optional supervising DC, marketing-consent (timestamped). Marketing attributes captured for later Brevo sync; sets `clinic_owner` → `clinic_admin` role.
+- **Roadmap instantiation** (`src/lib/roadmap.ts`): snapshots template steps into `user_steps` with a linear gate (step 1 done, step 2 available, rest locked). Initial & renewal paths wired.
+- **Dashboard** (`/dashboard`): renders the user's roadmap with per-step status.
+- **Append-only events**: `signup`, `login`, `intake_completed` written via `src/lib/events.ts`.
+- **Schema delta**: added `users.intake_completed_at`; `legal_name` now defaults to `""` (filled at intake). Migration `0001_add_intake_completed_at.sql`.
+- **Verified locally** (curl, port 4322): guard redirect, request-link, callback→session, intake gate, intake submit, dashboard roadmap (initial + renewal), single-use token reuse blocked, logout.
+
+### Open product question raised in M1
+- **Clinic-owner path:** there is no clinic roadmap template yet, so clinic owners are set to `clinic_admin` and land on a dashboard placeholder. Confirm desired behavior (own onboarding path? seat management? — currently a deferred feature). Defaulted, not invented.
 
 **Build order is strict and one-at-a-time: M0 → M1 → M2 → M3 → M4 → M5 → M6. Confirm before moving between milestones.**
 
@@ -181,6 +196,32 @@ Principles: `events` append-only; derived totals always recomputed, never stored
 - Each milestone gets a named branch off `main`: `m0-scaffold`, `m1-auth`, `m2-player`, … merged back on completion.
 - Small, frequent commits; never commit secrets (`.dev.vars` local, env vars documented in `README.md`).
 - Product ambiguity → ask. Technical ambiguity → 2 options + recommendation. Plain-language recap + local test steps at the end of each block.
+
+## 9a. Cloud-session network allowlist
+
+The Claude Code **web environment** runs behind an egress proxy. As of this
+session the environment is set to **Full** (any domain) for convenience. If we
+later tighten it to **Custom** (recommended for a compliance product), allowlist
+the hosts below. **Scope note:** this governs only the *dev sandbox* (the agent
+running scripts/tests). The **deployed app runs on Cloudflare**, so production
+outbound calls are unaffected by this setting.
+
+| Host | Why | Milestone |
+|---|---|---|
+| `registry.npmjs.org` | `npm install` (in Trusted defaults already) | all |
+| `github.com`, `*.githubusercontent.com` | git (via GitHub proxy; in defaults) | all |
+| `api.anthropic.com` | Anthropic API (in Trusted defaults already) | M6 |
+| `code.claude.com`, `docs.claude.com` | Claude Code docs (in defaults) | — |
+| `api.resend.com` | Resend email send (only if we test real sends from the sandbox) | M1+ |
+| `api.cloudflare.com` | Stream uploads + signing-key calls from `scripts/upload-to-stream` | M2 |
+| `customer-*.cloudflarestream.com`, `*.videodelivery.net` | Stream playback/iframe + HLS (browser-side; sandbox only if we fetch) | M2 |
+| `api.stripe.com` | Stripe API calls if exercised from the sandbox | M3 |
+| `developers.cloudflare.com` | CF docs (optional) | — |
+
+> Most of these fire from the **deployed Worker**, not the sandbox. The sandbox
+> only needs a host allowlisted when *we* call it directly (e.g. running
+> `scripts/upload-to-stream`, or a local script that hits Resend/Stripe).
+
 
 ---
 
