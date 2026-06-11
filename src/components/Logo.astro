@@ -1,58 +1,19 @@
 ---
 /**
- * ChiroSmarts wordmark — vector recreation of the brand logo: a geometric
- * "CHIRO" whose O is a lightbulb, with "smarts" beneath in a lighter tone.
- *
- * Uses `currentColor` throughout so it adapts to light/dark surfaces (the site
- * is dark-themed; the certificate is white). The geometric font falls back
- * across Century Gothic → Questrial (loaded in the page <head>) → Jost.
- *
- * When the final raster/vector art is committed, swap this component's body for
- * an <img>/inline-SVG of the real file — nothing else references the artwork.
+ * ChiroSmarts logo. Uses the canonical brand artwork (public/logo.png) keyed to
+ * a transparent background and recolored white for the dark site theme
+ * (public/logo-light.png). The certificate embeds the dark variant separately
+ * (src/lib/logo-data.ts).
  */
 interface Props {
-  height?: number; // px height of the full mark
+  height?: number; // px height of the mark
 }
-const { height = 40 } = Astro.props;
-const f1 = Math.round(height * 0.58); // CHIR
-const f2 = Math.round(height * 0.33); // smarts
-const bulbW = Math.round(height * 0.6);
-const geometric =
-  "'Century Gothic','Questrial','Jost','Twentieth Century',system-ui,sans-serif";
+const { height = 36 } = Astro.props;
 ---
 
-<span
-  class="cs-logo"
-  role="img"
-  aria-label="ChiroSmarts"
-  style={`display:inline-flex;align-items:stretch;height:${height}px;color:currentColor;font-family:${geometric}`}
->
-  <span
-    style={`display:flex;flex-direction:column;justify-content:space-between;height:100%`}
-  >
-    <span style={`font-size:${f1}px;line-height:0.9;letter-spacing:0.08em;font-weight:400`}>CHIR</span>
-    <span style={`font-size:${f2}px;line-height:0.9;letter-spacing:0.04em;opacity:0.85`}>smarts</span>
-  </span>
-  <svg
-    width={bulbW}
-    height={height}
-    viewBox="0 0 64 108"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="3"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    aria-hidden="true"
-    style="flex:none;overflow:visible"
-  >
-    <!-- glass globe = the "O" -->
-    <circle cx="32" cy="30" r="28"></circle>
-    <!-- filament squiggle -->
-    <path d="M27 28 q4 5 0 10 q-4 5 0 10"></path>
-    <path d="M37 28 q4 5 0 10 q-4 5 0 10"></path>
-    <!-- screw base / coil, aligned beside "smarts" -->
-    <path d="M22 70 q10 -5 20 0"></path>
-    <path d="M22 80 q10 6 20 0"></path>
-    <path d="M25 90 q7 9 14 0"></path>
-  </svg>
-</span>
+<img
+  src="/logo-light.png"
+  alt="ChiroSmarts"
+  height={height}
+  style={`height:${height}px;width:auto;display:block`}
+/>

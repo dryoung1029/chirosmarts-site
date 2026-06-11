@@ -30,6 +30,15 @@ import { getSiteUrl } from "@/lib/env";
 import { formatPacific, nowIso } from "@/lib/time";
 import { logEvent } from "@/lib/events";
 import { sendCertificateEmail } from "@/lib/email/certificate";
+import { LOGO_DARK_PNG_BASE64 } from "@/lib/logo-data";
+
+/** Decode a base64 string to bytes (Workers + Node). */
+function decodeBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 export interface IssueResult {
   certificate: typeof schema.certificates.$inferSelect;
@@ -257,8 +266,16 @@ export async function renderCertificatePdf(
     borderWidth: 1,
   });
 
-  // --- Logo wordmark, top-center ---
-  drawWordmark(page, helv, width / 2, height - 96);
+  // --- Logo (embedded brand artwork), top-center ---
+  const logoPng = await doc.embedPng(decodeBase64(LOGO_DARK_PNG_BASE64));
+  const logoW = 168;
+  const logoH = (logoPng.height / logoPng.width) * logoW;
+  page.drawImage(logoPng, {
+    x: (width - logoW) / 2,
+    y: height - 60 - logoH,
+    width: logoW,
+    height: logoH,
+  });
 
   // --- Heading ---
   centerText("Certificate of Completion", height - 165, 30, helvBold, INK);
@@ -373,87 +390,6 @@ export async function renderCertificatePdf(
 function formatCredits(hours: number): string {
   const h = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
   return `${h} ${hours === 1 ? "hour" : "hours"}`;
-}
-
-/**
- * ChiroSmarts wordmark — vector recreation of the brand logo: "CHIRO" whose O is
- * a lightbulb, "smarts" beneath in grey. Drawn directly (no font embedding) so
- * it matches the on-site SVG. Centered horizontally on `cx`; `y` is the CHIR
- * baseline.
- */
-function drawWordmark(
-  page: PDFPage,
-  font: PDFFont,
-  cx: number,
-  y: number,
-): void {
-  const f1 = 30; // CHIR
-  const word = "CHIR";
-  const w1 = font.widthOfTextAtSize(word, f1);
-  const r = f1 * 0.38; // bulb glass radius ≈ cap height / 2
-  const gap = 5;
-  const total = w1 + gap + r * 2;
-  const startX = cx - total / 2;
-  const stroke = 1.4; // thin, monoline — matches the brand
-
-  // CHIR
-  page.drawText(word, { x: startX, y, size: f1, font, color: INK });
-
-  // lightbulb "O" — glass globe
-  const glassCx = startX + w1 + gap + r;
-  const glassCy = y + f1 * 0.36; // cap vertical center above baseline
-  page.drawCircle({
-    x: glassCx,
-    y: glassCy,
-    size: r,
-    borderColor: INK,
-    borderWidth: stroke,
-  });
-  // filament squiggle
-  page.drawSvgPath("M -3 4 q 3 4 0 8 q -3 4 0 8", {
-    x: glassCx - 1.5,
-    y: glassCy + 2,
-    borderColor: INK,
-    borderWidth: stroke,
-    scale: 0.9,
-  });
-  page.drawSvgPath("M 3 4 q 3 4 0 8 q -3 4 0 8", {
-    x: glassCx - 1.5,
-    y: glassCy + 2,
-    borderColor: INK,
-    borderWidth: stroke,
-    scale: 0.9,
-  });
-  // screw base / coil, just under the glass
-  const baseY = glassCy - r - 2;
-  page.drawLine({
-    start: { x: glassCx - r * 0.5, y: baseY },
-    end: { x: glassCx + r * 0.5, y: baseY },
-    thickness: stroke,
-    color: INK,
-  });
-  page.drawLine({
-    start: { x: glassCx - r * 0.4, y: baseY - 4 },
-    end: { x: glassCx + r * 0.4, y: baseY - 4 },
-    thickness: stroke,
-    color: INK,
-  });
-  page.drawLine({
-    start: { x: glassCx - r * 0.25, y: baseY - 8 },
-    end: { x: glassCx + r * 0.25, y: baseY - 8 },
-    thickness: stroke,
-    color: INK,
-  });
-
-  // smarts (beneath CHIR)
-  const f2 = f1 * 0.58;
-  page.drawText("smarts", {
-    x: startX + 2,
-    y: y - f2 - 3,
-    size: f2,
-    font,
-    color: MUTED,
-  });
 }
 
 /** Tiled, rotated, faint repeating wordmark across the whole page. */
