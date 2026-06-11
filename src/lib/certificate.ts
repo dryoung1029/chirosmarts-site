@@ -258,7 +258,7 @@ export async function renderCertificatePdf(
   });
 
   // --- Logo wordmark, top-center ---
-  drawWordmark(page, helvBold, helv, width / 2, height - 96);
+  drawWordmark(page, helv, width / 2, height - 96);
 
   // --- Heading ---
   centerText("Certificate of Completion", height - 165, 30, helvBold, INK);
@@ -384,22 +384,22 @@ function formatCredits(hours: number): string {
 function drawWordmark(
   page: PDFPage,
   font: PDFFont,
-  light: PDFFont,
   cx: number,
   y: number,
 ): void {
   const f1 = 30; // CHIR
   const word = "CHIR";
   const w1 = font.widthOfTextAtSize(word, f1);
-  const r = f1 * 0.37; // bulb glass radius ≈ cap height / 2
+  const r = f1 * 0.38; // bulb glass radius ≈ cap height / 2
   const gap = 5;
   const total = w1 + gap + r * 2;
   const startX = cx - total / 2;
+  const stroke = 1.4; // thin, monoline — matches the brand
 
   // CHIR
   page.drawText(word, { x: startX, y, size: f1, font, color: INK });
 
-  // lightbulb "O"
+  // lightbulb "O" — glass globe
   const glassCx = startX + w1 + gap + r;
   const glassCy = y + f1 * 0.36; // cap vertical center above baseline
   page.drawCircle({
@@ -407,20 +407,41 @@ function drawWordmark(
     y: glassCy,
     size: r,
     borderColor: INK,
-    borderWidth: 2.6,
+    borderWidth: stroke,
   });
-  // screw base, just under the glass
-  const baseY = glassCy - r - 3;
+  // filament squiggle
+  page.drawSvgPath("M -3 4 q 3 4 0 8 q -3 4 0 8", {
+    x: glassCx - 1.5,
+    y: glassCy + 2,
+    borderColor: INK,
+    borderWidth: stroke,
+    scale: 0.9,
+  });
+  page.drawSvgPath("M 3 4 q 3 4 0 8 q -3 4 0 8", {
+    x: glassCx - 1.5,
+    y: glassCy + 2,
+    borderColor: INK,
+    borderWidth: stroke,
+    scale: 0.9,
+  });
+  // screw base / coil, just under the glass
+  const baseY = glassCy - r - 2;
   page.drawLine({
-    start: { x: glassCx - r * 0.55, y: baseY },
-    end: { x: glassCx + r * 0.55, y: baseY },
-    thickness: 2.6,
+    start: { x: glassCx - r * 0.5, y: baseY },
+    end: { x: glassCx + r * 0.5, y: baseY },
+    thickness: stroke,
     color: INK,
   });
   page.drawLine({
-    start: { x: glassCx - r * 0.42, y: baseY - 4 },
-    end: { x: glassCx + r * 0.42, y: baseY - 4 },
-    thickness: 2.6,
+    start: { x: glassCx - r * 0.4, y: baseY - 4 },
+    end: { x: glassCx + r * 0.4, y: baseY - 4 },
+    thickness: stroke,
+    color: INK,
+  });
+  page.drawLine({
+    start: { x: glassCx - r * 0.25, y: baseY - 8 },
+    end: { x: glassCx + r * 0.25, y: baseY - 8 },
+    thickness: stroke,
     color: INK,
   });
 
@@ -430,7 +451,7 @@ function drawWordmark(
     x: startX + 2,
     y: y - f2 - 3,
     size: f2,
-    font: light,
+    font,
     color: MUTED,
   });
 }

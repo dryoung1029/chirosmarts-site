@@ -14,9 +14,9 @@ interface Props {
   height?: number; // px height of the full mark
 }
 const { height = 40 } = Astro.props;
-const f1 = Math.round(height * 0.6); // CHIR
-const f2 = Math.round(height * 0.34); // smarts
-const bulbW = Math.round(height * 0.62);
+const f1 = Math.round(height * 0.58); // CHIR
+const f2 = Math.round(height * 0.33); // smarts
+const bulbW = Math.round(height * 0.6);
 const geometric =
   "'Century Gothic','Questrial','Jost','Twentieth Century',system-ui,sans-serif";
 ---
@@ -30,27 +30,29 @@ const geometric =
   <span
     style={`display:flex;flex-direction:column;justify-content:space-between;height:100%`}
   >
-    <span style={`font-size:${f1}px;line-height:0.9;letter-spacing:0.06em;font-weight:500`}>CHIR</span>
-    <span style={`font-size:${f2}px;line-height:0.9;letter-spacing:0.05em;opacity:0.5`}>smarts</span>
+    <span style={`font-size:${f1}px;line-height:0.9;letter-spacing:0.08em;font-weight:400`}>CHIR</span>
+    <span style={`font-size:${f2}px;line-height:0.9;letter-spacing:0.04em;opacity:0.85`}>smarts</span>
   </span>
   <svg
     width={bulbW}
     height={height}
-    viewBox="0 0 64 104"
+    viewBox="0 0 64 108"
     fill="none"
+    stroke="currentColor"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
     aria-hidden="true"
     style="flex:none;overflow:visible"
   >
     <!-- glass globe = the "O" -->
-    <circle
-      cx="32"
-      cy="31"
-      r="27"
-      stroke="currentColor"
-      stroke-width="4.5"></circle>
-    <!-- screw base / cap, aligned beside "smarts" -->
-    <line x1="20" y1="66" x2="44" y2="66" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></line>
-    <line x1="22" y1="76" x2="42" y2="76" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></line>
-    <path d="M25 86 q7 11 14 0" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"></path>
+    <circle cx="32" cy="30" r="28"></circle>
+    <!-- filament squiggle -->
+    <path d="M27 28 q4 5 0 10 q-4 5 0 10"></path>
+    <path d="M37 28 q4 5 0 10 q-4 5 0 10"></path>
+    <!-- screw base / coil, aligned beside "smarts" -->
+    <path d="M22 70 q10 -5 20 0"></path>
+    <path d="M22 80 q10 6 20 0"></path>
+    <path d="M25 90 q7 9 14 0"></path>
   </svg>
 </span>
