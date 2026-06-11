@@ -144,6 +144,11 @@ const finalPassed = finalExam ? await hasPassed(db, user.id, finalExam.id) : fal
 
   <div class="panel">
     <h2>Final exam {finalPassed && <span style="color:var(--ok);font-size:0.9rem">· ✓ passed</span>}</h2>
+    <div class="notice" style="background:#0b2942;border:1px solid #1e496b;color:#cfe8ff">
+      <strong>Not the certification exam.</strong> This confirms you understood the
+      training material. It does <strong>not</strong> certify you — Oregon CA
+      certification requires the separate exam administered through the NBCE.
+    </div>
     {
       !finalExam ? (
         <p style="margin-top:0">The final exam isn't published yet.</p>
