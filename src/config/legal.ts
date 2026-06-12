@@ -11,6 +11,7 @@
 export const LEGAL = {
   entityName: "[LEGAL ENTITY NAME]",
   contactEmail: "[CONTACT EMAIL]",
+  mailingAddress: "[MAILING ADDRESS]",
   effectiveDate: "[EFFECTIVE DATE]",
   termsVersion: "2026-06-draft",
   privacyVersion: "2026-06-draft",
