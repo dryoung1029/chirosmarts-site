@@ -15,12 +15,18 @@
  *   node --experimental-strip-types scripts/upload-to-stream.ts \
  *     --lesson <lessonId> --video ./welcome.mp4 --transcript ./welcome.vtt [--name "Welcome"] [--remote]
  *
+ *   # attach a video that's ALREADY in Cloudflare Stream (you have the UID):
+ *   # reads the true duration from Stream, then sets stream_video_uid +
+ *   # duration_seconds on the lesson (the seat-time gate needs the exact runtime).
+ *   node --experimental-strip-types scripts/upload-to-stream.ts \
+ *     --lesson <lessonId> --attach-uid <streamUid> [--transcript ./welcome.vtt] [--remote]
+ *
  *   # parse + preview the transcript/SQL without uploading or touching Stream:
  *   node --experimental-strip-types scripts/upload-to-stream.ts \
  *     --lesson <lessonId> --transcript ./welcome.vtt --dry-run
  *
  * Requires CF_ACCOUNT_ID and CF_STREAM_API_TOKEN (from the environment or
- * .dev.vars) for a real upload. `--dry-run` needs neither.
+ * .dev.vars) for a real upload or --attach-uid. `--dry-run` needs neither.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -115,6 +121,10 @@ async function waitForReady(
       headers: { Authorization: `Bearer ${token}` },
     });
     const data: any = await res.json();
+    // Fail fast on a bad UID / auth error instead of polling for 6 minutes.
+    if (res.status === 404 || data.success === false) {
+      fail(`Stream video not found for uid ${uid} (check the UID and token): ${JSON.stringify(data.errors ?? data)}`);
+    }
     const r = data.result;
     if (r?.readyToStream) {
       const duration = Math.round(r.duration ?? 0);
@@ -169,9 +179,14 @@ async function main() {
   const lessonId = arg("lesson") || fail("--lesson <lessonId> is required");
   const transcriptPath = arg("transcript");
   const videoPath = arg("video");
+  const attachUid = arg("attach-uid");
   const name = arg("name") || lessonId;
   const remote = hasFlag("remote");
   const dryRun = hasFlag("dry-run");
+
+  if (videoPath && attachUid) {
+    fail("provide either --video (upload a file) or --attach-uid (existing Stream video), not both");
+  }
 
   let chunks: TranscriptChunk[] = [];
   if (transcriptPath) {
@@ -192,6 +207,7 @@ async function main() {
       console.log(buildTranscriptSql(lessonId, chunks));
     }
     if (videoPath) console.log(`\nWould upload video: ${videoPath}`);
+    if (attachUid) console.log(`\nWould attach existing Stream uid: ${attachUid} (duration read live from Stream)`);
     return;
   }
 
@@ -202,6 +218,14 @@ async function main() {
   if (videoPath) {
     uid = await uploadVideo(env, videoPath, name);
     duration = await waitForReady(env, uid);
+    if (chunks.length) await attachCaptions(env, uid, chunksToVtt(chunks));
+  } else if (attachUid) {
+    uid = attachUid;
+    // Video is already in Stream — a single status read returns its true duration.
+    duration = await waitForReady(env, uid);
+    if (!duration || duration <= 0) {
+      fail(`Stream reports a 0s duration for ${uid} — is the video finished processing? A real duration is required for the seat-time gate.`);
+    }
     if (chunks.length) await attachCaptions(env, uid, chunksToVtt(chunks));
   }
 
