@@ -9,6 +9,7 @@
     "preview": "wrangler pages dev ./dist",
     "deploy": "astro build && wrangler pages deploy ./dist",
     "astro": "astro",
+    "assets:illustrations": "node scripts/build-illustration-assets.mjs",
     "typecheck": "astro check",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -22,7 +22,7 @@ export function isValidEmail(e: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 }
 
-function emailBody(source: LeadSource, confirmUrl: string) {
+function emailBody(source: LeadSource, confirmUrl: string, site: string) {
   const isChecklist = source === "checklist_pdf";
   const subject = isChecklist
     ? "Confirm your email to get the Oregon CA certification checklist"
@@ -31,8 +31,14 @@ function emailBody(source: LeadSource, confirmUrl: string) {
     ? "Thanks for requesting the Oregon CA certification checklist."
     : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
   const cta = isChecklist ? "Confirm & get the checklist" : "Confirm my email";
+  // Decorative renewal-reminder illustration (09), hosted as an absolute PNG so it
+  // renders in every email client. Only the renewal flow has a mapped image.
+  const hero = isChecklist
+    ? ""
+    : `<img src="${site}/email/renewal.png" alt="" width="320" style="display:block;max-width:320px;height:auto;margin:0 0 12px">`;
   const text = `${lead}\n\nPlease confirm your email to continue:\n${confirmUrl}\n\nIf you didn't request this, you can ignore this message.`;
   const html =
+    hero +
     `<p>${lead}</p>` +
     `<p>Please confirm your email to continue:</p>` +
     `<p><a href="${confirmUrl}">${cta}</a></p>` +
@@ -103,7 +109,7 @@ export async function captureLead(
 
   const site = getSiteUrl(env).replace(/\/$/, "");
   const confirmUrl = `${site}/leads/confirm?token=${token}`;
-  const { subject, text, html } = emailBody(source, confirmUrl);
+  const { subject, text, html } = emailBody(source, confirmUrl, site);
   await sendEmail(env, { to: email, subject, html, text });
 
   await logEvent(db, {

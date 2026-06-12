@@ -5,6 +5,7 @@ import StatsBar from "@/components/marketing/StatsBar.astro";
 import Testimonials from "@/components/marketing/Testimonials.astro";
 import Faq from "@/components/marketing/Faq.astro";
 import LeadCapture from "@/components/marketing/LeadCapture.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
 import { getDb, schema } from "@/db/client";
 import { eq, asc } from "drizzle-orm";
 import { OWNER, ownerCopy } from "@/config/marketing";
@@ -23,9 +24,9 @@ const heroSubhead = OWNER.hero.subhead ?? ownerCopy("hero subhead");
 const instructor = OWNER.instructor;
 
 const audience = [
-  { title: "I'm becoming a CA", desc: "New to the field? See every step from hired to certified.", cta: "Start here →", href: "/guides/become-a-chiropractic-assistant-oregon" },
-  { title: "I need to renew", desc: "Find your deadline and exactly which hours Oregon requires of you this year.", cta: "Check my date →", href: "/renewal" },
-  { title: "I run a clinic", desc: "Buy seats, invite your team, and watch every certification stay current.", cta: "See how →", href: "/clinics" },
+  { title: "I'm becoming a CA", desc: "New to the field? See every step from hired to certified.", cta: "Start here →", href: "/guides/become-a-chiropractic-assistant-oregon", illo: "becoming-ca" as const },
+  { title: "I need to renew", desc: "Find your deadline and exactly which hours Oregon requires of you this year.", cta: "Check my date →", href: "/renewal", illo: "time-to-renew" as const },
+  { title: "I run a clinic", desc: "Buy seats, invite your team, and watch every certification stay current.", cta: "See how →", href: "/clinics", illo: "run-a-clinic" as const },
 ];
 const steps = [
   { n: "1", t: "Sign up, get your roadmap.", d: "Answer five questions; we build your personal step-by-step Oregon path — training, paperwork, exam, deadlines." },
@@ -65,6 +66,7 @@ const steps = [
     <div class="mk-container mk-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
       {audience.map((a) => (
         <a class="mk-card" href={a.href} style="text-decoration:none;color:inherit">
+          <Illustration name={a.illo} maxWidth={160} style="margin:0 auto 0.75rem" />
           <strong style="color:var(--text);font-size:1.05rem">{a.title}</strong>
           <p style="margin:0.4rem 0 0;color:var(--muted)">{a.desc}</p>
           <span style="color:var(--accent);font-size:0.9rem">{a.cta}</span>
@@ -78,7 +80,13 @@ const steps = [
   <!-- How it works -->
   <section class="mk-section">
     <div class="mk-container">
-      <h2>How it works</h2>
+      <div class="how-head">
+        <div>
+          <h2 style="margin-top:0">How it works</h2>
+          <p style="margin:0;color:var(--muted);max-width:34rem">Train on your own schedule — most students finish in a couple of evenings, with their hours and renewal tracked automatically.</p>
+        </div>
+        <Illustration name="evening-study" maxWidth={340} class="how-illo" />
+      </div>
       <div class="mk-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
         {steps.map((s) => (
           <div class="mk-card">
@@ -161,9 +169,15 @@ const steps = [
 
   <style>
     .hero-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+    .how-head { display: flex; gap: 2rem; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .how-head .how-illo { flex: 0 0 auto; }
     @media (max-width: 880px) {
       .hero-wrap { grid-template-columns: 1fr; }
       .hero-demo-col { order: -1; }
+    }
+    @media (max-width: 720px) {
+      .how-head { flex-direction: column; align-items: flex-start; }
+      .how-head .how-illo { margin: 0.5rem auto 0; }
     }
   </style>
 </MarketingLayout>

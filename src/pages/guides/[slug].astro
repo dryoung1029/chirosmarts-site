@@ -1,5 +1,6 @@
 ---
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
 import { getEntry, render } from "astro:content";
 import { getDb } from "@/db/client";
 import { getCourseBySlug } from "@/lib/courses";
@@ -53,6 +54,7 @@ const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
       </nav>
 
       <article style="max-width:720px;line-height:1.7">
+        <Illustration name="oregon-path" maxWidth={720} sizes="(max-width: 800px) 92vw, 720px" style="margin:0 0 1.25rem" />
         <h1 style="margin:0 0 0.5rem">{entry.data.title}</h1>
         <p style="color:var(--muted);margin:0 0 1.5rem;font-size:0.9rem">
           By {author ? author : <span class="owner-copy">{ownerCopy("author name")}</span>}

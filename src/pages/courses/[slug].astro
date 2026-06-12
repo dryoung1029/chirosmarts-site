@@ -5,6 +5,8 @@ import CertificatePreview from "@/components/marketing/CertificatePreview.astro"
 import Testimonials from "@/components/marketing/Testimonials.astro";
 import Faq from "@/components/marketing/Faq.astro";
 import StickyCta from "@/components/marketing/StickyCta.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
+import type { IllustrationName } from "@/lib/illustration-manifest";
 import { getDb, schema } from "@/db/client";
 import { and, eq } from "drizzle-orm";
 import { getCourseBySlug, getCourseStructure } from "@/lib/courses";
@@ -34,6 +36,13 @@ if (user) {
 }
 
 const mk = COURSE_MARKETING[course.slug] ?? {};
+// Decorative per-course illustration (square AR). Slugs without a mapping simply
+// render no syllabus visual — see PLAN.md for unfilled slots.
+const courseIllos: Record<string, IllustrationName> = {
+  "oregon-ca-initial": "hands-on-training", // 05
+  "vitals-monitoring": "vitals", // 06
+};
+const courseIllo = courseIllos[course.slug];
 const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
 const canceled = Astro.url.searchParams.get("canceled");
 const siteUrl = getSiteUrl(env).replace(/\/$/, "");
@@ -90,8 +99,10 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
 
   <!-- Syllabus -->
   <section class="mk-section" style="padding-top:0">
-    <div class="mk-container" style="max-width:820px">
-      <h2>What's included</h2>
+    <div class:list={["mk-container", { "syllabus-wrap": courseIllo }]} style="max-width:820px">
+      {courseIllo && <Illustration name={courseIllo} maxWidth={240} class="syllabus-illo" />}
+      <div>
+      <h2 style="margin-top:0">What's included</h2>
       {structure.length === 0 ? (
         <p style="color:var(--muted)">Course content is being finalized.</p>
       ) : (
@@ -105,6 +116,7 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
           ))}
         </ol>
       )}
+      </div>
     </div>
   </section>
 
@@ -115,6 +127,7 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
   <!-- Final CTA -->
   <section class="mk-section" style="text-align:center;background:var(--bg-2)">
     <div class="mk-container">
+      <Illustration name="certificate-moment" maxWidth={220} style="margin:0 auto 1rem" />
       <h2 style="margin-bottom:0.75rem">Ready to start?</h2>
       {isEnrolled ? (
         <a class="btn-primary" href={`/learn/${course.slug}`}>Go to your course →</a>
@@ -140,5 +153,10 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
 
   <style>
     @media (max-width: 760px) { .course-head { grid-template-columns: 1fr !important; } }
+    .syllabus-wrap { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem; align-items: start; }
+    @media (max-width: 640px) {
+      .syllabus-wrap { grid-template-columns: 1fr; }
+      .syllabus-wrap .syllabus-illo { margin: 0 auto; }
+    }
   </style>
 </MarketingLayout>
