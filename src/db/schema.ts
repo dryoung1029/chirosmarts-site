@@ -15,6 +15,7 @@ import {
   text,
   integer,
   real,
+  blob,
   index,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
@@ -620,5 +621,30 @@ export const marketingLeads = sqliteTable(
   (t) => [
     uniqueIndex("marketing_leads_email_source_idx").on(t.email, t.source),
     index("marketing_leads_status_idx").on(t.status),
+  ],
+);
+
+// Semantic-search vectors for transcript chunks (M6 tutor). Each row holds one
+// chunk's normalized embedding (Float32 bytes) for a given model, so the tutor
+// can rank by cosine similarity instead of keyword overlap. Decoupled from
+// `lesson_transcripts` so models can be swapped/re-embedded without touching the
+// transcript of record. Cosine is computed in-JS over the course's vectors
+// (no Vectorize needed at this scale).
+export const transcriptEmbeddings = sqliteTable(
+  "transcript_embeddings",
+  {
+    id: text("id").primaryKey(),
+    lessonTranscriptId: text("lesson_transcript_id")
+      .notNull()
+      .references(() => lessonTranscripts.id),
+    lessonId: text("lesson_id").notNull(), // denormalized for fast entitlement filtering
+    model: text("model").notNull(),
+    dim: integer("dim").notNull(),
+    vector: blob("vector", { mode: "buffer" }).notNull(), // normalized Float32 little-endian
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("transcript_emb_chunk_model_idx").on(t.lessonTranscriptId, t.model),
+    index("transcript_emb_lesson_idx").on(t.lessonId, t.model),
   ],
 );

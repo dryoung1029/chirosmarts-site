@@ -14,10 +14,17 @@ import Anthropic from "@anthropic-ai/sdk";
 import { and, asc, eq, inArray, or, like } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
+import {
+  EMBED_MODEL,
+  embedQuery,
+  cosine,
+  unpackVector,
+} from "@/lib/embeddings";
 
 const MODEL = "claude-haiku-4-5";
 const MAX_CANDIDATES = 800; // keyword-matching candidate chunks to score
 const MAX_ANCHORS = 12; // top-scoring chunks to expand into passages
+const MIN_SIM = 0.32; // minimum cosine for a semantic anchor (else: off-topic)
 const WINDOW_BACK = 1; // neighbouring chunks before an anchor
 const WINDOW_FWD = 2; // neighbouring chunks after an anchor (claims often follow setup)
 const MAX_PASSAGES = 12; // passages handed to the model
@@ -70,24 +77,23 @@ function fmtTimestamp(seconds: number): string {
   return `${m}:${ss}`;
 }
 
+interface Anchor {
+  lessonId: string;
+  chunkIndex: number;
+  score: number;
+}
+
 /**
- * Retrieve the most relevant transcript PASSAGES the student may see.
- * `allowedLessonIds` is the entitlement gate — pass only lessons in modules the
- * user can access. Returns [] when nothing relevant matches.
- *
- * Beyond a plain keyword match, this: (1) weights query terms by IDF so a
- * distinctive word ("scope", "vitals") outranks a ubiquitous one
- * ("chiropractic"); (2) boosts chunks whose LESSON TITLE matches (a "scope of
- * practice" question surfaces Module 2); (3) expands each top chunk with its
- * neighbours and merges them into coherent multi-sentence passages, so the model
- * sees the whole point rather than a one-line cue.
+ * Keyword/IDF anchors: top transcript chunks for a question by stemmed-term
+ * relevance with a lesson-title boost. The fallback when embeddings are absent,
+ * and the hybrid partner for semantic retrieval (keeps exact-term matches).
  */
-export async function retrieveChunks(
+async function keywordAnchors(
   db: Db,
   courseId: string,
   allowedLessonIds: string[],
   question: string,
-): Promise<RetrievedChunk[]> {
+): Promise<Anchor[]> {
   const keywords = tokenize(question);
   if (keywords.length === 0 || allowedLessonIds.length === 0) return [];
 
@@ -176,10 +182,90 @@ export async function retrieveChunks(
     if (anchors.length >= MAX_ANCHORS) break;
   }
 
-  // 5) Pull every chunk for the anchor lessons so we can build context windows.
-  const anchorLessonIds = [...new Set(anchors.map((a) => a.r.lessonId))];
+  return anchors.map((a) => ({
+    lessonId: a.r.lessonId,
+    chunkIndex: a.r.chunkIndex,
+    score: a.s,
+  }));
+}
+
+/**
+ * Semantic anchors via Workers AI embeddings + cosine over the course's vectors.
+ * Returns null when AI/embeddings are unavailable (caller falls back to keywords),
+ * or [] when AI ran but nothing cleared the similarity bar (off-topic).
+ */
+async function semanticAnchors(
+  env: CloudflareEnv,
+  db: Db,
+  allowedLessonIds: string[],
+  question: string,
+): Promise<Anchor[] | null> {
+  if (!env.AI || allowedLessonIds.length === 0) return null;
+  const rows = await db
+    .select({
+      lessonId: schema.transcriptEmbeddings.lessonId,
+      chunkIndex: schema.lessonTranscripts.chunkIndex,
+      vector: schema.transcriptEmbeddings.vector,
+    })
+    .from(schema.transcriptEmbeddings)
+    .innerJoin(
+      schema.lessonTranscripts,
+      eq(schema.transcriptEmbeddings.lessonTranscriptId, schema.lessonTranscripts.id),
+    )
+    .where(
+      and(
+        inArray(schema.transcriptEmbeddings.lessonId, allowedLessonIds),
+        eq(schema.transcriptEmbeddings.model, EMBED_MODEL),
+      ),
+    )
+    .all();
+  if (rows.length === 0) return null; // not embedded yet → keyword fallback
+
+  let qv: number[];
+  try {
+    qv = await embedQuery(env, question);
+  } catch (e) {
+    console.error("[tutor] query embedding failed", e);
+    return null;
+  }
+  const scored = rows
+    .map((r) => ({
+      lessonId: r.lessonId,
+      chunkIndex: r.chunkIndex,
+      score: cosine(qv, unpackVector(r.vector as unknown as Uint8Array)),
+    }))
+    .sort((a, b) => b.score - a.score);
+  if (scored.length === 0 || scored[0].score < MIN_SIM) return [];
+  return scored.filter((x) => x.score >= MIN_SIM).slice(0, MAX_ANCHORS);
+}
+
+/**
+ * Expand anchors with neighbouring chunks and merge contiguous ones into coherent
+ * multi-sentence passages, so the model sees whole points rather than one-line
+ * cues. Shared by the keyword and semantic paths.
+ */
+async function buildPassages(db: Db, anchors: Anchor[]): Promise<RetrievedChunk[]> {
+  if (anchors.length === 0) return [];
+  type Row = {
+    lessonId: string;
+    moduleId: string;
+    lessonTitle: string;
+    chunkIndex: number;
+    startSeconds: number;
+    endSeconds: number;
+    text: string;
+  };
+  const anchorLessonIds = [...new Set(anchors.map((a) => a.lessonId))];
   const lessonChunks = (await db
-    .select(select)
+    .select({
+      lessonId: schema.lessonTranscripts.lessonId,
+      moduleId: schema.lessons.moduleId,
+      lessonTitle: schema.lessons.title,
+      chunkIndex: schema.lessonTranscripts.chunkIndex,
+      startSeconds: schema.lessonTranscripts.startSeconds,
+      endSeconds: schema.lessonTranscripts.endSeconds,
+      text: schema.lessonTranscripts.text,
+    })
     .from(schema.lessonTranscripts)
     .innerJoin(schema.lessons, eq(schema.lessonTranscripts.lessonId, schema.lessons.id))
     .where(inArray(schema.lessonTranscripts.lessonId, anchorLessonIds))
@@ -191,18 +277,16 @@ export async function retrieveChunks(
     byLesson.get(c.lessonId)!.set(c.chunkIndex, c);
   }
 
-  // 6) Per lesson, collect anchor ± window indices (carrying the best anchor score).
   const wanted = new Map<string, Map<number, number>>();
   for (const a of anchors) {
-    const m = wanted.get(a.r.lessonId) ?? new Map<number, number>();
+    const m = wanted.get(a.lessonId) ?? new Map<number, number>();
     for (let d = -WINDOW_BACK; d <= WINDOW_FWD; d++) {
-      const idx = a.r.chunkIndex + d;
-      m.set(idx, Math.max(m.get(idx) ?? 0, a.s));
+      const idx = a.chunkIndex + d;
+      m.set(idx, Math.max(m.get(idx) ?? 0, a.score));
     }
-    wanted.set(a.r.lessonId, m);
+    wanted.set(a.lessonId, m);
   }
 
-  // 7) Merge contiguous indices into passages.
   const passages: { score: number; chunk: RetrievedChunk }[] = [];
   for (const [lessonId, idxScores] of wanted) {
     const chunkMap = byLesson.get(lessonId);
@@ -233,16 +317,49 @@ export async function retrieveChunks(
     }
     flush();
   }
-
   passages.sort((a, b) => b.score - a.score);
   return passages.slice(0, MAX_PASSAGES).map((p) => p.chunk);
+}
+
+/**
+ * Retrieve the most relevant transcript PASSAGES the student may see, entitlement-
+ * scoped to `allowedLessonIds`. Prefers Workers AI semantic search (cosine over
+ * embeddings), hybridized with keyword/IDF anchors so exact-term matches aren't
+ * lost; falls back to pure keyword retrieval when embeddings/AI are absent.
+ */
+export async function retrieveChunks(
+  env: CloudflareEnv,
+  db: Db,
+  courseId: string,
+  allowedLessonIds: string[],
+  question: string,
+): Promise<RetrievedChunk[]> {
+  const sem = await semanticAnchors(env, db, allowedLessonIds, question);
+  const kw = await keywordAnchors(db, courseId, allowedLessonIds, question);
+
+  let anchors: Anchor[];
+  if (sem === null) {
+    anchors = kw; // semantic unavailable → keyword only
+  } else {
+    // Hybrid: semantic first (higher quality), then fill with keyword anchors.
+    const seen = new Set<string>();
+    anchors = [];
+    for (const a of [...sem, ...kw]) {
+      const key = `${a.lessonId}:${a.chunkIndex}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      anchors.push(a);
+      if (anchors.length >= MAX_ANCHORS) break;
+    }
+  }
+  return buildPassages(db, anchors);
 }
 
 const SYSTEM_PROMPT = `You are the ChiroSmarts course tutor for an Oregon Chiropractic Assistant (CA) continuing-education course. Help the enrolled student understand the material.
 
 HOW TO ANSWER:
 - The numbered SOURCES are excerpts from the course's own lesson videos. Answer using them — synthesize across sources, connect related points, and explain in your own words. You don't need a citation to restate something the sources clearly imply.
-- Make a genuine attempt before giving up. The sources are retrieved by keyword and may phrase things differently from the question; read them for meaning, not exact words. If several sources each contribute part of the answer, combine them.
+- Make a genuine attempt before giving up. The sources are retrieved by relevance and may phrase things differently from the question; read them for meaning, not exact words. If several sources each contribute part of the answer, combine them.
 - Cite the source number(s) you drew from, like [2] or [3][5], right after the sentence they support. Never invent a source number.
 - Only say the topic "isn't covered in the course material" (and suggest asking the instructor) if the sources genuinely have nothing relevant — not merely because the wording differs or the answer is incomplete. A partial answer grounded in the sources is better than a refusal.
 - Decline clinical or medical advice (diagnosis, treatment, patient-specific guidance) and anything outside this CA course.
@@ -265,6 +382,7 @@ export async function askTutor(
   },
 ): Promise<TutorResult> {
   const chunks = await retrieveChunks(
+    env,
     db,
     opts.courseId,
     opts.allowedLessonIds,

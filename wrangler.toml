@@ -25,6 +25,10 @@ database_name = "chirosmarts"
 database_id = "05f1cac3-0a6f-4b49-82f1-46d87f064445"
 migrations_dir = "./migrations"
 
+# --- Workers AI (M6 tutor: transcript + query embeddings for semantic search) ---
+[ai]
+binding = "AI"
+
 # --- R2 (documents: certificate PDFs, signed hands-on logs) ---
 [[r2_buckets]]
 binding = "DOCS"

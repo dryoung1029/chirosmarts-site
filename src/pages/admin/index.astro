@@ -114,4 +114,39 @@ const stats = [
       <button type="submit">Sync to Brevo</button>
     </form>
   </div>
+
+  <div class="panel">
+    <h2>AI tutor — semantic index</h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Embeds new transcript chunks so the tutor can answer by meaning, not just
+      keywords. Run this after ingesting new transcripts. Already-embedded chunks
+      are skipped.
+    </p>
+    <button type="button" id="embed-btn">Embed transcripts</button>
+    <span id="embed-status" class="muted" style="margin-left:0.75rem"></span>
+  </div>
+
+  <script is:inline>
+    document.getElementById("embed-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("embed-btn");
+      const status = document.getElementById("embed-status");
+      btn.disabled = true;
+      let total = 0;
+      try {
+        for (let i = 0; i < 100; i++) {
+          status.textContent = "Embedding…";
+          const res = await fetch("/api/admin/embed-transcripts", { method: "POST" });
+          const data = await res.json();
+          if (!data.ok) { status.textContent = data.message || "Error."; break; }
+          total += data.embedded;
+          status.textContent = `Embedded ${total}; ${data.remaining} remaining…`;
+          if (data.remaining === 0) { status.textContent = `Done — ${total} chunk(s) embedded, index up to date.`; break; }
+        }
+      } catch {
+        status.textContent = "Network error — re-run to continue (it resumes).";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
 </Layout>

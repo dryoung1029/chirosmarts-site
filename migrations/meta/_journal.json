@@ -57,6 +57,13 @@
       "when": 1781226302429,
       "tag": "0007_silky_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1781238673885,
+      "tag": "0008_curly_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

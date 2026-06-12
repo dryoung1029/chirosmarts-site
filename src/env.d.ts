@@ -7,6 +7,14 @@ interface CloudflareEnv {
   // Bindings
   DB: D1Database;
   DOCS: R2Bucket;
+  // Workers AI (M6 tutor embeddings). Minimal shape — the embedding model
+  // returns one vector per input text.
+  AI?: {
+    run(
+      model: string,
+      inputs: { text: string[] },
+    ): Promise<{ data: number[][] }>;
+  };
 
   // Public vars
   SITE_URL: string;
