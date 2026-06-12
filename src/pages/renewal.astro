@@ -1,0 +1,58 @@
+---
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { ownerCopy } from "@/config/marketing";
+
+const db = getDb(Astro.locals.runtime.env);
+const bundle = await db
+  .select()
+  .from(schema.courses)
+  .where(eq(schema.courses.id, "crs_renewal_bundle"))
+  .get();
+const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
+---
+
+<MarketingLayout
+  title="Oregon CA renewal — dates and required hours"
+  description="How Oregon Chiropractic Assistant renewal works, when your deadline falls, and the continuing-education hours you need."
+  canonicalPath="/renewal"
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container" style="max-width:780px">
+      <h1 style="font-size:2.1rem;margin:0 0 0.75rem">Oregon CA renewal</h1>
+      <p style="color:var(--muted)">
+        <span class="owner-copy">{ownerCopy("how Oregon CA renewal works — overview paragraph")}</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- Renewal-date checker tool (interactive island) — DEFERRED in this build.
+       Ships with the lead-capture/double-opt-in funnel (see PLAN.md). -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container" style="max-width:780px">
+      <div class="mk-card" style="border-style:dashed;color:var(--muted);text-align:center;min-height:160px;display:grid;place-items:center">
+        <span class="owner-copy">{ownerCopy("renewal-date checker tool — coming in the funnel build")}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Renewal bundle course card (from DB) -->
+  {bundle && (
+    <section class="mk-section" style="padding-top:0">
+      <div class="mk-container" style="max-width:780px">
+        <div class="mk-card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px">
+            <strong style="color:var(--text);font-size:1.1rem">{bundle.title}</strong>
+            <p style="margin:0.3rem 0 0;color:var(--muted)">{bundle.description}</p>
+            <p style="margin:0.3rem 0 0;color:var(--muted)">{bundle.creditHours} credit hours · {usd(bundle.priceCents)}</p>
+          </div>
+          <a class="btn-primary" href={`/courses/${bundle.slug}`}>View the renewal bundle →</a>
+        </div>
+        {bundle.status !== "published" && (
+          <p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">This bundle is being finalized.</p>
+        )}
+      </div>
+    </section>
+  )}
+</MarketingLayout>

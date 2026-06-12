@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /learn
+Disallow: /api
+Disallow: /intake
+
+Sitemap: https://chirosmarts-site.pages.dev/sitemap.xml

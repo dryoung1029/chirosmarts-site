@@ -9,12 +9,33 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **Multi-course expansion** — Phases 1–3 + pricing model + legal pages built. Phase 4 (per-course clinic seat pools) pending DDL review. M0–M6 shipped. |
+| Current milestone | **Marketing storefront + funnel** — first slice built (homepage, hero demo, course landing upgrade, clinics/renewal/about, guides system, SEO/sitemap). Funnel (renewal checker, lead magnet, Brevo) deferred. Multi-course Phases 1–3 + pricing + legal shipped; Phase 4 seat pools pending DDL review. M0–M6 shipped. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### Marketing storefront + funnel — first slice (shipped)
+Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top of the app. Cloudflare Web Analytics only (no other trackers); prices/titles/hours always from the DB.
+- **Shipped:** homepage `/` (hero + owner-copy CTAs + **animated hero demo**, audience router, stats bar, how-it-works, instructor block, testimonials grid, DB catalog teaser, FAQ, preserved NBCE disclaimer); upgraded course landing `/courses/[slug]` (requirements-mapping table, certificate preview, syllabus, course-tagged testimonials, course FAQ, sticky mobile CTA, refund line → Terms); `/clinics`, `/renewal` (checker slot), `/about`; **guides system** (`src/content/guides/`) with ToC + Article JSON-LD + byline + related-course card and two stub entries; `sitemap.xml`, `robots.txt`; SEO component with canonical/OG/Twitter; JSON-LD **Organization** (sitewide), **Course**, **FAQPage**, **Article**.
+- **Hero demo** (`HeroDemo.astro` + `/hero-demo.js`, **2.6KB** ≤ 30KB): code-built loop of a fictional "Maya R." dashboard (checklist → course ring 0→8.0 → hands-on signed → exam passed → certificate → maintain mode), `prefers-reduced-motion` static fallback, IntersectionObserver pause. All data visibly fictional.
+- **Rendering choice (documented):** marketing pages are **edge-SSR** (server-rendered per request — one fast DB query) rather than statically prerendered, because catalog prices and auth-aware nav are dynamic; still fully server-rendered HTML for SEO.
+- **Analytics how-to:** set `CF_WEB_ANALYTICS_TOKEN` (env) → the cookieless beacon injects into the marketing layout only; view in Cloudflare dashboard → Analytics & Logs → Web Analytics.
+
+#### OWNER COPY placeholders (every pending item — render as visible `[OWNER COPY: …]`)
+- Homepage: hero **headline**, hero **subhead**; **stats** (in `src/config/marketing.ts` — renders nothing until provided, never a fake number); **instructor** name / credentials / bio / photo; homepage **FAQ** Q&A.
+- Testimonials: none yet — add `src/content/testimonials/*.md` (quote, name, role?, clinic?, photo?, courseTag?).
+- Per-course (`COURSE_MARKETING` in `src/config/marketing.ts`): **requirements-mapping rows** and **course FAQ** for each course (e.g. `oregon-ca-initial`).
+- Clinics: hero **headline** / **subhead**; **dashboard screenshot/mock** image; **overview video** (Cloudflare Stream UID).
+- Renewal: **how-renewal-works** overview; **renewal-date checker** (deferred tool).
+- About: company/instructor **story**; instructor photo.
+- Guides: full **bodies** + **last-updated** dates for `become-a-chiropractic-assistant-oregon` and `oregon-ca-renewal-requirements`.
+- Assets: `public/og-default.svg` is a placeholder branded OG; supply a proper per-page OG PNG template when ready.
+- Config: set `entityName`/`effectiveDate` etc. (already wired) and, when running ads/analytics, `CF_WEB_ANALYTICS_TOKEN`.
+
+#### Deferred (funnel layer — next build)
+Renewal-date checker island + Oregon-rule config + unit tests; lead-magnet capture component; **`marketing_leads` table + double-opt-in** (Resend) confirm flow + `lead_captured` event; Brevo sync job (env slots `BREVO_API_KEY`/`BREVO_LIST_ID_LEADS`/`BREVO_LIST_ID_USERS` added; pushes **confirmed** leads + opted-in users only); per-course OG images; light marketing framing on `/verify`; (MDX for inline-CTA-in-markdown was avoided to respect the dependency policy — guides use a fixed related-course card).
 
 ### Multi-course expansion — Phases 1–3 (shipped)
 - **Phase 1 — exam gate / `required_seat_minutes`.** New nullable `courses.required_seat_minutes` (content-minutes floor, clamped to runtime so never unsatisfiable), **decoupled from `credit_hours`** (cert figure only). Note: the live gate never actually used `credit_hours × 60` — it was already per-lesson-90% coverage; this adds the explicit floor + admin knob. Seeded single-module **Vitals** ($39, `rsm=5`, credit 1h) and **HIPAA** ($35) courses.

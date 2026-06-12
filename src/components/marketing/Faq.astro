@@ -1,0 +1,32 @@
+---
+/** FAQ accordion (zero JS via <details>) + FAQPage JSON-LD. Owner-supplied Q&A;
+ * empty → a visible placeholder and no structured data. */
+import { faqPageLd } from "@/lib/structured-data";
+import { ownerCopy } from "@/config/marketing";
+
+interface Props {
+  faqs: { q: string; a: string }[];
+  heading?: string;
+}
+const { faqs, heading = "Frequently asked questions" } = Astro.props;
+const ld = faqPageLd(faqs);
+---
+
+<section class="mk-section">
+  <div class="mk-container" style="max-width:780px">
+    <h2>{heading}</h2>
+    {
+      faqs.length === 0 ? (
+        <p><span class="owner-copy">{ownerCopy("FAQ questions & answers")}</span></p>
+      ) : (
+        faqs.map((f) => (
+          <details class="mk-faq">
+            <summary>{f.q}</summary>
+            <p style="margin:0.6rem 0 0;color:var(--muted)">{f.a}</p>
+          </details>
+        ))
+      )
+    }
+  </div>
+  {ld && <script type="application/ld+json" set:html={JSON.stringify(ld)} />}
+</section>

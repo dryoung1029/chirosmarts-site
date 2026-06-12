@@ -1,0 +1,148 @@
+---
+import Logo from "@/components/Logo.astro";
+import { getSiteUrl } from "@/lib/env";
+import { LEGAL } from "@/config/legal";
+import { organizationLd } from "@/lib/structured-data";
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string; // defaults to current path
+  ogImage?: string; // absolute or root-relative; defaults to /og-default.svg
+  jsonLd?: unknown[]; // additional structured-data objects for this page
+}
+
+const { title, description, canonicalPath, ogImage, jsonLd = [] } = Astro.props;
+const env = Astro.locals.runtime.env;
+const siteUrl = getSiteUrl(env).replace(/\/$/, "");
+const path = canonicalPath ?? Astro.url.pathname;
+const canonical = `${siteUrl}${path}`;
+const og = (ogImage ?? "/og-default.svg").startsWith("http")
+  ? ogImage!
+  : `${siteUrl}${ogImage ?? "/og-default.svg"}`;
+const fullTitle = title.includes("ChiroSmarts") ? title : `${title} · ChiroSmarts`;
+
+const user = Astro.locals.user;
+const analyticsToken = env.CF_WEB_ANALYTICS_TOKEN;
+
+const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={og} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {ld.map((obj) => (
+      <script type="application/ld+json" set:html={JSON.stringify(obj)} />
+    ))}
+    {analyticsToken && (
+      <script
+        defer
+        src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon={`{"token": "${analyticsToken}"}`}
+      />
+    )}
+    <style is:global>
+      :root {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --bg-2: #0b1220;
+        --panel: #1e293b;
+        --panel-2: #1b2531;
+        --border: #334155;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #0ea5e9;
+        --accent-text: #fff;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--accent); }
+      img { max-width: 100%; height: auto; }
+      .mk-container { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; }
+      .mk-section { padding: 3.5rem 0; }
+      .mk-section h2 { font-size: 1.7rem; margin: 0 0 1.25rem; }
+      .mk-nav {
+        display: flex; align-items: center; gap: 1.25rem;
+        max-width: 1080px; margin: 0 auto; padding: 1rem 1.25rem;
+      }
+      .mk-nav .spacer { flex: 1; }
+      .mk-nav a { color: var(--text); text-decoration: none; font-size: 0.95rem; }
+      .mk-nav a.cta { background: var(--accent); color: var(--accent-text); padding: 0.45rem 0.9rem; border-radius: 8px; }
+      .btn-primary {
+        display: inline-block; background: var(--accent); color: var(--accent-text);
+        padding: 0.7rem 1.3rem; border-radius: 10px; text-decoration: none; font-weight: 600;
+        border: 0; cursor: pointer; font-size: 1rem;
+      }
+      .btn-secondary {
+        display: inline-block; background: transparent; color: var(--text);
+        padding: 0.7rem 1.3rem; border-radius: 10px; text-decoration: none; font-weight: 600;
+        border: 1px solid var(--border);
+      }
+      .mk-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+      .mk-grid { display: grid; gap: 1rem; }
+      .owner-copy {
+        display: inline-block; background: #3a2a10; color: #fbbf24;
+        border: 1px dashed #b4791f; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.9rem;
+      }
+      .mk-footer {
+        border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
+        margin-top: 2rem;
+      }
+      .mk-footer .mk-container { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; padding-top: 1.5rem; padding-bottom: 1.5rem; }
+      details.mk-faq { border-bottom: 1px solid var(--border); padding: 0.85rem 0; }
+      details.mk-faq summary { cursor: pointer; font-weight: 600; list-style: none; }
+      details.mk-faq summary::-webkit-details-marker { display: none; }
+      details.mk-faq[open] summary { color: var(--accent); }
+      @media (max-width: 640px) {
+        .mk-section { padding: 2.25rem 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav class="mk-nav">
+        <a href="/" aria-label="ChiroSmarts home"><Logo height={30} /></a>
+        <span class="spacer"></span>
+        <a href="/courses">Courses</a>
+        <a href="/clinics">For clinics</a>
+        {user ? <a class="cta" href="/dashboard">Dashboard</a> : <a class="cta" href="/login">Sign in</a>}
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="mk-footer">
+      <div class="mk-container">
+        <span>© {new Date().getFullYear()} {LEGAL.entityName}</span>
+        <a href="/courses">Courses</a>
+        <a href="/verify">Verify a certificate</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/about">About</a>
+      </div>
+    </footer>
+  </body>
+</html>

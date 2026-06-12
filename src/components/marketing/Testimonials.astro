@@ -1,0 +1,44 @@
+---
+/** Testimonial card grid from the `testimonials` content collection. Renders only
+ * entries that exist; optionally filtered to a course slug. Owner supplies all. */
+import { getCollection } from "astro:content";
+
+interface Props {
+  heading?: string;
+  courseTag?: string; // when set, show only testimonials tagged for this course
+}
+const { heading = "What students say", courseTag } = Astro.props;
+
+const all = await getCollection("testimonials");
+const items = courseTag
+  ? all.filter((t) => t.data.courseTag === courseTag)
+  : all;
+---
+
+{
+  items.length > 0 && (
+    <section class="mk-section">
+      <div class="mk-container">
+        <h2>{heading}</h2>
+        <div class="mk-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
+          {items.map((t) => (
+            <figure class="mk-card" style="margin:0">
+              <blockquote style="margin:0 0 0.75rem;font-size:1.02rem">“{t.data.quote}”</blockquote>
+              <figcaption style="display:flex;align-items:center;gap:0.6rem;color:var(--muted);font-size:0.9rem">
+                {t.data.photo && (
+                  <img src={t.data.photo} alt="" width="36" height="36" loading="lazy" style="border-radius:50%" />
+                )}
+                <span>
+                  <strong style="color:var(--text)">{t.data.name}</strong>
+                  {(t.data.role || t.data.clinic) && (
+                    <span> — {[t.data.role, t.data.clinic].filter(Boolean).join(", ")}</span>
+                  )}
+                </span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}

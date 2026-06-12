@@ -1,0 +1,106 @@
+---
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { LEGAL } from "@/config/legal";
+import { OWNER, ownerCopy } from "@/config/marketing";
+
+const db = getDb(Astro.locals.runtime.env);
+// Seat price = the CA course's current DB price (no hard-coded prices).
+const caCourse = await db
+  .select({ priceCents: schema.courses.priceCents })
+  .from(schema.courses)
+  .where(eq(schema.courses.id, "crs_or_ca_initial"))
+  .get();
+const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
+
+const steps = [
+  { n: "1", t: "Buy seats", d: "Purchase a pool of training seats for your team — priced at the course price, charged at checkout." },
+  { n: "2", t: "Invite staff", d: "Assign a seat to each staff member by email; they claim it and start training." },
+  { n: "3", t: "Track compliance", d: "See enrollment, completion, and certificates for everyone you sponsor." },
+];
+const headline = OWNER.clinics.headline;
+const subhead = OWNER.clinics.subhead;
+---
+
+<MarketingLayout
+  title="ChiroSmarts for clinics — train and track your team"
+  description="Buy training seats for your chiropractic assistants, invite staff by email, and track their certification and renewal compliance in one place."
+  canonicalPath="/clinics"
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container">
+      <h1 style="font-size:2.2rem;margin:0 0 0.6rem">
+        {headline ? headline : <span class="owner-copy">{ownerCopy("clinics hero headline")}</span>}
+      </h1>
+      <p style="font-size:1.1rem;color:var(--muted);max-width:38rem">
+        {subhead ? subhead : <span class="owner-copy">{ownerCopy("clinics hero subhead")}</span>}
+      </p>
+      <div style="margin-top:1.25rem">
+        <a class="btn-primary" href="/login">Create a clinic account</a>
+        <a class="btn-secondary" href={`mailto:${LEGAL.contactEmail}`} style="margin-left:0.5rem">Questions? Email us</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard visual (placeholder until owner supplies a screenshot/mock) -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container">
+      <div class="mk-card" style="display:grid;place-items:center;min-height:240px;border-style:dashed;color:var(--muted)">
+        <span class="owner-copy">{ownerCopy("clinic dashboard screenshot or mock image")}</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="mk-section" style="background:var(--bg-2)">
+    <div class="mk-container">
+      <h2>How seats work</h2>
+      <div class="mk-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+        {steps.map((s) => (
+          <div class="mk-card">
+            <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;font-weight:700">{s.n}</div>
+            <h3 style="margin:0.6rem 0 0.3rem;font-size:1.1rem">{s.t}</h3>
+            <p style="margin:0;color:var(--muted)">{s.d}</p>
+          </div>
+        ))}
+      </div>
+      {caCourse && (
+        <p style="margin-top:1.25rem;color:var(--muted)">
+          Seats are priced at the course price — e.g. the Oregon CA Initial Certification is
+          <strong style="color:var(--text)"> {usd(caCourse.priceCents)}</strong> per seat. Volume is handled at checkout.
+        </p>
+      )}
+    </div>
+  </section>
+
+  <!-- Owner-produced overview video (lazy; only if a Stream UID is configured) -->
+  {OWNER.clinics.demoVideoStreamUid ? (
+    <section class="mk-section">
+      <div class="mk-container">
+        <div style="position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--border)">
+          <iframe
+            src={`https://iframe.videodelivery.net/${OWNER.clinics.demoVideoStreamUid}`}
+            loading="lazy"
+            style="position:absolute;inset:0;width:100%;height:100%;border:0"
+            allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </section>
+  ) : (
+    <section class="mk-section">
+      <div class="mk-container">
+        <div class="mk-card" style="display:grid;place-items:center;min-height:160px;border-style:dashed;color:var(--muted)">
+          <span class="owner-copy">{ownerCopy("clinic overview video (Cloudflare Stream UID)")}</span>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="mk-section" style="text-align:center;padding-top:0">
+    <div class="mk-container">
+      <a class="btn-primary" href="/login">Create a clinic account</a>
+    </div>
+  </section>
+</MarketingLayout>

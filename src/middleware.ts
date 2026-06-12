@@ -27,8 +27,16 @@ const PUBLIC_PATHS = new Set<string>([
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
-  // Public course catalog + landing pages (Q6 — only content is gated).
+  // Public marketing layer (catalog, guides, clinics, renewal, about, sitemap).
   if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
+  if (pathname.startsWith("/guides/")) return true;
+  if (
+    pathname === "/clinics" ||
+    pathname === "/renewal" ||
+    pathname === "/about" ||
+    pathname === "/sitemap.xml"
+  )
+    return true;
   // public verification route (M4) and static assets
   if (pathname.startsWith("/verify/")) return true;
   if (pathname.startsWith("/_")) return true; // _astro, _image, _server-islands

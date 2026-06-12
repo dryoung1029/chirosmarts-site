@@ -12,4 +12,30 @@ const legal = defineCollection({
   }),
 });
 
-export const collections = { legal };
+// Owner-supplied testimonials. Empty dir → grid renders nothing (no fabrication).
+const testimonials = defineCollection({
+  loader: glob({ pattern: "*.md", base: "./src/content/testimonials" }),
+  schema: z.object({
+    quote: z.string(),
+    name: z.string(),
+    role: z.string().optional(),
+    clinic: z.string().optional(),
+    photo: z.string().optional(),
+    courseTag: z.string().optional(), // course slug to filter by on course pages
+  }),
+});
+
+// Long-form pillar guides (SEO). Markdown bodies authored by the owner.
+const guides = defineCollection({
+  loader: glob({ pattern: "*.md", base: "./src/content/guides" }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    author: z.string().optional(),
+    authorCredentials: z.string().optional(),
+    lastUpdated: z.string(),
+    relatedCourse: z.string().optional(), // course slug for the related-course card
+  }),
+});
+
+export const collections = { legal, testimonials, guides };
