@@ -589,3 +589,36 @@ export const bundleItems = sqliteTable(
     index("bundle_items_bundle_idx").on(t.bundleCourseId),
   ],
 );
+
+// Marketing leads captured from the funnel (renewal checker, lead-magnet PDF).
+// DOUBLE-OPT-IN: a lead is `pending` until it confirms via the emailed link, then
+// `confirmed` — only confirmed leads are eligible for Brevo sync. Kept separate
+// from `users` (an account) and from compliance data. `consentAt` records the
+// single opt-in submission; `confirmedAt` the double opt-in.
+export const marketingLeads = sqliteTable(
+  "marketing_leads",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(), // normalized lowercase
+    source: text("source", {
+      enum: ["renewal_checker", "checklist_pdf", "other"],
+    })
+      .notNull()
+      .default("other"),
+    birthMonth: integer("birth_month"),
+    status: text("status", {
+      enum: ["pending", "confirmed", "unsubscribed"],
+    })
+      .notNull()
+      .default("pending"),
+    confirmTokenHash: text("confirm_token_hash"),
+    consentAt: text("consent_at").notNull().default(nowUtc),
+    confirmedAt: text("confirmed_at"),
+    syncedToBrevoAt: text("synced_to_brevo_at"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("marketing_leads_email_source_idx").on(t.email, t.source),
+    index("marketing_leads_status_idx").on(t.status),
+  ],
+);

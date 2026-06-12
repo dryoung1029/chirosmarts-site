@@ -3,6 +3,7 @@ import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { ownerCopy } from "@/config/marketing";
+import RenewalChecker from "@/components/marketing/RenewalChecker.astro";
 
 const db = getDb(Astro.locals.runtime.env);
 const bundle = await db
@@ -27,13 +28,11 @@ const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
     </div>
   </section>
 
-  <!-- Renewal-date checker tool (interactive island) — DEFERRED in this build.
-       Ships with the lead-capture/double-opt-in funnel (see PLAN.md). -->
+  <!-- Renewal-date checker (interactive island). -->
   <section class="mk-section" style="padding-top:0">
     <div class="mk-container" style="max-width:780px">
-      <div class="mk-card" style="border-style:dashed;color:var(--muted);text-align:center;min-height:160px;display:grid;place-items:center">
-        <span class="owner-copy">{ownerCopy("renewal-date checker tool — coming in the funnel build")}</span>
-      </div>
+      <h2 style="margin-top:0">Check your renewal date</h2>
+      <RenewalChecker />
     </div>
   </section>
 

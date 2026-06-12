@@ -1,0 +1,27 @@
+---
+/**
+ * Reusable lead-magnet capture (double opt-in). Posts the email to
+ * /api/leads/capture with the given `source`; the confirmation email delivers
+ * the asset after the lead confirms. Wired by /lead-capture.js (one handler for
+ * all instances on the page).
+ */
+interface Props {
+  source: string; // e.g. "checklist_pdf"
+  heading: string;
+  blurb: string;
+  buttonLabel?: string;
+}
+const { source, heading, blurb, buttonLabel = "Email it to me" } = Astro.props;
+---
+
+<div class="mk-card lead-capture" data-lead-capture data-source={source}>
+  <h3 style="margin:0 0 0.3rem">{heading}</h3>
+  <p style="margin:0 0 0.85rem;color:var(--muted)">{blurb}</p>
+  <form data-lc-form style="display:flex;gap:0.5rem;flex-wrap:wrap">
+    <input type="email" data-lc-email placeholder="you@example.com" required style="flex:1;min-width:200px" />
+    <button class="btn-primary" type="submit" style="padding:0.55rem 1rem">{buttonLabel}</button>
+  </form>
+  <p data-lc-msg style="margin:0.5rem 0 0;font-size:0.9rem" hidden></p>
+</div>
+
+<script src="/lead-capture.js" type="module"></script>

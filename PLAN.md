@@ -34,8 +34,19 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 - Assets: `public/og-default.svg` is a placeholder branded OG; supply a proper per-page OG PNG template when ready.
 - Config: set `entityName`/`effectiveDate` etc. (already wired) and, when running ads/analytics, `CF_WEB_ANALYTICS_TOKEN`.
 
-#### Deferred (funnel layer — next build)
-Renewal-date checker island + Oregon-rule config + unit tests; lead-magnet capture component; **`marketing_leads` table + double-opt-in** (Resend) confirm flow + `lead_captured` event; Brevo sync job (env slots `BREVO_API_KEY`/`BREVO_LIST_ID_LEADS`/`BREVO_LIST_ID_USERS` added; pushes **confirmed** leads + opted-in users only); per-course OG images; light marketing framing on `/verify`; (MDX for inline-CTA-in-markdown was avoided to respect the dependency policy — guides use a fixed related-course card).
+#### Funnel layer (shipped)
+- **Renewal-date checker** (`/renewal`): deadlines for all 12 months are computed server-side with the unit-tested `nextRenewalDeadline` (no forked date logic in the client — island ~1.7KB just looks up the selection); first-vs-subsequent hour figures come from `src/config/oregon-renewal.ts` (**owner-supplied; null → visible `[OWNER COPY]` placeholder**, never invented). Works fully without an email. 8 unit tests in `renewal.test.ts`.
+- **Lead capture + DOUBLE OPT-IN** (`marketing_leads` table, migration 0007): `POST /api/leads/capture` stores a `pending` lead + emails a Resend confirm link; `/leads/confirm` flips it to `confirmed` (single-use token) and, for the checklist source, serves the asset. `lead_captured` + `lead_confirmed` events. Verified end-to-end in dev.
+- **Lead magnet** (`LeadCapture.astro` on the homepage): the Oregon CA checklist; the gated `/api/leads/asset` streams the R2 object at `lead-magnets/oregon-ca-checklist.pdf` only to a confirmed checklist lead. **Owner action:** upload that PDF to R2 (`wrangler r2 object put chirosmarts-docs/lead-magnets/oregon-ca-checklist.pdf --file=…`) — until then the route returns a graceful "not available yet."
+- **Brevo sync** (`src/lib/brevo.ts`, admin overview "Sync to Brevo" button): manual, pushes only **confirmed leads + opted-in users** with attributes (source, birth_month, role); marks `synced_to_brevo_at`; no campaigns; no-op until `BREVO_API_KEY` + list IDs are set.
+
+#### Funnel placeholders / owner actions
+- `src/config/oregon-renewal.ts`: `firstRenewalHours`, `subsequentRenewalHours`, `requirementsNote` (regulatory figures — owner supplies).
+- Upload `lead-magnets/oregon-ca-checklist.pdf` to R2 for the lead magnet.
+- Set `CF_WEB_ANALYTICS_TOKEN`, `BREVO_API_KEY`, `BREVO_LIST_ID_LEADS`, `BREVO_LIST_ID_USERS` when ready.
+
+#### Still deferred
+Per-course OG images; light marketing framing on `/verify`; embedding the renewal checker on the homepage; (MDX for inline-CTA-in-markdown was avoided to respect the dependency policy — guides use a fixed related-course card).
 
 ### Multi-course expansion — Phases 1–3 (shipped)
 - **Phase 1 — exam gate / `required_seat_minutes`.** New nullable `courses.required_seat_minutes` (content-minutes floor, clamped to runtime so never unsatisfiable), **decoupled from `credit_hours`** (cert figure only). Note: the live gate never actually used `credit_hours × 60` — it was already per-lesson-90% coverage; this adds the explicit floor + admin knob. Seeded single-module **Vitals** ($39, `rsm=5`, credit 1h) and **HIPAA** ($35) courses.

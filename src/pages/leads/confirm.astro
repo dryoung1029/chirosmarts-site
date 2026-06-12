@@ -1,0 +1,48 @@
+---
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb } from "@/db/client";
+import { confirmLead } from "@/lib/leads";
+
+const db = getDb(Astro.locals.runtime.env);
+const token = Astro.url.searchParams.get("token") ?? "";
+const lead = await confirmLead(db, token);
+const isChecklist = lead?.source === "checklist_pdf";
+---
+
+<MarketingLayout
+  title="Email confirmed"
+  description="Confirm your ChiroSmarts email."
+  canonicalPath="/leads/confirm"
+>
+  <section class="mk-section" style="padding-top:3rem">
+    <div class="mk-container" style="max-width:640px;text-align:center">
+      {
+        !lead ? (
+          <>
+            <h1>That link didn't work</h1>
+            <p style="color:var(--muted)">
+              The confirmation link is invalid or has already been used. You can
+              request it again from the page where you signed up.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>You're confirmed ✓</h1>
+            {isChecklist ? (
+              <>
+                <p style="color:var(--muted)">Your Oregon CA certification checklist is ready.</p>
+                <a class="btn-primary" href={`/api/leads/asset?lid=${lead.id}`}>Download the checklist (PDF)</a>
+              </>
+            ) : (
+              <p style="color:var(--muted)">
+                We'll remind you before your Oregon CA renewal deadline. You can
+                unsubscribe anytime from any email we send.
+              </p>
+            )}
+            <p style="margin-top:1.5rem"><a href="/courses">Browse courses →</a></p>
+          </>
+        )
+      }
+    </div>
+  </section>
+</MarketingLayout>

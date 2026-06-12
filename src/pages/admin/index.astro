@@ -6,6 +6,7 @@ import { sql, eq, desc } from "drizzle-orm";
 import { formatPacific } from "@/lib/time";
 
 const db = getDb(Astro.locals.runtime.env);
+const flash = Astro.url.searchParams.get("done");
 
 const totalUsers = await db
   .select({ n: sql<number>`count(*)` })
@@ -101,4 +102,16 @@ const stats = [
   <p class="muted" style="font-size:0.9rem">
     <a href="/admin/students">View all students →</a>
   </p>
+
+  <div class="panel">
+    <h2>Marketing</h2>
+    {flash && <div class="notice ok">{flash}</div>}
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Push consented contacts (confirmed leads + opted-in users) to Brevo. No
+      campaigns are sent — automations are configured in Brevo.
+    </p>
+    <form method="POST" action="/api/admin/brevo-sync" style="margin:0">
+      <button type="submit">Sync to Brevo</button>
+    </form>
+  </div>
 </Layout>

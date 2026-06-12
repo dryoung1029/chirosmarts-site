@@ -4,6 +4,7 @@ import HeroDemo from "@/components/marketing/HeroDemo.astro";
 import StatsBar from "@/components/marketing/StatsBar.astro";
 import Testimonials from "@/components/marketing/Testimonials.astro";
 import Faq from "@/components/marketing/Faq.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
 import { getDb, schema } from "@/db/client";
 import { eq, asc } from "drizzle-orm";
 import { OWNER, ownerCopy } from "@/config/marketing";
@@ -125,6 +126,18 @@ const steps = [
           </a>
         ))}
       </div>
+    </div>
+  </section>
+
+  <!-- Lead magnet -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container" style="max-width:680px">
+      <LeadCapture
+        source="checklist_pdf"
+        heading="Free Oregon CA certification checklist"
+        blurb="The steps to get certified in Oregon, in a printable one-pager. Confirm your email and we'll send it over."
+        buttonLabel="Send me the checklist"
+      />
     </div>
   </section>
 

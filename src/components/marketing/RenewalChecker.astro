@@ -1,0 +1,65 @@
+---
+/**
+ * Public renewal-date checker. Deadlines for all 12 months are computed
+ * server-side with the unit-tested `nextRenewalDeadline` (no forked date logic
+ * in the client), and the owner-supplied hour figures come from the renewal
+ * config (placeholder when null). The island in /renewal-checker.js just looks
+ * up the selection and wires the (optional) email capture. The checker works
+ * fully without entering an email.
+ */
+import { nextRenewalDeadline } from "@/lib/renewal";
+import { OREGON_CA_RENEWAL } from "@/config/oregon-renewal";
+
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const deadlines: Record<number, string> = {};
+for (let m = 1; m <= 12; m++) deadlines[m] = nextRenewalDeadline(m)?.label ?? "";
+
+const data = {
+  deadlines,
+  firstHours: OREGON_CA_RENEWAL.firstRenewalHours,
+  subsequentHours: OREGON_CA_RENEWAL.subsequentRenewalHours,
+  note: OREGON_CA_RENEWAL.requirementsNote,
+};
+---
+
+<div class="mk-card renewal-checker" data-renewal-checker>
+  <script type="application/json" data-renewal-data set:html={JSON.stringify(data)} />
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+    <label style="flex:1;min-width:180px">
+      Your birth month
+      <select data-month style="width:100%;margin-top:0.25rem">
+        <option value="">Select…</option>
+        {months.map((name, i) => <option value={i + 1}>{name}</option>)}
+      </select>
+    </label>
+    <label class="check" style="display:flex;align-items:center;gap:0.5rem">
+      <input type="checkbox" data-renewed-before />
+      <span>I've renewed before</span>
+    </label>
+  </div>
+
+  <div data-result hidden style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+    <p style="margin:0">
+      Your renewal is due by <strong data-deadline style="color:var(--text)"></strong>.
+    </p>
+    <p style="margin:0.4rem 0 0">
+      CE hours required: <strong data-hours style="color:var(--text)"></strong>
+    </p>
+    <p data-note style="margin:0.4rem 0 0;color:var(--muted);font-size:0.9rem" hidden></p>
+
+    <!-- Optional email capture — the result above is shown regardless. -->
+    <form data-capture style="margin-top:1.1rem">
+      <label style="font-size:0.95rem">Want us to remind you before your deadline?</label>
+      <div style="display:flex;gap:0.5rem;margin-top:0.4rem;flex-wrap:wrap">
+        <input type="email" data-email placeholder="you@example.com" required style="flex:1;min-width:200px" />
+        <button class="btn-primary" type="submit" style="padding:0.55rem 1rem">Remind me</button>
+      </div>
+      <p data-capture-msg style="margin:0.5rem 0 0;font-size:0.9rem" hidden></p>
+    </form>
+  </div>
+</div>
+
+<script src="/renewal-checker.js" type="module"></script>
