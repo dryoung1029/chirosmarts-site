@@ -16,12 +16,12 @@ version: "2026-06-draft"
     (3) governing law Oregon / venue Benton County.
   Placeholders (set the matching constants in src/config/legal.ts, and replace the
   bracketed text below when finalized):
-    [LEGAL ENTITY NAME], [CONTACT EMAIL], [MAILING ADDRESS], [EFFECTIVE DATE].
+    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, [EFFECTIVE DATE].
 -->
 
 **Effective date: [EFFECTIVE DATE]**
 
-These Terms of Service ("Terms") govern your use of ChiroSmarts.com (the "Service"), operated by [LEGAL ENTITY NAME] ("ChiroSmarts," "we," "us"). By creating an account or purchasing a course, you agree to these Terms.
+These Terms of Service ("Terms") govern your use of ChiroSmarts.com (the "Service"), operated by Talisman Health Enterprise Management, LLC ("ChiroSmarts," "we," "us"). By creating an account or purchasing a course, you agree to these Terms.
 
 ## 1. The Service
 
@@ -49,7 +49,7 @@ ChiroSmarts provides educational content. **We are not a licensing body.** Your 
 
 Prices are listed on each course page and charged at checkout via our payment processor (Stripe). We do not store your full payment card details. Prices may change; the price you pay is the price displayed at your time of purchase.
 
-**Refunds:** You may request a refund within **14 days of purchase**, provided you have not passed the course's final examination and no certificate has been issued for the course. Refund requests go to [CONTACT EMAIL]. Once a certificate has been issued, the purchase is non-refundable. Clinic-purchased seats (Section 6) are refundable only to the purchasing clinic and only for seats not yet claimed; enrollments granted through a claimed seat are non-refundable.
+**Refunds:** You may request a refund within **14 days of purchase**, provided you have not passed the course's final examination and no certificate has been issued for the course. Refund requests go to contact@chirosmarts.com. Once a certificate has been issued, the purchase is non-refundable. Clinic-purchased seats (Section 6) are refundable only to the purchasing clinic and only for seats not yet claimed; enrollments granted through a claimed seat are non-refundable.
 
 ## 6. Clinic Accounts
 
@@ -81,4 +81,4 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW, OUR TOTAL LIABILITY ARISING FROM OR RELA
 
 These Terms are governed by the laws of the State of Oregon, without regard to conflict-of-law rules; venue for disputes lies in the state or federal courts located in Benton County, Oregon [CONFIRM VENUE]. We may update these Terms; material changes will be posted with a new effective date, and continued use after the effective date constitutes acceptance. If any provision is unenforceable, the remainder stays in effect. These Terms, together with the Privacy Policy, are the entire agreement between you and ChiroSmarts regarding the Service.
 
-**Contact:** [LEGAL ENTITY NAME], [MAILING ADDRESS], [CONTACT EMAIL]
+**Contact:** Talisman Health Enterprise Management, LLC, 867 NW 23rd St, Corvallis, OR 97330, contact@chirosmarts.com

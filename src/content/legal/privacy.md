@@ -8,12 +8,12 @@ version: "2026-06-draft"
   DRAFT FOR ATTORNEY REVIEW — delete this comment before publishing.
   Not legal advice; must be reviewed by an Oregon-licensed attorney before launch.
   Placeholders (mirror in src/config/legal.ts; replace bracketed text when final):
-    [LEGAL ENTITY NAME], [CONTACT EMAIL], [MAILING ADDRESS], [EFFECTIVE DATE].
+    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, [EFFECTIVE DATE].
 -->
 
 **Effective date: [EFFECTIVE DATE]**
 
-This policy describes how [LEGAL ENTITY NAME] ("ChiroSmarts," "we") collects, uses, and shares information through ChiroSmarts.com.
+This policy describes how Talisman Health Enterprise Management, LLC ("ChiroSmarts," "we") collects, uses, and shares information through ChiroSmarts.com.
 
 ## 1. Information We Collect
 
@@ -51,7 +51,7 @@ We do not sell your personal information. We share it only as follows:
 
 ## 5. Your Choices and Rights
 
-You may access and correct your profile information in your account, download your certificates at any time, and opt out of marketing email at any time (transactional email, such as login links and renewal reminders, is part of the Service). You may request deletion of your account by contacting [CONTACT EMAIL]; we will delete profile and marketing data, but **compliance records are retained** as described above, dissociated from marketing use. Depending on your state of residence, you may have additional rights (such as access, correction, deletion, and portability under the Oregon Consumer Privacy Act, where applicable); requests go to [CONTACT EMAIL] and we will respond as the law requires, including an appeal process where mandated.
+You may access and correct your profile information in your account, download your certificates at any time, and opt out of marketing email at any time (transactional email, such as login links and renewal reminders, is part of the Service). You may request deletion of your account by contacting contact@chirosmarts.com; we will delete profile and marketing data, but **compliance records are retained** as described above, dissociated from marketing use. Depending on your state of residence, you may have additional rights (such as access, correction, deletion, and portability under the Oregon Consumer Privacy Act, where applicable); requests go to contact@chirosmarts.com and we will respond as the law requires, including an appeal process where mandated.
 
 ## 6. Security
 
@@ -63,4 +63,4 @@ The Service is intended for adults 18 and over and is not directed to children. 
 
 ## 8. Changes and Contact
 
-We may update this policy; material changes will be posted with a new effective date, and where required we will notify you. Questions and requests: [LEGAL ENTITY NAME], [MAILING ADDRESS], [CONTACT EMAIL].
+We may update this policy; material changes will be posted with a new effective date, and where required we will notify you. Questions and requests: Talisman Health Enterprise Management, LLC, 867 NW 23rd St, Corvallis, OR 97330, contact@chirosmarts.com.
