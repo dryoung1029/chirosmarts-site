@@ -10,8 +10,9 @@ import { formatPacific } from "@/lib/time";
 const code = (Astro.params.code ?? "").toUpperCase();
 const db = getDb(Astro.locals.runtime.env);
 const cert = await getCertificateByCode(db, code);
-const valid = cert && cert.status !== "revoked";
+const valid = cert && cert.status === "issued";
 const revoked = cert && cert.status === "revoked";
+const superseded = cert && cert.status === "reissued";
 
 const fmtCredits = (h: number) =>
   `${Number.isInteger(h) ? h : h.toFixed(1)} ${h === 1 ? "hour" : "hours"}`;
@@ -24,10 +25,10 @@ const fmtCredits = (h: number) =>
 
   {
     valid && cert && (
-      <div class="panel" style="border-color:#1e7a48">
+      <div class="panel" style="border-color:var(--success)">
         <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem">
           <span style="font-size:1.5rem">✓</span>
-          <h1 style="margin:0;color:#22c55e">Valid certificate</h1>
+          <h1 style="margin:0;color:var(--success)">Valid certificate</h1>
         </div>
         <p style="color:var(--muted);margin-top:0">
           This is a genuine ChiroSmarts certificate of completion.
@@ -55,12 +56,25 @@ const fmtCredits = (h: number) =>
 
   {
     revoked && cert && (
-      <div class="panel" style="border-color:#7a1e1e">
-        <h1 style="margin:0;color:#f87171">⚠ Certificate revoked</h1>
+      <div class="panel" style="border-color:var(--danger)">
+        <h1 style="margin:0;color:var(--danger)">⚠ Certificate revoked</h1>
         <p>
           Certificate <strong>{cert.certNumber}</strong> was issued but has since
           been revoked and is no longer valid. Contact ChiroSmarts if you believe
           this is in error.
+        </p>
+      </div>
+    )
+  }
+
+  {
+    superseded && cert && (
+      <div class="panel" style="border-color:var(--warn)">
+        <h1 style="margin:0;color:var(--warn)">⚠ Superseded certificate</h1>
+        <p>
+          Certificate <strong>{cert.certNumber}</strong> was reissued and this
+          copy is no longer the current one. The replacement certificate is the
+          valid record. Contact ChiroSmarts for the current verification code.
         </p>
       </div>
     )

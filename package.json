@@ -17,9 +17,12 @@
     "db:migrate:local": "wrangler d1 migrations apply chirosmarts --local",
     "db:migrate:remote": "wrangler d1 migrations apply chirosmarts --remote",
     "db:seed:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed.sql",
-    "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql"
+    "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql",
+    "db:seed:catalog:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed-catalog.sql",
+    "db:seed:catalog:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed-catalog.sql"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@astrojs/cloudflare": "^12.6.0",
     "astro": "^5.13.0",
     "drizzle-orm": "^0.44.2",

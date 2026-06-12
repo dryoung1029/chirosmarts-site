@@ -9,12 +9,95 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **M4 — Certificates + verification** (built + deployed). M0–M3 shipped. **M5 — Admin** is next. |
+| Current milestone | **Marketing storefront + funnel** — first slice built (homepage, hero demo, course landing upgrade, clinics/renewal/about, guides system, SEO/sitemap). Funnel (renewal checker, lead magnet, Brevo) deferred. Multi-course Phases 1–3 + pricing + legal shipped; Phase 4 seat pools pending DDL review. M0–M6 shipped. |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+
+### Design tokens (shipped)
+- **One source of truth:** `src/styles/tokens.css` defines the brand palette (--brand teal, --action orange, --ink/--muted, --canvas/--surface, success/warning/danger + tints, gold, derived --border/--focus/--shadow) and is imported by both layouts — components reference tokens only, **no raw hexes** (emails keep inline hex; CSS vars don't work in mail clients). Back-compat aliases (`--bg/--panel/--text/--accent/--ok/--warn`) re-map the existing app to the light theme.
+- **Usage rules** baked into base styles: --action for primary CTAs only; secondary = --brand outline; links = --brand underlined; success/warning/danger map to cert states (current/approaching/lapsed), never decorative; amber-tint text uses --warning-ink (#633806); focus rings --brand 2px. Hero demo, logo, and certificate (PDF + preview) retokenized to ink+teal+gold. **WCAG verified** — body ≥4.5:1, state/large ≥3:1 on every pairing.
+
+### Marketing storefront + funnel — first slice (shipped)
+Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top of the app. Cloudflare Web Analytics only (no other trackers); prices/titles/hours always from the DB.
+- **Shipped:** homepage `/` (hero + owner-copy CTAs + **animated hero demo**, audience router, stats bar, how-it-works, instructor block, testimonials grid, DB catalog teaser, FAQ, preserved NBCE disclaimer); upgraded course landing `/courses/[slug]` (requirements-mapping table, certificate preview, syllabus, course-tagged testimonials, course FAQ, sticky mobile CTA, refund line → Terms); `/clinics`, `/renewal` (checker slot), `/about`; **guides system** (`src/content/guides/`) with ToC + Article JSON-LD + byline + related-course card and two stub entries; `sitemap.xml`, `robots.txt`; SEO component with canonical/OG/Twitter; JSON-LD **Organization** (sitewide), **Course**, **FAQPage**, **Article**.
+- **Hero demo** (`HeroDemo.astro` + `/hero-demo.js`, **2.6KB** ≤ 30KB): code-built loop of a fictional "Maya R." dashboard (checklist → course ring 0→8.0 → hands-on signed → exam passed → certificate → maintain mode), `prefers-reduced-motion` static fallback, IntersectionObserver pause. All data visibly fictional.
+- **Rendering choice (documented):** marketing pages are **edge-SSR** (server-rendered per request — one fast DB query) rather than statically prerendered, because catalog prices and auth-aware nav are dynamic; still fully server-rendered HTML for SEO.
+- **Analytics how-to:** set `CF_WEB_ANALYTICS_TOKEN` (env) → the cookieless beacon injects into the marketing layout only; view in Cloudflare dashboard → Analytics & Logs → Web Analytics.
+
+#### Copy status — owner copy is now IN (`src/config/marketing.ts`, `COURSE_MARKETING`, guides, course descriptions). Two registries remain:
+
+**`[VERIFY]` launch blockers** — owner-flagged factual/regulatory claims, kept verbatim & visible; the site must NOT truly launch with any of these unresolved (each renders as a visible flag):
+- Instructor bio: years in practice (`[VERIFY]`).
+- Homepage FAQ: duties-before-certification framing; OBCE fee link/list; legacy-records promise.
+- Course (`oregon-ca-initial`) requirements table: confirm every "Oregon requires" row vs current OAR (the page's biggest claim surface); course FAQ "accepted by the Oregon board" approval phrasing.
+- Renewal page + Guide 2: lapse-consequence phrasing, the 6-hour topic breakdown rows, reinstatement process/fee, board submission fee/method, birth-month deadline rule.
+- Guide 1: the requirements list vs OAR, hands-on required topics, application steps/fee/fingerprint vendor, exam format/score/fee/retakes, accepted BLS providers, state fee amounts, BLS price range.
+
+**Still pending owner inputs** (render as `[OWNER COPY]` chips or are omitted):
+- **Stats** — kept EMPTY (owner's numeric stats were `[VERIFY]`; "only real numbers can ship"). Fill `OWNER.stats` with confirmed figures to show the bar.
+- **Testimonials** — none yet; add `src/content/testimonials/*.md` (real only).
+- **Instructor photo / About story**; **guide last-updated dates** (frontmatter `lastUpdated: "[ADD DATE]"` — JSON-LD date is omitted until set); **clinic dashboard image** + **overview video** Stream UID.
+- Assets: proper per-page OG PNG (currently the branded `og-default.svg`).
+- Config: `effectiveDate` (legal), `CF_WEB_ANALYTICS_TOKEN`, Brevo keys, Oregon renewal hour figures, the lead-magnet checklist PDF in R2.
+
+#### Funnel layer (shipped)
+- **Renewal-date checker** (`/renewal`): deadlines for all 12 months are computed server-side with the unit-tested `nextRenewalDeadline` (no forked date logic in the client — island ~1.7KB just looks up the selection); first-vs-subsequent hour figures come from `src/config/oregon-renewal.ts` (**owner-supplied; null → visible `[OWNER COPY]` placeholder**, never invented). Works fully without an email. 8 unit tests in `renewal.test.ts`.
+- **Lead capture + DOUBLE OPT-IN** (`marketing_leads` table, migration 0007): `POST /api/leads/capture` stores a `pending` lead + emails a Resend confirm link; `/leads/confirm` flips it to `confirmed` (single-use token) and, for the checklist source, serves the asset. `lead_captured` + `lead_confirmed` events. Verified end-to-end in dev.
+- **Lead magnet** (`LeadCapture.astro` on the homepage): the Oregon CA checklist; the gated `/api/leads/asset` streams the R2 object at `lead-magnets/oregon-ca-checklist.pdf` only to a confirmed checklist lead. **Owner action:** upload that PDF to R2 (`wrangler r2 object put chirosmarts-docs/lead-magnets/oregon-ca-checklist.pdf --file=…`) — until then the route returns a graceful "not available yet."
+- **Brevo sync** (`src/lib/brevo.ts`, admin overview "Sync to Brevo" button): manual, pushes only **confirmed leads + opted-in users** with attributes (source, birth_month, role); marks `synced_to_brevo_at`; no campaigns; no-op until `BREVO_API_KEY` + list IDs are set.
+
+#### Funnel placeholders / owner actions
+- `src/config/oregon-renewal.ts`: `firstRenewalHours`, `subsequentRenewalHours`, `requirementsNote` (regulatory figures — owner supplies).
+- Upload `lead-magnets/oregon-ca-checklist.pdf` to R2 for the lead magnet.
+- Set `CF_WEB_ANALYTICS_TOKEN`, `BREVO_API_KEY`, `BREVO_LIST_ID_LEADS`, `BREVO_LIST_ID_USERS` when ready.
+
+#### Still deferred
+Per-course OG images; light marketing framing on `/verify`; embedding the renewal checker on the homepage; (MDX for inline-CTA-in-markdown was avoided to respect the dependency policy — guides use a fixed related-course card).
+
+### Multi-course expansion — Phases 1–3 (shipped)
+- **Phase 1 — exam gate / `required_seat_minutes`.** New nullable `courses.required_seat_minutes` (content-minutes floor, clamped to runtime so never unsatisfiable), **decoupled from `credit_hours`** (cert figure only). Note: the live gate never actually used `credit_hours × 60` — it was already per-lesson-90% coverage; this adds the explicit floor + admin knob. Seeded single-module **Vitals** ($39, `rsm=5`, credit 1h) and **HIPAA** ($35) courses.
+- **Phase 2 — catalog + multi-course.** Public `/courses` catalog + `/courses/[slug]` landing (only content is gated, Q6). Dashboard "Your courses" grid. Checkout + webhook generalized to a **course-id list** (bundle-ready).
+- **Phase 3 — course resources.** `course_resources` table (R2-backed) for assets the course PROVIDES (e.g. the Vitals practice-log PDF) — admin upload/delete in the content editor, entitlement-gated download route, downloads section on the course page. Distinct from `documents` (student's uploaded evidence).
+
+### Pricing model (Item 1 — shipped)
+- Price card lives in the DB (`courses.price_cents`) as the **single source of truth**; **zero hard-coded prices** in code (removed the clinic `SEAT_PRICE_CENTS` and the schema `$149` default). Seeded: CA $149, Renewal Bundle $89, Cultural Competency $29, Vitals $39, HIPAA $35, CBT $49. Not-yet-authored courses created **`status='draft'`** with their prices.
+- **Per-course pricing, no per-hour/hours-bank concept.** Clinic seat price = the course's current DB price × count (dynamic Stripe amounts).
+- **Bundles as data:** a bundle is one saleable `courses` row; `bundle_items(bundle_course_id, child_course_id)` maps it to constituents; checkout/webhook `expandFulfillment()` enrolls the children. Renewal Bundle → vitals + cultural competency. Verified: buying the bundle enrolls the constituents, not the bundle SKU.
+- Display: whole dollars on marketing surfaces, cents at checkout/receipts (Stripe). Price changes log a `course_price_changed` event (admin editor); **historical purchases keep the price paid** — never recalculated. No subscription products (the `accessModel='subscription'` enum stays unused).
+
+### Legal pages (Item 2 — shipped, pending real text)
+- `/terms` + `/privacy` rendered from `src/content/legal/*.md` (content collection) — owner edits via commit; "Last updated" from frontmatter. **`legal-policies.md` was not in the repo**, so the bodies are visible placeholders (no invented legal text). Placeholders (`[LEGAL ENTITY NAME]`, `[CONTACT EMAIL]`, `[EFFECTIVE DATE]`) + version strings centralized in `src/config/legal.ts`.
+- Footer links both pages on every page. Checkout entry points show "By purchasing you agree to the Terms of Service"; intake shows a required "By creating an account you agree to the Terms of Service and Privacy Policy" line (in addition to the optional marketing checkbox). `terms_accepted` event (with `termsVersion`) written at signup and at each purchase, so future policy updates can require re-acceptance (no re-acceptance UX built).
+- **Before first real payment:** owner must paste the real ToS/Privacy text and set the `src/config/legal.ts` constants.
+
+### Phase 4 — per-course clinic seat pools (APPROVED design, DDL pending review)
+Decisions locked for the build (NOT yet implemented — DDL produced separately for review):
+- **Normalized `seat_assignments(memberId, courseId, status, enrollmentId, …)`**; `clinic_members` stays one row per person and keeps the invite/claim machinery. Assigning an **already-active** member requires **no invite**. (Rationale: annual renewal re-grants courses yearly; per-person-per-course-per-year roster rows would explode.)
+- Per-course `clinic_seat_pools(clinicId, courseId, seats_purchased)`; consumed seats **recomputed** from assignments. Backfill the existing single `clinics.seats_purchased` into a pool row for `crs_or_ca_initial`.
+- New enrollment `payment_status='clinic_seat'` (distinct value, not `comp`).
+- **Seat lifecycle (record):** unclaimed invites **expire after 30 days and free the seat**; **claimed seats are permanently consumed**; a member **leaving the clinic never revokes their enrollments or certificates**.
+- **Refunds (record):** clinic-seat enrollments are **non-refundable at the student level**; refund webhooks **log an event for manual handling — no automatic pool shrinking**.
+
+### M6 — what shipped this build (AI course tutor)
+- **Model**: Claude Haiku 4.5 via the official `@anthropic-ai/sdk` (the one approved M6 dep), called from `src/lib/tutor.ts`. `ANTHROPIC_API_KEY` is a prod secret — without it the tutor replies "not configured yet" (retrieval + UI still work).
+- **Retrieval over `lesson_transcripts` ONLY**, entitlement-scoped to the student's accessible modules (no paywall leakage).
+- **Semantic search (upgrade)**: Cloudflare **Workers AI** embeddings (`@cf/baai/bge-small-en-v1.5`, 384-dim, `AI` binding) stored in `transcript_embeddings` (D1 blob, migration 0008); the tutor ranks chunks by **cosine similarity** (computed in-JS over a course's vectors — no Vectorize) and **hybridizes** with keyword/IDF anchors so exact-term matches aren't lost. Falls back to pure keyword retrieval if the AI binding or embeddings are absent. Top chunks are expanded with neighbours into coherent passages; off-topic questions fall below a similarity floor and decline. **Verified on prod**: conceptually-phrased questions (e.g. "how do I keep patient information private?") now retrieve the right content despite no word overlap. **Owner action**: after ingesting new transcripts, click **Admin → AI tutor → Embed transcripts** (or `POST /api/admin/embed-transcripts` until `remaining:0`). Workers AI free tier covers this corpus + query volume.
+- **Grounding + guardrails**: system prompt answers only from numbered sources, cites `[n]`, declines out-of-scope + clinical/medical advice, says so when the material doesn't cover it. Off-topic questions short-circuit before any API call (cost saver).
+- **Citations deep-link** to `/learn/{slug}/{moduleId}/{lessonId}?t={sec}`; the player (`public/lesson-player.js`) now honors `?t=` to seek (Stream + sim adapters).
+- **Both placements**: course page `/learn/[slug]/tutor` + per-lesson sidebar, sharing `TutorPanel.astro` + `public/tutor-panel.js` and the `POST /api/tutor` backend. Roadmap links to the tutor page.
+- **Audit**: every question logs an append-only `tutor_query` event (question + cited lessons).
+- Seeded a sample transcript for the free-preview lesson (demo + `tutor.test.ts`). **Verified** via `wrangler pages dev`: entitlement-scoped retrieval, on-topic vs off-topic paths, deep-link seek, event logging, both pages render.
+
+### M5 — what shipped this build (admin)
+- **Admin access**: `ADMIN_EMAILS` env allowlist → `isAdmin` (role OR allowlist) in `src/lib/admin.ts`; middleware guards `/admin` + `/api/admin`; login auto-promotes matching accounts to `site_admin`. Owner's email is in `wrangler.toml [vars]`.
+- **Overview** (`/admin`): account/enrollment/completion/cert counts + recent certificates.
+- **Students** (`/admin/students`): searchable roster; **audit** (`/admin/students/[id]`) — per-course seat-time breakdown (per-lesson credited vs length, %, ≥90% gate), append-only quiz attempts, certificate list with download/verify, and the raw recent-event trail.
+- **Content** (`/admin/content`): course list + editor for course/module/lesson metadata (titles, description, credit hours, instructor, pass threshold, max rate, status, free-preview, positions). Zod-validated update endpoints. Video stays via the upload script; quiz authoring deferred.
+- **Certificate lifecycle**: revoke + reissue endpoints/actions; reissue supersedes the old (`reissued`) and mints+emails a fresh cert; `getActiveCertificate` now returns only `issued`; verify page shows valid/revoked/superseded.
+- **Verified** with a forged local admin session via `wrangler pages dev`: all pages render 200, metadata save round-trips, guard redirects non-admins, Astro CSRF origin-check active.
 
 ### M4 — what shipped this build (certificates + verification)
 - **`src/lib/certificate.ts`**: idempotent issuance with snapshotted legal name / course title / credit hours / instructor / date. Two IDs per cert — `certNumber` human serial (`CS-YYYY-NNNN`, sequential per year) + random unguessable `verificationCode` (public lookup). Legal-name guard: no name on file → issuance deferred until intake completed.

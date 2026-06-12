@@ -31,24 +31,26 @@ export interface CheckoutArgs {
   metadata: Record<string, string>;
 }
 
-/** A one-time Checkout session for a single course seat. */
+/**
+ * A one-time Checkout session for one or more courses (each quantity 1). Selling
+ * is standalone today, but accepting a list means course bundles need no rework
+ * later (PLAN.md Q2) — the webhook fulfils every course in the session.
+ */
 export async function createCourseCheckout(
   env: CloudflareEnv,
-  args: CheckoutArgs & { courseTitle: string; priceCents: number },
+  args: CheckoutArgs & { courses: { title: string; priceCents: number }[] },
 ): Promise<string> {
   const stripe = getStripe(env);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: args.priceCents,
-          product_data: { name: args.courseTitle },
-        },
+    line_items: args.courses.map((c) => ({
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: c.priceCents,
+        product_data: { name: c.title },
       },
-    ],
+    })),
     customer_email: args.customerEmail ?? undefined,
     client_reference_id: args.clientReferenceId,
     metadata: args.metadata,

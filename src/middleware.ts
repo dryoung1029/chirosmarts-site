@@ -10,6 +10,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { getDb } from "@/db/client";
 import { getSessionUser } from "@/lib/auth/session";
+import { isAdmin } from "@/lib/admin";
 
 // Routes reachable without a session.
 const PUBLIC_PATHS = new Set<string>([
@@ -20,10 +21,26 @@ const PUBLIC_PATHS = new Set<string>([
   "/auth/callback",
   "/clinic/join", // clinic invite claim (token authenticates the CA)
   "/api/stripe/webhook", // server-to-server; trust comes from the signature
+  "/terms",
+  "/privacy",
 ]);
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // Public marketing layer (catalog, guides, clinics, renewal, about, sitemap).
+  if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
+  if (pathname.startsWith("/guides/")) return true;
+  if (
+    pathname === "/clinics" ||
+    pathname === "/renewal" ||
+    pathname === "/about" ||
+    pathname === "/sitemap.xml"
+  )
+    return true;
+  // Funnel: lead capture, double-opt-in confirm, and gated asset download.
+  if (pathname === "/api/leads/capture") return true;
+  if (pathname === "/leads/confirm") return true;
+  if (pathname === "/api/leads/asset") return true;
   // public verification route (M4) and static assets
   if (pathname.startsWith("/verify/")) return true;
   if (pathname.startsWith("/_")) return true; // _astro, _image, _server-islands
@@ -67,6 +84,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // Already signed in and fully onboarded? Skip the login page.
   if (locals.user && locals.user.intakeCompletedAt && path === "/login") {
+    return redirect("/dashboard", 302);
+  }
+
+  // Admin area requires the site_admin role (or an ADMIN_EMAILS match).
+  if (
+    (path === "/admin" || path.startsWith("/admin/") || path.startsWith("/api/admin/")) &&
+    !isAdmin(env, locals.user)
+  ) {
     return redirect("/dashboard", 302);
   }
 

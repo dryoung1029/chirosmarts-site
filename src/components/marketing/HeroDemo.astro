@@ -1,0 +1,160 @@
+---
+/**
+ * Animated, self-looping mock of the student roadmap dashboard (the homepage
+ * centerpiece). Pure code-built UI with FICTIONAL data — an honest depiction of
+ * the real app, not a video. The timeline controller lives in /hero-demo.js
+ * (≤30KB, vanilla): it adds milestone classes cumulatively, animates the course
+ * ring, loops with a crossfade, honors prefers-reduced-motion (static final
+ * state), and pauses off-screen via IntersectionObserver.
+ */
+import { OWNER } from "@/config/marketing";
+const caption = OWNER.hero.demoCaption;
+---
+
+<figure class="hero-demo" data-hero-demo aria-label="Animated preview of a student dashboard with fictional data">
+  <div class="browser">
+    <div class="bar">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="url">chirosmarts.com/dashboard</span>
+    </div>
+    <div class="screen">
+      <div class="dash">
+        <div class="hello">Welcome back, <strong>Maya R.</strong></div>
+
+        <ul class="checklist">
+          <li class="row" data-step="account">
+            <span class="mark">✓</span><span class="label">Account &amp; intake</span>
+            <span class="state done">Done</span>
+          </li>
+          <li class="row" data-step="course">
+            <span class="mark course-mark">●</span>
+            <span class="label">8-hour online course</span>
+            <span class="ring"><span class="ring-num">0.0</span><span class="ring-unit">hrs</span></span>
+          </li>
+          <li class="row" data-step="handson">
+            <span class="mark">✓</span><span class="label">Hands-on training</span>
+            <span class="chip">signed by Dr. Patel</span>
+          </li>
+          <li class="row" data-step="exam">
+            <span class="mark">✓</span><span class="label">Final exam</span>
+            <span class="state pass">Passed — 92%</span>
+          </li>
+        </ul>
+
+        <div class="cert-card">
+          <span class="shine"></span>
+          <div class="cert-h">Certificate of Completion</div>
+          <div class="cert-n">Maya R.</div>
+          <div class="cert-c">Oregon Chiropractic Assistant — Initial Certification</div>
+          <div class="cert-v">Verification: CS-2026-0143</div>
+        </div>
+
+        <div class="maintain">
+          <span class="renew">Renews June 30</span>
+          <span class="maintain-label">Maintain mode</span>
+        </div>
+        <div class="toast">🔔 Your renewal bundle is ready</div>
+      </div>
+    </div>
+  </div>
+  <figcaption class="caption">{caption}</figcaption>
+</figure>
+
+<style>
+  .hero-demo { margin: 0; }
+  .caption { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 0.75rem 0 0; }
+  .browser {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  .bar { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.75rem; background: var(--brand-tint); border-bottom: 1px solid var(--border); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+  .url { margin-left: 0.6rem; font-size: 0.78rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.15rem 0.6rem; }
+  .screen { padding: 1.1rem; min-height: 320px; position: relative; }
+  .dash { position: relative; }
+  .hello { font-size: 1.05rem; margin-bottom: 0.9rem; }
+
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+  .row {
+    display: flex; align-items: center; gap: 0.6rem;
+    background: var(--brand-tint); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.8rem;
+    opacity: 0; transform: translateY(6px); transition: opacity .45s ease, transform .45s ease;
+  }
+  .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .row .label { flex: 1; }
+  .state { font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 6px; }
+  .state.done { background: var(--success-tint); color: var(--success); }
+  .state.pass { background: var(--success-tint); color: var(--success); opacity: 0; transition: opacity .4s ease; }
+  .chip { font-size: 0.78rem; padding: 0.1rem 0.5rem; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); opacity: 0; transition: opacity .4s ease; }
+  .course-mark { color: var(--warning); }
+  .ring {
+    display: inline-flex; align-items: baseline; gap: 0.15rem; font-variant-numeric: tabular-nums;
+    color: var(--brand); font-weight: 700;
+  }
+  .ring-unit { font-size: 0.7rem; color: var(--muted); }
+
+  /* certificate slides up from below, hidden initially. Ink + brand teal + gold. */
+  .cert-card {
+    position: relative; overflow: hidden; margin-top: 0.8rem;
+    background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+    border: 1px solid var(--brand); border-top: 3px solid var(--gold); border-radius: 10px;
+    padding: 0.9rem; text-align: center; color: var(--ink);
+    opacity: 0; transform: translateY(16px); transition: opacity .5s ease, transform .5s ease;
+  }
+  .cert-h { color: var(--brand); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .cert-n { font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem; }
+  .cert-c { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+  .cert-v { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
+  .shine { position: absolute; top: 0; left: -60%; width: 50%; height: 100%; background: linear-gradient(100deg, transparent, var(--sheen), transparent); }
+
+  .maintain { display: none; align-items: center; gap: 0.6rem; margin-top: 0.8rem; }
+  .renew { background: var(--brand-tint); color: var(--brand); border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.85rem; font-weight: 600; }
+  .maintain-label { color: var(--muted); font-size: 0.8rem; }
+  .toast {
+    position: absolute; right: 0.8rem; bottom: 0.8rem;
+    background: var(--surface); border: 1px solid var(--brand); border-radius: 10px;
+    padding: 0.5rem 0.75rem; font-size: 0.82rem; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(10px); transition: opacity .4s ease, transform .4s ease;
+  }
+
+  /* ---- milestone reveals (classes added cumulatively by hero-demo.js) ---- */
+  .hero-demo.s1 .row { opacity: 1; transform: none; }
+  .hero-demo.s1 .row[data-step="course"] { transition-delay: .08s; }
+  .hero-demo.s1 .row[data-step="handson"] { transition-delay: .16s; }
+  .hero-demo.s1 .row[data-step="exam"] { transition-delay: .24s; }
+  /* stages 1+ reveal rows; handson/exam extras hidden until their stage */
+  .hero-demo .row[data-step="handson"] .chip,
+  .hero-demo .row[data-step="exam"] .state.pass { opacity: 0; }
+  .hero-demo.s3 .row[data-step="handson"] .chip { opacity: 1; }
+  .hero-demo.s3 .row[data-step="handson"] .mark { background: var(--success-tint); color: var(--success); }
+  .hero-demo.s4 .row[data-step="exam"] .state.pass { opacity: 1; }
+  .hero-demo.s4 .row[data-step="exam"] .mark { background: var(--success-tint); color: var(--success); }
+  .hero-demo.s5 .cert-card { opacity: 1; transform: none; }
+  .hero-demo.s5 .shine { animation: shine 1.4s ease .3s 1; }
+  .hero-demo.s6 .maintain { display: flex; }
+  .hero-demo.s6 .toast { opacity: 1; transform: none; }
+
+  @keyframes shine { from { left: -60%; } to { left: 120%; } }
+
+  /* crossfade on loop reset */
+  .hero-demo.fade .dash { opacity: 0; transition: opacity .5s ease; }
+
+  /* reduced-motion / no-JS: show the final composition statically */
+  .hero-demo.static .row,
+  .hero-demo.static .cert-card { opacity: 1; transform: none; }
+  .hero-demo.static .row[data-step="handson"] .chip,
+  .hero-demo.static .row[data-step="exam"] .state.pass,
+  .hero-demo.static .toast { opacity: 1; transform: none; }
+  .hero-demo.static .row[data-step="handson"] .mark,
+  .hero-demo.static .row[data-step="exam"] .mark { background: var(--success-tint); color: var(--success); }
+  .hero-demo.static .maintain { display: flex; }
+  .hero-demo.static .shine { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-demo .row, .hero-demo .cert-card, .hero-demo .toast,
+    .hero-demo .state.pass, .hero-demo .chip { transition: none; }
+    .hero-demo .shine { animation: none; display: none; }
+  }
+</style>
+
+<script src="/hero-demo.js" type="module"></script>

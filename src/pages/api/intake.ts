@@ -8,6 +8,7 @@ import { instantiatePath, type PathChoice } from "@/lib/roadmap";
 import { createClinicForOwner } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
 import { nowIso } from "@/lib/time";
+import { LEGAL } from "@/config/legal";
 
 const intakeSchema = z
   .object({
@@ -85,6 +86,17 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     userId: user.id,
     type: "intake_completed",
     payload: { path: d.path, marketingConsent: consented },
+  });
+
+  // Record agreement to the Terms + Privacy at account creation (PLAN.md Item 2).
+  await logEvent(db, {
+    userId: user.id,
+    type: "terms_accepted",
+    payload: {
+      context: "signup",
+      termsVersion: LEGAL.termsVersion,
+      privacyVersion: LEGAL.privacyVersion,
+    },
   });
 
   return redirect("/dashboard", 303);

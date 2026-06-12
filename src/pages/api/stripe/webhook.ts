@@ -13,7 +13,11 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
 import { constructWebhookEvent } from "@/lib/stripe";
-import { activateEnrollment, revokeEnrollmentByPaymentIntent } from "@/lib/enrollment";
+import {
+  activateEnrollment,
+  expandFulfillment,
+  revokeEnrollmentByPaymentIntent,
+} from "@/lib/enrollment";
 import { grantSeats } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
 
@@ -47,13 +51,23 @@ export const POST: APIRoute = async ({ request, locals }) => {
     };
     const meta = session.metadata ?? {};
 
-    if (meta.kind === "course" && meta.userId && meta.courseId) {
-      await activateEnrollment(db, meta.userId, meta.courseId, {
-        paymentStatus: "paid",
-        stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: session.payment_intent ?? undefined,
-        amountCents: session.amount_total ?? undefined,
-      });
+    if (meta.kind === "course" && meta.userId && (meta.courseIds || meta.courseId)) {
+      // `courseIds` (CSV) is the bundle-ready form; `courseId` kept for any
+      // older in-flight session. Activate each course in the session.
+      const courseIds = (meta.courseIds ?? meta.courseId ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const courseId of courseIds) {
+        // Bundles expand to their constituent courses (one purchase → many).
+        for (const targetId of await expandFulfillment(db, courseId)) {
+          await activateEnrollment(db, meta.userId, targetId, {
+            paymentStatus: "paid",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent ?? undefined,
+          });
+        }
+      }
     } else if (meta.kind === "seats" && meta.clinicId && meta.count) {
       const clinic = await db
         .select()

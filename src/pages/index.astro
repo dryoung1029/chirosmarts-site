@@ -1,69 +1,169 @@
 ---
-// Public landing page.
-import Logo from "@/components/Logo.astro";
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import HeroDemo from "@/components/marketing/HeroDemo.astro";
+import StatsBar from "@/components/marketing/StatsBar.astro";
+import Testimonials from "@/components/marketing/Testimonials.astro";
+import Faq from "@/components/marketing/Faq.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
+import { getDb, schema } from "@/db/client";
+import { eq, asc } from "drizzle-orm";
+import { OWNER, ownerCopy } from "@/config/marketing";
+
+const db = getDb(Astro.locals.runtime.env);
+const courses = await db
+  .select()
+  .from(schema.courses)
+  .where(eq(schema.courses.status, "published"))
+  .orderBy(asc(schema.courses.priceCents))
+  .all();
+const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
+
+const heroHeadline = OWNER.hero.headline ?? ownerCopy("hero headline");
+const heroSubhead = OWNER.hero.subhead ?? ownerCopy("hero subhead");
+const instructor = OWNER.instructor;
+
+const audience = [
+  { title: "I'm becoming a CA", desc: "New to the field? See every step from hired to certified.", cta: "Start here →", href: "/guides/become-a-chiropractic-assistant-oregon" },
+  { title: "I need to renew", desc: "Find your deadline and exactly which hours Oregon requires of you this year.", cta: "Check my date →", href: "/renewal" },
+  { title: "I run a clinic", desc: "Buy seats, invite your team, and watch every certification stay current.", cta: "See how →", href: "/clinics" },
+];
+const steps = [
+  { n: "1", t: "Sign up, get your roadmap.", d: "Answer five questions; we build your personal step-by-step Oregon path — training, paperwork, exam, deadlines." },
+  { n: "2", t: "Train at your pace.", d: "Watch on any device, pick up where you left off, pass the final exam. Your hours are tracked automatically." },
+  { n: "3", t: "Certified — and never caught off guard again.", d: "Your certificate is issued instantly, verifiable by any employer, and your renewal deadline is tracked for you every year." },
+];
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChiroSmarts — Oregon Chiropractic Assistant training</title>
-    <style>
-      :root { color-scheme: light dark; }
-      body {
-        font-family: system-ui, sans-serif;
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: #0f172a;
-        color: #e2e8f0;
-      }
-      main { text-align: center; padding: 2rem; max-width: 40rem; }
-      h1 { font-size: 2rem; margin-bottom: 0.5rem; }
-      p { color: #94a3b8; line-height: 1.55; }
-      .cta {
-        display: inline-block;
-        margin-top: 0.5rem;
-        background: #0ea5e9;
-        color: #fff;
-        padding: 0.6rem 1.2rem;
-        border-radius: 8px;
-        text-decoration: none;
-      }
-      .disclaimer {
-        margin: 1.75rem auto 0;
-        max-width: 34rem;
-        text-align: left;
-        background: #0b2942;
-        border: 1px solid #1e496b;
-        color: #cfe8ff;
-        border-radius: 10px;
-        padding: 1rem 1.15rem;
-        font-size: 0.95rem;
-        line-height: 1.5;
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <div style="display:flex;justify-content:center;margin-bottom:0.75rem">
-        <Logo height={46} />
+<MarketingLayout
+  title="ChiroSmarts — Oregon Chiropractic Assistant training"
+  description="Oregon CA certification training online — state-required hours, exam prep, verifiable certificates, and automatic renewal tracking. Module 1 free."
+  canonicalPath="/"
+>
+  <!-- Hero -->
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container hero-wrap">
+      <div class="hero-copy">
+        <h1 style="font-size:2.4rem;line-height:1.15;margin:0 0 0.75rem">
+          {heroHeadline.startsWith("[OWNER COPY") ? <span class="owner-copy">{heroHeadline}</span> : heroHeadline}
+        </h1>
+        <p style="font-size:1.1rem;color:var(--muted);margin:0 0 1.5rem;max-width:34rem">
+          {heroSubhead.startsWith("[OWNER COPY") ? <span class="owner-copy">{heroSubhead}</span> : heroSubhead}
+        </p>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+          <a class="btn-primary" href="/login">Start free — Module 1 is on us</a>
+          <a class="btn-secondary" href="/clinics">For clinics →</a>
+        </div>
       </div>
-      <p>
-        State-compliant Oregon Chiropractic Assistant training &amp; continuing
-        education.
-      </p>
-      <p><a class="cta" href="/login">Sign in / Create account</a></p>
+      <div class="hero-demo-col">
+        <HeroDemo />
+      </div>
+    </div>
+  </section>
 
-      <p class="disclaimer">
-        <strong>Please note:</strong> ChiroSmarts training and its final exam
-        confirm that you have completed and understood the coursework. They are
+  <!-- Audience router -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container mk-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      {audience.map((a) => (
+        <a class="mk-card" href={a.href} style="text-decoration:none;color:inherit">
+          <strong style="color:var(--text);font-size:1.05rem">{a.title}</strong>
+          <p style="margin:0.4rem 0 0;color:var(--muted)">{a.desc}</p>
+          <span style="color:var(--accent);font-size:0.9rem">{a.cta}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <StatsBar />
+
+  <!-- How it works -->
+  <section class="mk-section">
+    <div class="mk-container">
+      <h2>How it works</h2>
+      <div class="mk-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+        {steps.map((s) => (
+          <div class="mk-card">
+            <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-text);display:grid;place-items:center;font-weight:700">{s.n}</div>
+            <h3 style="margin:0.6rem 0 0.3rem;font-size:1.1rem">{s.t}</h3>
+            <p style="margin:0;color:var(--muted)">{s.d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Instructor credibility -->
+  <section class="mk-section" style="background:var(--bg-2)">
+    <div class="mk-container" style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
+      {instructor.photo
+        ? <img src={instructor.photo} alt={instructor.name ?? "Instructor"} width="120" height="120" loading="lazy" style="border-radius:14px" />
+        : <div style="width:120px;height:120px;border-radius:14px;background:var(--panel);border:1px dashed var(--border);display:grid;place-items:center;color:var(--muted);font-size:0.8rem;text-align:center">photo</div>}
+      <div style="flex:1;min-width:240px">
+        <h2 style="margin:0 0 0.25rem">
+          {instructor.name ? instructor.name : <span class="owner-copy">{ownerCopy("instructor name")}</span>}
+        </h2>
+        <p style="margin:0 0 0.5rem;color:var(--accent)">
+          {instructor.credentials ? instructor.credentials : <span class="owner-copy">{ownerCopy("instructor credentials")}</span>}
+        </p>
+        <p style="margin:0;color:var(--muted)">
+          {instructor.bio ? instructor.bio : <span class="owner-copy">{ownerCopy("instructor short bio")}</span>}
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <Testimonials />
+
+  <!-- Catalog teaser -->
+  <section class="mk-section">
+    <div class="mk-container">
+      <h2>Courses</h2>
+      <div class="mk-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+        {courses.map((c) => (
+          <a class="mk-card" href={`/courses/${c.slug}`} style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.4rem">
+            <strong style="color:var(--text)">{c.title}</strong>
+            <span style="color:var(--muted);font-size:0.9rem">{c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} · {usd(c.priceCents)}</span>
+            <span style="color:var(--accent);font-size:0.9rem">View course →</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Lead magnet -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container" style="max-width:680px">
+      <LeadCapture
+        source="checklist_pdf"
+        heading="Free: the Oregon CA Certification Checklist"
+        blurb="Every step from job offer to certificate — the training hours, the hands-on log, the state application, the exam — on one printable page. Enter your email and we'll send it over."
+        buttonLabel="Send me the checklist"
+      />
+      <p class="muted" style="font-size:0.82rem;margin:0.5rem 0 0">
+        No spam. One useful PDF and an unsubscribe link in every email.
+      </p>
+    </div>
+  </section>
+
+  <Faq faqs={OWNER.homepageFaq} />
+
+  <!-- Existing compliance disclaimer (owner copy — preserved) -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container">
+      <div class="mk-card" style="border-color:var(--brand);background:var(--brand-tint);color:var(--ink)">
+        <strong>Please note:</strong> ChiroSmarts training and its final exam confirm
+        that you have completed and understood the coursework. They are
         <strong>not</strong> the certification exam. Becoming a certified Oregon
         Chiropractic Assistant requires passing the separate certification exam
         administered through the NBCE.
-      </p>
-    </main>
-  </body>
-</html>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .hero-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+    @media (max-width: 880px) {
+      .hero-wrap { grid-template-columns: 1fr; }
+      .hero-demo-col { order: -1; }
+    }
+  </style>
+</MarketingLayout>

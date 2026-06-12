@@ -1,0 +1,43 @@
+---
+/** "The state requires → this course provides" mapping. Rows are owner-authored
+ * per course (config); missing → a visible placeholder, no invented claims. */
+import { ownerCopy } from "@/config/marketing";
+
+interface Props {
+  rows?: { requires: string; provides: string }[];
+  verifyNote?: string; // owner [VERIFY] reminder shown until certified
+}
+const { rows, verifyNote } = Astro.props;
+const has = rows && rows.length > 0;
+---
+
+<section class="mk-section">
+  <div class="mk-container" style="max-width:820px">
+    <h2>What Oregon requires — and how this course covers it</h2>
+    {
+      !has ? (
+        <p><span class="owner-copy">{ownerCopy("requirements-mapping rows (state requires → course provides)")}</span></p>
+      ) : (
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="text-align:left;color:var(--muted);font-size:0.85rem">
+              <th style="padding:0.6rem 0.75rem;border-bottom:1px solid var(--border)">Oregon requires</th>
+              <th style="padding:0.6rem 0.75rem;border-bottom:1px solid var(--border)">You get</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows!.map((r) => (
+              <tr>
+                <td style="padding:0.6rem 0.75rem;border-bottom:1px solid var(--border)">{r.requires}</td>
+                <td style="padding:0.6rem 0.75rem;border-bottom:1px solid var(--border);color:var(--text)">✓ {r.provides}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+    }
+    {has && verifyNote && (
+      <p style="margin-top:0.75rem"><span class="owner-copy">{verifyNote}</span></p>
+    )}
+  </div>
+</section>

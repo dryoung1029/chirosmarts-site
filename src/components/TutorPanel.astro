@@ -1,0 +1,84 @@
+---
+/**
+ * Course tutor chat panel (M6). Reused on the course tutor page and the
+ * per-lesson sidebar. Client logic lives in /tutor-panel.js (loaded once per
+ * page; module dedupes across instances).
+ */
+interface Props {
+  courseSlug: string;
+  compact?: boolean;
+}
+const { courseSlug, compact = false } = Astro.props;
+const threadHeight = compact ? "220px" : "340px";
+---
+
+<div class="tutor-panel" data-tutor-panel data-course-slug={courseSlug}>
+  <div data-tutor-thread class="tutor-thread" style={`max-height:${threadHeight}`}>
+    <div class="tutor-msg tutor-bot">
+      <span class="muted">
+        Ask about anything covered in this course's lessons. I answer only from
+        the course material and link you to the exact lesson and timestamp.
+      </span>
+    </div>
+  </div>
+  <div class="tutor-input-row">
+    <textarea
+      data-tutor-input
+      rows={compact ? 2 : 3}
+      placeholder="e.g. What are the steps for taking a blood pressure?"
+    ></textarea>
+    <button type="button" data-tutor-send>Ask</button>
+  </div>
+</div>
+
+<script src="/tutor-panel.js" type="module"></script>
+
+<style is:global>
+  .tutor-thread {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+  .tutor-msg {
+    padding: 0.55rem 0.8rem;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    max-width: 90%;
+  }
+  .tutor-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .tutor-bot {
+    align-self: flex-start;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+  }
+  .tutor-cites {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .tutor-cites ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1.1rem;
+  }
+  .tutor-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+  }
+  .tutor-input-row textarea {
+    flex: 1;
+    resize: vertical;
+    margin: 0;
+  }
+  .tutor-input-row button {
+    margin: 0;
+    white-space: nowrap;
+  }
+</style>

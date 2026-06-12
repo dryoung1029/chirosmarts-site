@@ -1,0 +1,15 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getEntry, render } from "astro:content";
+
+const entry = await getEntry("legal", "terms");
+const { Content } = await render(entry!);
+---
+
+<Layout title={entry!.data.title} showNav={true}>
+  <article style="max-width:48rem;line-height:1.6">
+    <h1>{entry!.data.title}</h1>
+    <p class="muted" style="margin-top:0">Last updated: {entry!.data.lastUpdated}</p>
+    <Content />
+  </article>
+</Layout>

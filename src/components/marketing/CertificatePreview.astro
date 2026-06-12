@@ -1,0 +1,42 @@
+---
+/** A framed SAMPLE certificate preview. Uses the real course title/hours/
+ * instructor from the DB, but a clearly fictional recipient — honest depiction,
+ * no fabricated person. */
+interface Props {
+  courseTitle: string;
+  creditHours: number;
+  instructorName: string;
+}
+const { courseTitle, creditHours, instructorName } = Astro.props;
+---
+
+<div class="cert-preview" aria-label="Sample certificate preview">
+  <div class="cert-watermark">SAMPLE</div>
+  <div class="cert-head">Certificate of Completion</div>
+  <div class="cert-body">
+    <div class="cert-name">Sample Student</div>
+    <div class="cert-course">{courseTitle}</div>
+    <div class="cert-meta">{creditHours} credit hour{creditHours === 1 ? "" : "s"} · {instructorName}</div>
+    <div class="cert-code">Verification: CS-SAMPLE-0000</div>
+  </div>
+</div>
+
+<style>
+  .cert-preview {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+    border: 1px solid var(--brand); border-top: 3px solid var(--gold); border-radius: 12px;
+    padding: 1.5rem; text-align: center; max-width: 460px;
+  }
+  .cert-watermark {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 3.5rem; font-weight: 800; color: var(--brand); opacity: 0.07;
+    transform: rotate(-18deg); letter-spacing: 0.2em; pointer-events: none;
+  }
+  .cert-head { color: var(--brand); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.8rem; }
+  .cert-body { margin-top: 0.75rem; }
+  .cert-name { font-size: 1.5rem; font-weight: 700; color: var(--ink); }
+  .cert-course { margin-top: 0.35rem; color: var(--ink); }
+  .cert-meta { margin-top: 0.35rem; color: var(--muted); font-size: 0.85rem; }
+  .cert-code { margin-top: 0.75rem; font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.8rem; }
+</style>

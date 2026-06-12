@@ -61,7 +61,117 @@ export async function getActiveCertificate(
       ),
     )
     .all()
-    .then((rows) => rows.find((r) => r.status !== "revoked"));
+    .then((rows) => rows.find((r) => r.status === "issued"));
+}
+
+/** All certificates for a user+course, newest first (admin history view). */
+export async function listCertificates(
+  db: Db,
+  userId: string,
+  courseId: string,
+) {
+  const rows = await db
+    .select()
+    .from(schema.certificates)
+    .where(
+      and(
+        eq(schema.certificates.userId, userId),
+        eq(schema.certificates.courseId, courseId),
+      ),
+    )
+    .all();
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Revoke a certificate. The PDF is retained in R2 (compliance never deletes). */
+export async function revokeCertificate(
+  db: Db,
+  certId: string,
+  adminUserId: string,
+): Promise<void> {
+  const cert = await db
+    .select()
+    .from(schema.certificates)
+    .where(eq(schema.certificates.id, certId))
+    .get();
+  if (!cert) return;
+  await db
+    .update(schema.certificates)
+    .set({ status: "revoked" })
+    .where(eq(schema.certificates.id, certId));
+  await logEvent(db, {
+    userId: cert.userId,
+    type: "certificate_revoked",
+    courseId: cert.courseId,
+    payload: { certificateId: certId, by: adminUserId },
+  });
+}
+
+/**
+ * Reissue a certificate: supersede the current one and mint a fresh certificate
+ * with current snapshot values (e.g. after a legal-name correction). The old row
+ * is marked `reissued` (invalid for verification); the new row points back via
+ * supersedesId. Emails the new PDF.
+ */
+export async function reissueCertificate(
+  env: CloudflareEnv,
+  db: Db,
+  certId: string,
+  adminUserId: string,
+): Promise<IssueResult | null> {
+  const old = await db
+    .select()
+    .from(schema.certificates)
+    .where(eq(schema.certificates.id, certId))
+    .get();
+  if (!old) return null;
+
+  // Mark the old one superseded so getActiveCertificate won't return it.
+  await db
+    .update(schema.certificates)
+    .set({ status: "reissued" })
+    .where(eq(schema.certificates.id, certId));
+
+  const user = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, old.userId))
+    .get();
+  const issued = await issueCertificate(env, db, {
+    userId: old.userId,
+    courseId: old.courseId,
+  });
+  if (!issued?.created) return issued;
+
+  await db
+    .update(schema.certificates)
+    .set({ supersedesId: old.id })
+    .where(eq(schema.certificates.id, issued.certificate.id));
+  await logEvent(db, {
+    userId: old.userId,
+    type: "certificate_reissued",
+    courseId: old.courseId,
+    payload: { certificateId: issued.certificate.id, supersedes: old.id, by: adminUserId },
+  });
+
+  if (user && issued.certificate.r2Key) {
+    try {
+      const pdf = await getCertificatePdf(env, issued.certificate.r2Key);
+      if (pdf) {
+        await sendCertificateEmail(env, {
+          to: user.email,
+          legalName: issued.certificate.legalNameSnapshot,
+          courseTitle: issued.certificate.courseTitleSnapshot,
+          certNumber: issued.certificate.certNumber!,
+          verificationCode: issued.certificate.verificationCode,
+          pdf: new Uint8Array(pdf),
+        });
+      }
+    } catch (e) {
+      console.error("[certificate] reissue email failed", e);
+    }
+  }
+  return issued;
 }
 
 /** Look up a certificate by its public verification code. */
@@ -207,10 +317,13 @@ export async function getCertificatePdf(
 // PDF rendering
 // ---------------------------------------------------------------------------
 
-const ACCENT = rgb(0.055, 0.647, 0.914); // #0ea5e9
-const INK = rgb(0.06, 0.09, 0.16);
-const MUTED = rgb(0.42, 0.47, 0.55);
-const WATERMARK = rgb(0.9, 0.93, 0.97);
+// Certificate palette: ink + brand teal + a gold accent (matches design tokens;
+// uses --brand/--gold, never --action).
+const ACCENT = rgb(0.043, 0.42, 0.388); // --brand #0B6B63
+const GOLD = rgb(0.722, 0.525, 0.043); // --gold #B8860B
+const INK = rgb(0.075, 0.153, 0.169); // --ink #13272B
+const MUTED = rgb(0.318, 0.392, 0.416); // --muted #51646A
+const WATERMARK = rgb(0.93, 0.95, 0.94);
 
 interface RenderArgs {
   legalName: string;
@@ -262,7 +375,7 @@ export async function renderCertificatePdf(
     y: 32,
     width: width - 64,
     height: height - 64,
-    borderColor: rgb(0.78, 0.85, 0.93),
+    borderColor: GOLD,
     borderWidth: 1,
   });
 

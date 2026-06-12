@@ -1,0 +1,31 @@
+---
+/** Admin section sub-navigation. */
+interface Props {
+  active?: "overview" | "students" | "content";
+}
+const { active } = Astro.props;
+const links: { key: string; href: string; label: string }[] = [
+  { key: "overview", href: "/admin", label: "Overview" },
+  { key: "students", href: "/admin/students", label: "Students" },
+  { key: "content", href: "/admin/content", label: "Content" },
+];
+---
+
+<nav
+  style="display:flex;gap:0.25rem;margin:0 0 1.5rem;border-bottom:1px solid var(--border);padding-bottom:0.5rem"
+>
+  {
+    links.map((l) => (
+      <a
+        href={l.href}
+        style={`padding:0.4rem 0.8rem;border-radius:8px;text-decoration:none;font-size:0.95rem;${
+          active === l.key
+            ? "background:var(--accent);color:var(--accent-text)"
+            : "color:var(--muted)"
+        }`}
+      >
+        {l.label}
+      </a>
+    ))
+  }
+</nav>

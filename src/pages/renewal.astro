@@ -1,0 +1,66 @@
+---
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import RenewalChecker from "@/components/marketing/RenewalChecker.astro";
+
+const db = getDb(Astro.locals.runtime.env);
+const bundle = await db
+  .select()
+  .from(schema.courses)
+  .where(eq(schema.courses.id, "crs_renewal_bundle"))
+  .get();
+const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
+---
+
+<MarketingLayout
+  title="Oregon CA renewal — dates and required hours"
+  description="Oregon CA renewal made simple — find your birth-month deadline, see your required hours, and finish your 6-hour CE bundle online."
+  canonicalPath="/renewal"
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container" style="max-width:780px">
+      <h1 style="font-size:2.1rem;margin:0 0 0.75rem">Oregon CA renewal</h1>
+      <p style="color:var(--muted)">
+        Oregon CA certifications renew every year on the last day of your birth
+        month, and each renewal year requires 6 hours of continuing education —
+        including at least 1 hour of cultural competency, and 2 hours of vitals
+        training if this is your first renewal. Miss the window and you can't
+        legally perform clinical duties until you're current.
+        <span class="owner-copy">[VERIFY lapse-consequence phrasing]</span>
+        Use the checker below to see your exact deadline and the hours you need,
+        and we'll handle the rest: the renewal bundle covers your required hours
+        in one purchase, and once you have an account, we track your deadline and
+        remind you every year — so renewal becomes a two-evening task instead of
+        a scramble.
+      </p>
+    </div>
+  </section>
+
+  <!-- Renewal-date checker (interactive island). -->
+  <section class="mk-section" style="padding-top:0">
+    <div class="mk-container" style="max-width:780px">
+      <h2 style="margin-top:0">Check your renewal date</h2>
+      <RenewalChecker />
+    </div>
+  </section>
+
+  <!-- Renewal bundle course card (from DB) -->
+  {bundle && (
+    <section class="mk-section" style="padding-top:0">
+      <div class="mk-container" style="max-width:780px">
+        <div class="mk-card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px">
+            <strong style="color:var(--text);font-size:1.1rem">{bundle.title}</strong>
+            <p style="margin:0.3rem 0 0;color:var(--muted)">{bundle.description}</p>
+            <p style="margin:0.3rem 0 0;color:var(--muted)">{bundle.creditHours} credit hours · {usd(bundle.priceCents)}</p>
+          </div>
+          <a class="btn-primary" href={`/courses/${bundle.slug}`}>View the renewal bundle →</a>
+        </div>
+        {bundle.status !== "published" && (
+          <p style="color:var(--muted);font-size:0.85rem;margin-top:0.5rem">This bundle is being finalized.</p>
+        )}
+      </div>
+    </section>
+  )}
+</MarketingLayout>

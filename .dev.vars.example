@@ -8,6 +8,9 @@
 # (ChiroSmarts uses 4322 to avoid clashing with other Astro projects on 4321.)
 SITE_URL="http://localhost:4322"
 
+# Comma-separated emails granted the /admin area (promoted to site_admin on login).
+ADMIN_EMAILS="you@example.com"
+
 # --- Resend (transactional + compliance email: magic links, receipts, certs) ---
 # If RESEND_API_KEY is empty, sign-in links are printed to the dev server console
 # (and shown on the login page) instead of emailed, so you can test without a key.
@@ -34,5 +37,16 @@ CF_STREAM_SIGNING_KEY_ID=""
 CF_STREAM_SIGNING_KEY_PEM=""
 CF_STREAM_SIGNING_KEY_JWK=""
 
-# --- Anthropic API (M6 AI tutor only; unused until then) ---
+# --- Anthropic API (M6 AI course tutor — Claude Haiku 4.5) ---
+# Without a key the tutor still runs but answers "not configured yet".
 ANTHROPIC_API_KEY=""
+
+# --- Marketing layer ---
+# Cloudflare Web Analytics beacon token (cookieless). Injected into marketing
+# pages only when set. View stats in Cloudflare dashboard → Web Analytics.
+CF_WEB_ANALYTICS_TOKEN=""
+# Brevo (marketing email). Groundwork only — manual admin sync of CONSENTED
+# contacts; no campaigns. List IDs are numeric.
+BREVO_API_KEY=""
+BREVO_LIST_ID_LEADS=""
+BREVO_LIST_ID_USERS=""

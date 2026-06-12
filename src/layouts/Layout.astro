@@ -5,7 +5,12 @@ interface Props {
 }
 const { title, showNav = false } = Astro.props;
 const user = Astro.locals.user;
+import "@/styles/tokens.css";
 import Logo from "@/components/Logo.astro";
+import { isAdmin } from "@/lib/admin";
+import { LEGAL } from "@/config/legal";
+const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
+const legalEntity = LEGAL.entityName;
 ---
 
 <!doctype html>
@@ -15,27 +20,11 @@ import Logo from "@/components/Logo.astro";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} · ChiroSmarts</title>
     <style is:global>
-      :root {
-        color-scheme: light dark;
-        --bg: #0f172a;
-        --panel: #1e293b;
-        --border: #334155;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --accent: #0ea5e9;
-        --accent-text: #fff;
-        --ok: #22c55e;
-        --warn: #f59e0b;
-      }
-      * { box-sizing: border-box; }
       body {
         font-family: system-ui, sans-serif;
         margin: 0;
-        background: var(--bg);
-        color: var(--text);
         min-height: 100vh;
       }
-      a { color: var(--accent); }
       .nav {
         display: flex;
         justify-content: space-between;
@@ -47,69 +36,42 @@ import Logo from "@/components/Logo.astro";
       .nav form { margin: 0; }
       .wrap { max-width: 44rem; margin: 0 auto; padding: 2rem 1.5rem; }
       .panel {
-        background: var(--panel);
+        background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 1.5rem;
         margin-bottom: 1.25rem;
+        box-shadow: var(--shadow);
       }
       h1 { font-size: 1.6rem; margin: 0 0 0.5rem; }
       h2 { font-size: 1.1rem; margin: 0 0 0.75rem; }
       p { line-height: 1.5; color: var(--muted); }
       label { display: block; font-size: 0.9rem; margin: 0.9rem 0 0.3rem; }
-      input[type="text"], input[type="email"], select {
-        width: 100%;
-        padding: 0.6rem 0.7rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: #0b1220;
-        color: var(--text);
-        font-size: 1rem;
-      }
       .row { display: flex; gap: 1rem; }
       .row > div { flex: 1; }
       .check { display: flex; gap: 0.6rem; align-items: flex-start; margin-top: 1rem; }
-      .check input { margin-top: 0.25rem; }
-      button, .btn {
-        display: inline-block;
-        margin-top: 1.25rem;
-        background: var(--accent);
-        color: var(--accent-text);
-        border: 0;
-        padding: 0.7rem 1.2rem;
-        border-radius: 8px;
-        font-size: 1rem;
-        cursor: pointer;
-        text-decoration: none;
-      }
-      button.link {
-        background: none;
-        color: var(--accent);
-        padding: 0;
-        margin: 0;
-      }
+      .check input { width: auto; margin-top: 0.25rem; }
+      /* Keep the in-content form-button spacing the app relied on. */
+      .wrap button, .wrap .btn { margin-top: 1.25rem; }
+      .wrap button.link { margin-top: 0; }
       .muted { color: var(--muted); font-size: 0.9rem; }
-      .notice {
-        border-radius: 8px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 1rem;
-        font-size: 0.95rem;
-      }
-      .notice.ok { background: #052e1a; border: 1px solid #14532d; color: #bbf7d0; }
-      .notice.warn { background: #422006; border: 1px solid #713f12; color: #fde68a; }
-      .notice.err { background: #450a0a; border: 1px solid #7f1d1d; color: #fecaca; }
     </style>
   </head>
   <body>
     {
       showNav && (
         <nav class="nav">
-          <a href="/dashboard" style="text-decoration:none;color:inherit"><Logo height={30} /></a>
+          <a href="/dashboard" style="text-decoration:none;color:inherit"><Logo height={42} /></a>
           {user && (
-            <form method="POST" action="/api/auth/logout">
-              <span class="muted" style="margin-right:1rem">{user.email}</span>
-              <button class="link" type="submit">Sign out</button>
-            </form>
+            <div style="display:flex;align-items:center;gap:1rem">
+              {userIsAdmin && (
+                <a href="/admin" style="font-size:0.9rem">Admin</a>
+              )}
+              <form method="POST" action="/api/auth/logout" style="display:flex;align-items:center;gap:1rem">
+                <span class="muted">{user.email}</span>
+                <button class="link" type="submit">Sign out</button>
+              </form>
+            </div>
           )}
         </nav>
       )
@@ -117,5 +79,11 @@ import Logo from "@/components/Logo.astro";
     <main class="wrap">
       <slot />
     </main>
+    <footer class="wrap" style="margin-top:2rem;padding:1.25rem 0;border-top:1px solid var(--border);color:var(--muted);font-size:0.85rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
+      <span>© {new Date().getFullYear()} {legalEntity}</span>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/courses">Courses</a>
+    </footer>
   </body>
 </html>

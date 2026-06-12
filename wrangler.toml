@@ -15,6 +15,8 @@ pages_build_output_dir = "./dist"
 # This is the PRODUCTION value; local `astro dev` overrides it via `.dev.vars`.
 [vars]
 SITE_URL = "https://chirosmarts-site.pages.dev"
+# Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
+ADMIN_EMAILS = "dryoung1029@gmail.com"
 
 # --- D1 (database) ---
 [[d1_databases]]
@@ -22,6 +24,10 @@ binding = "DB"
 database_name = "chirosmarts"
 database_id = "05f1cac3-0a6f-4b49-82f1-46d87f064445"
 migrations_dir = "./migrations"
+
+# --- Workers AI (M6 tutor: transcript + query embeddings for semantic search) ---
+[ai]
+binding = "AI"
 
 # --- R2 (documents: certificate PDFs, signed hands-on logs) ---
 [[r2_buckets]]

@@ -15,6 +15,7 @@ import {
   text,
   integer,
   real,
+  blob,
   index,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
@@ -169,6 +170,13 @@ export const courses = sqliteTable("courses", {
   title: text("title").notNull(),
   description: text("description"),
   creditHours: real("credit_hours").notNull().default(0),
+  // Exam-unlock floor in CONTENT minutes (union-coverage credited time). NULL =
+  // no explicit floor; the gate then relies on per-lesson coverage only. Kept
+  // separate from creditHours (the certificate figure) so a course can grant
+  // more credit than its video runtime — e.g. Vitals, where credit includes
+  // off-video practice logged on paper. Never let this exceed runtime (the gate
+  // clamps it) or the exam would be unreachable.
+  requiredSeatMinutes: integer("required_seat_minutes"),
   topicCategory: text("topic_category", {
     enum: ["general", "vitals", "cultural_competency", "hipaa"],
   })
@@ -187,7 +195,10 @@ export const courses = sqliteTable("courses", {
   })
     .notNull()
     .default("one_time_purchase"),
-  priceCents: integer("price_cents").notNull().default(14900), // $149
+  // Per-course price in cents — the single source of truth for every display
+  // surface. No price is ever hard-coded in app code (catalog/checkout/seats all
+  // read this). Default 0 so a row without an explicit price is obviously unset.
+  priceCents: integer("price_cents").notNull().default(0),
   stripePriceId: text("stripe_price_id"),
   status: text("status", { enum: ["draft", "published", "archived"] })
     .notNull()
@@ -528,4 +539,112 @@ export const documents = sqliteTable(
     uploadedAt: text("uploaded_at").notNull().default(nowUtc),
   },
   (t) => [index("documents_user_idx").on(t.userId)],
+);
+
+// Course-level downloadable assets the course PROVIDES to students — e.g. the
+// blank Vitals practice-log PDF the student prints and fills in. Distinct from
+// `documents` (the student's own uploaded, completed evidence). Stored in R2.
+export const courseResources = sqliteTable(
+  "course_resources",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id),
+    type: text("type", {
+      enum: ["practice_log_template", "handout", "other"],
+    })
+      .notNull()
+      .default("other"),
+    title: text("title").notNull(),
+    fileName: text("file_name").notNull(),
+    contentType: text("content_type").notNull().default("application/pdf"),
+    r2Key: text("r2_key").notNull(),
+    // `enrolled` = entitled students only; `public` = anyone (e.g. a syllabus).
+    visibility: text("visibility", { enum: ["enrolled", "public"] })
+      .notNull()
+      .default("enrolled"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [index("course_resources_course_idx").on(t.courseId)],
+);
+
+// A bundle is a single saleable `courses` row (one price, one purchase) whose
+// fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
+// maps a bundle course to its children; checkout/webhook fulfilment expands the
+// purchased course id into this list. No per-hour or hours-bank concept — a
+// bundle is just "buy this SKU → get these courses".
+export const bundleItems = sqliteTable(
+  "bundle_items",
+  {
+    id: text("id").primaryKey(),
+    bundleCourseId: text("bundle_course_id")
+      .notNull()
+      .references(() => courses.id),
+    childCourseId: text("child_course_id")
+      .notNull()
+      .references(() => courses.id),
+  },
+  (t) => [
+    uniqueIndex("bundle_items_pair_idx").on(t.bundleCourseId, t.childCourseId),
+    index("bundle_items_bundle_idx").on(t.bundleCourseId),
+  ],
+);
+
+// Marketing leads captured from the funnel (renewal checker, lead-magnet PDF).
+// DOUBLE-OPT-IN: a lead is `pending` until it confirms via the emailed link, then
+// `confirmed` — only confirmed leads are eligible for Brevo sync. Kept separate
+// from `users` (an account) and from compliance data. `consentAt` records the
+// single opt-in submission; `confirmedAt` the double opt-in.
+export const marketingLeads = sqliteTable(
+  "marketing_leads",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(), // normalized lowercase
+    source: text("source", {
+      enum: ["renewal_checker", "checklist_pdf", "other"],
+    })
+      .notNull()
+      .default("other"),
+    birthMonth: integer("birth_month"),
+    status: text("status", {
+      enum: ["pending", "confirmed", "unsubscribed"],
+    })
+      .notNull()
+      .default("pending"),
+    confirmTokenHash: text("confirm_token_hash"),
+    consentAt: text("consent_at").notNull().default(nowUtc),
+    confirmedAt: text("confirmed_at"),
+    syncedToBrevoAt: text("synced_to_brevo_at"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("marketing_leads_email_source_idx").on(t.email, t.source),
+    index("marketing_leads_status_idx").on(t.status),
+  ],
+);
+
+// Semantic-search vectors for transcript chunks (M6 tutor). Each row holds one
+// chunk's normalized embedding (Float32 bytes) for a given model, so the tutor
+// can rank by cosine similarity instead of keyword overlap. Decoupled from
+// `lesson_transcripts` so models can be swapped/re-embedded without touching the
+// transcript of record. Cosine is computed in-JS over the course's vectors
+// (no Vectorize needed at this scale).
+export const transcriptEmbeddings = sqliteTable(
+  "transcript_embeddings",
+  {
+    id: text("id").primaryKey(),
+    lessonTranscriptId: text("lesson_transcript_id")
+      .notNull()
+      .references(() => lessonTranscripts.id),
+    lessonId: text("lesson_id").notNull(), // denormalized for fast entitlement filtering
+    model: text("model").notNull(),
+    dim: integer("dim").notNull(),
+    vector: blob("vector", { mode: "buffer" }).notNull(), // normalized Float32 little-endian
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("transcript_emb_chunk_model_idx").on(t.lessonTranscriptId, t.model),
+    index("transcript_emb_lesson_idx").on(t.lessonId, t.model),
+  ],
 );

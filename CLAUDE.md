@@ -48,7 +48,12 @@ until the custom domain attaches at launch.
    `position_start`, `position_end`, `wall_seconds`, `playback_rate`, and are
    **append-only**. Heartbeats fire only while playing in a focused tab.
    Playback speed allowed, capped per-course (default 1.5x). The final exam
-   cannot unlock until credited content-minutes ≥ `credit_hours × 60`.
+   unlocks when the student has watched ≥ 90% of EVERY lesson (no-skip rule) AND
+   accrued the course's explicit `required_seat_minutes` of content (a per-course
+   knob, NULL = no extra floor, clamped to runtime so it's never unsatisfiable).
+   **`required_seat_minutes` is decoupled from `credit_hours`** — the latter is
+   the certificate figure only, so a course may grant more credit than it has
+   video (e.g. Vitals, where credit includes off-video practice logged on paper).
    **Never UPDATE a seat-time total — always recompute from `events`.**
 2. **One active playback DEVICE per user** via the short-lived `playback_leases`
    table (NOT session revocation). Heartbeats renew the lease; a stale lease can

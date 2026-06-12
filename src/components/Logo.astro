@@ -1,18 +1,19 @@
 ---
 /**
- * ChiroSmarts logo. Uses the canonical brand artwork (public/logo.png) keyed to
- * a transparent background and recolored white for the dark site theme
- * (public/logo-light.png). The certificate embeds the dark variant separately
- * (src/lib/logo-data.ts).
+ * ChiroSmarts logo. The light site theme (canvas #FAFAF7 / white surfaces) uses
+ * the canonical dark brand artwork (public/logo.png). A white recolor remains at
+ * public/logo-light.png for dark placements (e.g. a brand-teal footer).
  */
 interface Props {
   height?: number; // px height of the mark
+  variant?: "dark" | "light"; // dark = canonical (default); light = white recolor
 }
-const { height = 36 } = Astro.props;
+const { height = 36, variant = "dark" } = Astro.props;
+const src = variant === "light" ? "/logo-light.png" : "/logo.png";
 ---
 
 <img
-  src="/logo-light.png"
+  src={src}
   alt="ChiroSmarts"
   height={height}
   style={`height:${height}px;width:auto;display:block`}

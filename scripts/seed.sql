@@ -25,7 +25,7 @@ INSERT OR REPLACE INTO courses
 VALUES
   ('crs_or_ca_initial', 'oregon-ca-initial',
    'Oregon Chiropractic Assistant — Initial Certification',
-   'State-compliant initial certification course (8 didactic hours).',
+   'The complete online portion of Oregon''s required chiropractic assistant training — 8 hours of instruction you can finish in days, with automatic hour tracking, a final exam, and an instantly verifiable certificate. Includes prep materials and a signable log for your 4 hands-on clinic hours, plus a guided checklist for the state application and exam that come next.',
    8, 'general', 'oregon', 'ca',
    'ce_course', 'one_time_purchase', 14900, 'published', 0.8, 1.5,
    'Jason Young, DC');
@@ -143,3 +143,149 @@ VALUES
   ('pts_c_seats',    'pt_clinic_owner', 2, 'buy_seats', 'Purchase training seats', 'Buy a pool of CA training seats for your staff.', 'external_action', NULL, 0),
   ('pts_c_invite',   'pt_clinic_owner', 3, 'invite_cas', 'Invite your CAs', 'Invite each Chiropractic Assistant by email to claim a seat.', 'custom', NULL, 0),
   ('pts_c_track',    'pt_clinic_owner', 4, 'track_progress', 'Track them to certification', 'Follow each CA''s progress through the initial certification.', 'custom', NULL, 0);
+
+-- ---------------------------------------------------------------------------
+-- Sample transcript for the free-preview lesson (M6 tutor demo + local tests).
+-- Real transcripts are ingested from Riverside exports via upload-to-stream.
+-- ---------------------------------------------------------------------------
+INSERT OR REPLACE INTO lesson_transcripts
+  (id, lesson_id, chunk_index, start_seconds, end_seconds, text)
+VALUES
+  ('lt_lsn_welcome_0', 'lsn_welcome', 0, 0, 18,
+   'Welcome to the Oregon Chiropractic Assistant certification course. In this orientation we cover how the course works, how your seat time is tracked, and what you need to do to earn your certificate.'),
+  ('lt_lsn_welcome_1', 'lsn_welcome', 1, 18, 42,
+   'Your seat time is measured from the unique content you actually watch. Rewatching a section never counts twice, and the final exam unlocks only after you have completed the required content minutes for the course.'),
+  ('lt_lsn_welcome_2', 'lsn_welcome', 2, 42, 70,
+   'To take an accurate blood pressure, seat the patient with their back supported and feet flat, rest the arm at heart level, choose a correctly sized cuff, and place it about one inch above the elbow crease before inflating.'),
+  ('lt_lsn_welcome_3', 'lsn_welcome', 3, 70, 96,
+   'Throughout the course you will find knowledge checks at the end of each module and a final exam. The passing threshold is eighty percent, and your attempts are recorded for compliance.');
+
+-- ===========================================================================
+-- Additional standalone CE courses (multi-course catalog). Single module each.
+-- Placeholder content — author real lessons/quizzes via the M5 admin editor and
+-- upload video + transcripts via the upload-to-stream script.
+-- ===========================================================================
+
+-- Vitals: short video, but credit includes off-video practice logged on paper,
+-- so credit_hours (1.0) deliberately exceeds video runtime. required_seat_minutes
+-- (5) is the exam floor and is decoupled from the certificate's credit figure.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_vitals', 'vitals-monitoring',
+   'Taking & Recording Vital Signs',
+   'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
+   1, 5, 'vitals', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 3900, 'published', 0.8, 1.5,
+   'Jason Young, DC');
+
+INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
+  ('mod_vitals', 'crs_vitals', 1, 'Vital Signs — Measurement & Documentation', 'Blood pressure, pulse, respiration, temperature.', 0);
+
+INSERT OR REPLACE INTO lessons
+  (id, module_id, position, title, stream_video_uid, duration_seconds, evidence_type)
+VALUES
+  ('lsn_vitals', 'mod_vitals', 1, 'Vital Signs — Measurement & Documentation', NULL, 600, 'playback_heartbeat');
+
+INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title, pass_threshold) VALUES
+  ('qz_vitals_final', 'crs_vitals', NULL, 'final_exam', 'Vitals Final Exam', 0.8);
+
+INSERT OR REPLACE INTO questions (id, quiz_id, position, prompt, type, explanation) VALUES
+  ('qv_1', 'qz_vitals_final', 1, 'A blood-pressure cuff should be placed about how far above the elbow crease?', 'single_choice', 'About one inch (2–3 cm) above the antecubital crease.'),
+  ('qv_2', 'qz_vitals_final', 2, 'The patient should be seated with feet flat and arm supported at heart level when taking blood pressure.', 'true_false', 'True — improper positioning skews the reading.');
+
+INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_correct) VALUES
+  ('ov_1a', 'qv_1', 1, 'One inch above the crease', 1),
+  ('ov_1b', 'qv_1', 2, 'Directly over the crease', 0),
+  ('ov_1c', 'qv_1', 3, 'On the forearm', 0),
+  ('ov_2a', 'qv_2', 1, 'True', 1),
+  ('ov_2b', 'qv_2', 2, 'False', 0);
+
+-- HIPAA: single-module certification. required_seat_minutes left NULL (gate uses
+-- per-lesson coverage only). credit_hours = 1.0.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_hipaa', 'hipaa-essentials',
+   'HIPAA Essentials for Chiropractic Assistants',
+   'A single-module HIPAA certification covering protected health information, the minimum-necessary rule, and front-desk privacy practices.',
+   1, NULL, 'hipaa', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 3500, 'published', 0.8, 1.5,
+   'Jason Young, DC');
+
+INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
+  ('mod_hipaa', 'crs_hipaa', 1, 'HIPAA Essentials', 'PHI, minimum necessary, and privacy at the front desk.', 0);
+
+INSERT OR REPLACE INTO lessons
+  (id, module_id, position, title, stream_video_uid, duration_seconds, evidence_type)
+VALUES
+  ('lsn_hipaa', 'mod_hipaa', 1, 'HIPAA Essentials', NULL, 600, 'playback_heartbeat');
+
+INSERT OR REPLACE INTO quizzes (id, course_id, module_id, kind, title, pass_threshold) VALUES
+  ('qz_hipaa_final', 'crs_hipaa', NULL, 'final_exam', 'HIPAA Final Exam', 0.8);
+
+INSERT OR REPLACE INTO questions (id, quiz_id, position, prompt, type, explanation) VALUES
+  ('qh_1', 'qz_hipaa_final', 1, 'Which law governs the privacy of protected health information (PHI)?', 'single_choice', 'HIPAA — the Health Insurance Portability and Accountability Act.'),
+  ('qh_2', 'qz_hipaa_final', 2, 'The minimum-necessary rule means you should access only the PHI needed for the task at hand.', 'true_false', 'True — access and disclosure are limited to what the task requires.');
+
+INSERT OR REPLACE INTO answer_options (id, question_id, position, text, is_correct) VALUES
+  ('oh_1a', 'qh_1', 1, 'HIPAA', 1),
+  ('oh_1b', 'qh_1', 2, 'OSHA', 0),
+  ('oh_1c', 'qh_1', 3, 'FERPA', 0),
+  ('oh_2a', 'qh_2', 1, 'True', 1),
+  ('oh_2b', 'qh_2', 2, 'False', 0);
+
+-- ===========================================================================
+-- Catalog price card (PLAN.md Item 1). Courses not yet authored exist as DRAFT
+-- rows so the price card lives in the DB from day one. Prices are the single
+-- source of truth (courses.price_cents); nothing is hard-coded in app code.
+-- ===========================================================================
+
+-- Cultural Competency (standalone) — $29
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_cultural', 'cultural-competency',
+   'Cultural Competency',
+   'Standalone cultural competency CE for chiropractic assistants.',
+   1, NULL, 'cultural_competency', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 2900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- CBT in Chiropractic Practice — $49
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_cbt', 'cbt-chiropractic-practice',
+   'CBT in Chiropractic Practice',
+   'Cognitive behavioral techniques applied in the chiropractic setting.',
+   1, NULL, 'general', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 4900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- Annual Renewal Bundle (6 hr, incl. vitals + cultural competency) — $89.
+-- A single saleable row whose fulfilment activates its constituent courses.
+INSERT OR REPLACE INTO courses
+  (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
+   state, audience, content_type, access_model, price_cents, status, pass_threshold,
+   max_playback_rate, instructor_name)
+VALUES
+  ('crs_renewal_bundle', 'annual-renewal-bundle',
+   'Annual Renewal Bundle (6 hr)',
+   'The annual CE bundle for renewing Oregon CAs — includes vitals and cultural competency.',
+   6, NULL, 'general', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 8900, 'draft', 0.8, 1.5,
+   'Jason Young, DC');
+
+-- Bundle constituents: buying the bundle enrolls the student in these courses.
+INSERT OR REPLACE INTO bundle_items (id, bundle_course_id, child_course_id) VALUES
+  ('bi_renewal_vitals',   'crs_renewal_bundle', 'crs_vitals'),
+  ('bi_renewal_cultural', 'crs_renewal_bundle', 'crs_cultural');

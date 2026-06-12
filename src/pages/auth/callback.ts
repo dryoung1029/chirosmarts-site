@@ -1,10 +1,12 @@
 import type { APIRoute } from "astro";
-import { getDb } from "@/db/client";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
 import { getSiteUrl } from "@/lib/env";
 import { consumeMagicLink } from "@/lib/auth/magic-link";
 import { findOrCreateUserByEmail } from "@/lib/auth/users";
 import { createSession } from "@/lib/auth/session";
 import { logEvent } from "@/lib/events";
+import { isAdminEmail } from "@/lib/admin";
 
 export const GET: APIRoute = async ({ url, locals, cookies, request, redirect }) => {
   const env = locals.runtime.env;
@@ -17,6 +19,15 @@ export const GET: APIRoute = async ({ url, locals, cookies, request, redirect })
   }
 
   const user = await findOrCreateUserByEmail(db, result.email);
+
+  // Persist the site_admin role for allowlisted emails (idempotent).
+  if (isAdminEmail(env, user.email) && user.role !== "site_admin") {
+    await db
+      .update(schema.users)
+      .set({ role: "site_admin" })
+      .where(eq(schema.users.id, user.id));
+    user.role = "site_admin";
+  }
 
   // Cookies are only marked Secure when the public URL is https (so local
   // http://localhost dev still works).

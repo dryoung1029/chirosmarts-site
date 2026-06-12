@@ -1,0 +1,36 @@
+---
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { OWNER, ownerCopy } from "@/config/marketing";
+import { LEGAL } from "@/config/legal";
+const i = OWNER.instructor;
+---
+
+<MarketingLayout
+  title="About ChiroSmarts"
+  description="About ChiroSmarts and the instructor behind our Oregon Chiropractic Assistant training."
+  canonicalPath="/about"
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container" style="max-width:820px">
+      <h1 style="font-size:2.1rem;margin:0 0 1rem">About ChiroSmarts</h1>
+
+      <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:1.5rem">
+        {i.photo
+          ? <img src={i.photo} alt={i.name ?? "Instructor"} width="140" height="140" loading="lazy" style="border-radius:14px" />
+          : <div style="width:140px;height:140px;border-radius:14px;background:var(--panel);border:1px dashed var(--border);display:grid;place-items:center;color:var(--muted);font-size:0.8rem">photo</div>}
+        <div style="flex:1;min-width:240px">
+          <h2 style="margin:0 0 0.2rem">{i.name ? i.name : <span class="owner-copy">{ownerCopy("instructor name")}</span>}</h2>
+          <p style="margin:0;color:var(--accent)">{i.credentials ? i.credentials : <span class="owner-copy">{ownerCopy("instructor credentials")}</span>}</p>
+        </div>
+      </div>
+
+      <p style="color:var(--muted)">
+        {OWNER.about ? OWNER.about : <span class="owner-copy">{ownerCopy("company / instructor story (a few paragraphs)")}</span>}
+      </p>
+
+      <p style="color:var(--muted);font-size:0.9rem;margin-top:1.5rem">
+        {LEGAL.entityName} · {LEGAL.mailingAddress} · <a href={`mailto:${LEGAL.contactEmail}`}>{LEGAL.contactEmail}</a>
+      </p>
+    </div>
+  </section>
+</MarketingLayout>

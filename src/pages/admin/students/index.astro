@@ -1,0 +1,103 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { desc } from "drizzle-orm";
+
+const db = getDb(Astro.locals.runtime.env);
+
+const users = await db
+  .select()
+  .from(schema.users)
+  .orderBy(desc(schema.users.createdAt))
+  .all();
+const enrollments = await db.select().from(schema.enrollments).all();
+const certs = await db.select().from(schema.certificates).all();
+
+const enrollByUser = new Map<string, typeof enrollments>();
+for (const e of enrollments) {
+  const list = enrollByUser.get(e.userId) ?? [];
+  list.push(e);
+  enrollByUser.set(e.userId, list);
+}
+const certCountByUser = new Map<string, number>();
+for (const c of certs) {
+  if (c.status === "issued")
+    certCountByUser.set(c.userId, (certCountByUser.get(c.userId) ?? 0) + 1);
+}
+
+const q = (Astro.url.searchParams.get("q") ?? "").trim().toLowerCase();
+const rows = users
+  .filter(
+    (u) =>
+      !q ||
+      u.email.toLowerCase().includes(q) ||
+      (u.legalName ?? "").toLowerCase().includes(q),
+  )
+  .map((u) => {
+    const es = enrollByUser.get(u.id) ?? [];
+    return {
+      user: u,
+      enrolled: es.filter((e) => e.status === "active" || e.status === "completed").length,
+      completed: es.filter((e) => e.status === "completed").length,
+      certs: certCountByUser.get(u.id) ?? 0,
+    };
+  });
+---
+
+<Layout title="Students · Admin" showNav={true}>
+  <AdminNav active="students" />
+  <h1>Students <span class="muted" style="font-size:1rem">({rows.length})</span></h1>
+
+  <form method="get" style="margin:0 0 1rem">
+    <input
+      type="text"
+      name="q"
+      value={q}
+      placeholder="Search name or email…"
+      style="max-width:22rem;display:inline-block;width:auto"
+    />
+    <button type="submit" style="margin-top:0">Search</button>
+    {q && <a href="/admin/students" style="margin-left:0.75rem;font-size:0.9rem">Clear</a>}
+  </form>
+
+  <div class="panel">
+    <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
+      <thead>
+        <tr style="text-align:left;color:var(--muted)">
+          <th style="padding:0.4rem 0.5rem">Name</th>
+          <th style="padding:0.4rem 0.5rem">Email</th>
+          <th style="padding:0.4rem 0.5rem">Role</th>
+          <th style="padding:0.4rem 0.5rem">Intake</th>
+          <th style="padding:0.4rem 0.5rem">Courses</th>
+          <th style="padding:0.4rem 0.5rem">Done</th>
+          <th style="padding:0.4rem 0.5rem">Certs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((r) => (
+            <tr style="border-top:1px solid var(--border)">
+              <td style="padding:0.4rem 0.5rem">
+                <a href={`/admin/students/${r.user.id}`}>
+                  {r.user.legalName?.trim() || <span class="muted">— no name —</span>}
+                </a>
+              </td>
+              <td style="padding:0.4rem 0.5rem">{r.user.email}</td>
+              <td style="padding:0.4rem 0.5rem">{r.user.role}</td>
+              <td style="padding:0.4rem 0.5rem">{r.user.intakeCompletedAt ? "✓" : "–"}</td>
+              <td style="padding:0.4rem 0.5rem">{r.enrolled}</td>
+              <td style="padding:0.4rem 0.5rem">{r.completed}</td>
+              <td style="padding:0.4rem 0.5rem">{r.certs}</td>
+            </tr>
+          ))
+        }
+        {rows.length === 0 && (
+          <tr>
+            <td colspan="7" style="padding:0.75rem 0.5rem" class="muted">No students match.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Layout>
