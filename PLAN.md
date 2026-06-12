@@ -9,7 +9,7 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **Marketing storefront + funnel** — first slice built (homepage, hero demo, course landing upgrade, clinics/renewal/about, guides system, SEO/sitemap). Funnel (renewal checker, lead magnet, Brevo) deferred. Multi-course Phases 1–3 + pricing + legal shipped; Phase 4 seat pools pending DDL review. M0–M6 shipped. |
+| Current milestone | **Marketing + funnel + light design-token theme + semantic tutor — all shipped.** M0–M6, multi-course Phases 1–3, pricing, legal (draft), funnel (renewal checker, lead capture double-opt-in, Brevo groundwork) done. **NEXT: illustration integration** (15 PNGs committed at `src/assets/illustrations/`; full spec in CLAUDE.md handoff). Phase 4 seat pools pending DDL review (`docs/phase4-seat-pools-ddl.md`). |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
