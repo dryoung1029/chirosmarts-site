@@ -1,29 +1,40 @@
 ---
-title: Oregon CA Renewal Requirements
-description: When your Oregon Chiropractic Assistant certification renews, the continuing-education hours required, and how to stay compliant.
-lastUpdated: "[OWNER COPY: last-updated date]"
+title: Oregon CA Renewal Requirements — Deadlines, Hours, and How to Stay Current
+description: When your Oregon Chiropractic Assistant certification renews, the continuing-education hours required (and the topics inside them), and how to stay current.
+author: Jason Young, DC
+authorCredentials: Oregon chiropractor · former director, National Board of Chiropractic Examiners
+lastUpdated: "[ADD DATE]"
 relatedCourse: annual-renewal-bundle
 ---
 
-<!-- OWNER COPY: replace this body with the real guide. Use ## headings for the
-     table of contents. Do not state hour requirements that aren't verified. -->
+Oregon chiropractic assistant certifications renew every year, and the rules have two details that catch people: the deadline is personal to you, and the hours have required topics inside them. Here's the whole picture.
 
-## When does my certification renew?
+## Your deadline: the last day of your birth month
 
-[OWNER COPY: how the renewal date is determined]
+Oregon CA certifications expire annually on the **last day of your birth month**. **[VERIFY]** Not a calendar year-end, not the anniversary of your certification — your birth month. Born in June? Every June 30 is your deadline, every year. This is the single most-missed fact in CA compliance, because nothing about a birth month says "regulatory deadline."
 
-## How many CE hours do I need?
+*(Use the [renewal checker](/renewal) — enter your birth month and we'll show your exact date and what you need, and remind you before every deadline if you'd like.)*
 
-[OWNER COPY: required continuing-education hours, including any topic-specific requirements]
+## The hours: 6 per year, with required topics inside
 
-## First renewal vs. subsequent renewals
+Each renewal year requires **6 hours of continuing education**, and they're not a free-for-all: **[VERIFY all rows]**
 
-[OWNER COPY: any differences between a first renewal and later ones]
+- **1 hour of cultural competency** — required every year.
+- **2 hours of vitals training** — required at your *first* renewal.
+- The remaining hours: qualifying CE relevant to your role.
 
-## How ChiroSmarts helps
+The required topics are where renewals go wrong — a CA takes six general hours, then learns at submission that the cultural competency hour is missing. Check the topic requirements *before* choosing courses, or take a bundle assembled to satisfy them. (Our Annual Renewal Bundle is exactly that: 6 hours including the required vitals and cultural competency, $89, finished in about two evenings.)
 
-[OWNER COPY: how the renewal bundle covers the requirements]
+## What happens if you lapse
 
-## Frequently asked questions
+If your certification lapses, you can't legally perform clinical CA duties until you're current again — which puts your clinic in an awkward spot and you potentially off the schedule. **[VERIFY current reinstatement process and any fee]** The fix is boring and reliable: know your date, get reminded ahead of it, and treat the 6 hours as a two-evening task in the month before your deadline rather than a scramble on the last day.
 
-[OWNER COPY: common renewal questions]
+## The five-minute renewal system
+
+1. Find your deadline (birth month → last day).
+2. 60 days out: start your 6 hours, required topics first.
+3. Finish, keep your certificates — your training provider should store them permanently in case of audit. (We do, with verification codes.)
+4. Submit your renewal to the board with the fee. **[VERIFY current fee + submission method]**
+5. Set next year's reminder — or use a platform that does it for you, forever.
+
+**[Check your renewal date now →](/renewal)** — and if you'd like, we'll email you before every deadline from here on out.

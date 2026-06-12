@@ -25,7 +25,7 @@ INSERT OR REPLACE INTO courses
 VALUES
   ('crs_or_ca_initial', 'oregon-ca-initial',
    'Oregon Chiropractic Assistant — Initial Certification',
-   'State-compliant initial certification course (8 didactic hours).',
+   'The complete online portion of Oregon''s required chiropractic assistant training — 8 hours of instruction you can finish in days, with automatic hour tracking, a final exam, and an instantly verifiable certificate. Includes prep materials and a signable log for your 4 hands-on clinic hours, plus a guided checklist for the state application and exam that come next.',
    8, 'general', 'oregon', 'ca',
    'ce_course', 'one_time_purchase', 14900, 'published', 0.8, 1.5,
    'Jason Young, DC');

@@ -52,8 +52,11 @@ const data = {
 
     <!-- Optional email capture — the result above is shown regardless. -->
     <form data-capture style="margin-top:1.1rem">
-      <label style="font-size:0.95rem">Want us to remind you before your deadline?</label>
-      <div style="display:flex;gap:0.5rem;margin-top:0.4rem;flex-wrap:wrap">
+      <label style="font-size:0.95rem;font-weight:600">Don't memorize your deadline — we'll remind you.</label>
+      <p style="margin:0.2rem 0 0;color:var(--muted);font-size:0.88rem">
+        Enter your email and we'll nudge you 60, 30, and 14 days before your renewal window closes. Nothing else, ever, unless you ask.
+      </p>
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap">
         <input type="email" data-email placeholder="you@example.com" required style="flex:1;min-width:200px" />
         <button class="btn-primary" type="submit" style="padding:0.55rem 1rem">Remind me</button>
       </div>

@@ -23,16 +23,21 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 - **Rendering choice (documented):** marketing pages are **edge-SSR** (server-rendered per request — one fast DB query) rather than statically prerendered, because catalog prices and auth-aware nav are dynamic; still fully server-rendered HTML for SEO.
 - **Analytics how-to:** set `CF_WEB_ANALYTICS_TOKEN` (env) → the cookieless beacon injects into the marketing layout only; view in Cloudflare dashboard → Analytics & Logs → Web Analytics.
 
-#### OWNER COPY placeholders (every pending item — render as visible `[OWNER COPY: …]`)
-- Homepage: hero **headline**, hero **subhead**; **stats** (in `src/config/marketing.ts` — renders nothing until provided, never a fake number); **instructor** name / credentials / bio / photo; homepage **FAQ** Q&A.
-- Testimonials: none yet — add `src/content/testimonials/*.md` (quote, name, role?, clinic?, photo?, courseTag?).
-- Per-course (`COURSE_MARKETING` in `src/config/marketing.ts`): **requirements-mapping rows** and **course FAQ** for each course (e.g. `oregon-ca-initial`).
-- Clinics: hero **headline** / **subhead**; **dashboard screenshot/mock** image; **overview video** (Cloudflare Stream UID).
-- Renewal: **how-renewal-works** overview; **renewal-date checker** (deferred tool).
-- About: company/instructor **story**; instructor photo.
-- Guides: full **bodies** + **last-updated** dates for `become-a-chiropractic-assistant-oregon` and `oregon-ca-renewal-requirements`.
-- Assets: `public/og-default.svg` is a placeholder branded OG; supply a proper per-page OG PNG template when ready.
-- Config: set `entityName`/`effectiveDate` etc. (already wired) and, when running ads/analytics, `CF_WEB_ANALYTICS_TOKEN`.
+#### Copy status — owner copy is now IN (`src/config/marketing.ts`, `COURSE_MARKETING`, guides, course descriptions). Two registries remain:
+
+**`[VERIFY]` launch blockers** — owner-flagged factual/regulatory claims, kept verbatim & visible; the site must NOT truly launch with any of these unresolved (each renders as a visible flag):
+- Instructor bio: years in practice (`[VERIFY]`).
+- Homepage FAQ: duties-before-certification framing; OBCE fee link/list; legacy-records promise.
+- Course (`oregon-ca-initial`) requirements table: confirm every "Oregon requires" row vs current OAR (the page's biggest claim surface); course FAQ "accepted by the Oregon board" approval phrasing.
+- Renewal page + Guide 2: lapse-consequence phrasing, the 6-hour topic breakdown rows, reinstatement process/fee, board submission fee/method, birth-month deadline rule.
+- Guide 1: the requirements list vs OAR, hands-on required topics, application steps/fee/fingerprint vendor, exam format/score/fee/retakes, accepted BLS providers, state fee amounts, BLS price range.
+
+**Still pending owner inputs** (render as `[OWNER COPY]` chips or are omitted):
+- **Stats** — kept EMPTY (owner's numeric stats were `[VERIFY]`; "only real numbers can ship"). Fill `OWNER.stats` with confirmed figures to show the bar.
+- **Testimonials** — none yet; add `src/content/testimonials/*.md` (real only).
+- **Instructor photo / About story**; **guide last-updated dates** (frontmatter `lastUpdated: "[ADD DATE]"` — JSON-LD date is omitted until set); **clinic dashboard image** + **overview video** Stream UID.
+- Assets: proper per-page OG PNG (currently the branded `og-default.svg`).
+- Config: `effectiveDate` (legal), `CF_WEB_ANALYTICS_TOKEN`, Brevo keys, Oregon renewal hour figures, the lead-magnet checklist PDF in R2.
 
 #### Funnel layer (shipped)
 - **Renewal-date checker** (`/renewal`): deadlines for all 12 months are computed server-side with the unit-tested `nextRenewalDeadline` (no forked date logic in the client — island ~1.7KB just looks up the selection); first-vs-subsequent hour figures come from `src/config/oregon-renewal.ts` (**owner-supplied; null → visible `[OWNER COPY]` placeholder**, never invented). Works fully without an email. 8 unit tests in `renewal.test.ts`.

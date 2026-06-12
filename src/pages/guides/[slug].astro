@@ -29,7 +29,7 @@ const ld = articleLd({
   description: entry.data.description,
   url: `${siteUrl}/guides/${slug}`,
   authorName: author ?? "ChiroSmarts",
-  datePublished: entry.data.lastUpdated,
+  datePublished: entry.data.lastUpdated.includes("[") ? undefined : entry.data.lastUpdated,
 });
 const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
 ---

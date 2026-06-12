@@ -68,13 +68,13 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
             ) : user ? (
               <form method="POST" action="/api/checkout/course" style="margin:0">
                 <input type="hidden" name="courseId" value={course.id} />
-                <button class="btn-primary" type="submit">Enroll now</button>
+                <button class="btn-primary" type="submit">Enroll — {usd(course.priceCents)}</button>
               </form>
             ) : (
-              <a class="btn-primary" href={`/login?next=${encodeURIComponent(`/courses/${course.slug}`)}`}>Sign in to enroll</a>
+              <a class="btn-primary" href={`/login?next=${encodeURIComponent(`/courses/${course.slug}`)}`}>Enroll — {usd(course.priceCents)}</a>
             )}
             {hasFreePreview && !isEnrolled && (
-              <a class="btn-secondary" href={`/login?next=${encodeURIComponent(`/learn/${course.slug}`)}`}>Start free — Module 1 is on us</a>
+              <a class="btn-secondary" href={`/login?next=${encodeURIComponent(`/learn/${course.slug}`)}`}>Try Module 1 free</a>
             )}
           </div>
           <p style="margin:0.75rem 0 0;color:var(--muted);font-size:0.85rem">
@@ -86,7 +86,7 @@ const ld = [courseLd(course, siteUrl), faqPageLd(mk.faqs ?? [])].filter(Boolean)
     </div>
   </section>
 
-  <RequirementsTable rows={mk.requirements} />
+  <RequirementsTable rows={mk.requirements} verifyNote={mk.requirementsVerify} />
 
   <!-- Syllabus -->
   <section class="mk-section" style="padding-top:0">

@@ -25,7 +25,7 @@ const subhead = OWNER.clinics.subhead;
 
 <MarketingLayout
   title="ChiroSmarts for clinics — train and track your team"
-  description="Buy training seats for your chiropractic assistants, invite staff by email, and track their certification and renewal compliance in one place."
+  description="Train and track your chiropractic team — buy seats, invite staff, and see every certification and renewal deadline in one dashboard."
   canonicalPath="/clinics"
 >
   <section class="mk-section" style="padding-top:2.5rem">
@@ -70,6 +70,7 @@ const subhead = OWNER.clinics.subhead;
           <strong style="color:var(--text)"> {usd(caCourse.priceCents)}</strong> per seat. Volume is handled at checkout.
         </p>
       )}
+      <p style="margin-top:0.75rem;color:var(--muted)">{OWNER.clinics.seatsClosingLine}</p>
     </div>
   </section>
 
@@ -77,6 +78,7 @@ const subhead = OWNER.clinics.subhead;
   {OWNER.clinics.demoVideoStreamUid ? (
     <section class="mk-section">
       <div class="mk-container">
+        <p style="margin-top:0">{OWNER.clinics.videoIntro}</p>
         <div style="position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--border)">
           <iframe
             src={`https://iframe.videodelivery.net/${OWNER.clinics.demoVideoStreamUid}`}
@@ -91,6 +93,7 @@ const subhead = OWNER.clinics.subhead;
   ) : (
     <section class="mk-section">
       <div class="mk-container">
+        <p style="margin-top:0">{OWNER.clinics.videoIntro}</p>
         <div class="mk-card" style="display:grid;place-items:center;min-height:160px;border-style:dashed;color:var(--muted)">
           <span class="owner-copy">{ownerCopy("clinic overview video (Cloudflare Stream UID)")}</span>
         </div>

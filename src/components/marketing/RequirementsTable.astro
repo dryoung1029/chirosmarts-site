@@ -5,8 +5,9 @@ import { ownerCopy } from "@/config/marketing";
 
 interface Props {
   rows?: { requires: string; provides: string }[];
+  verifyNote?: string; // owner [VERIFY] reminder shown until certified
 }
-const { rows } = Astro.props;
+const { rows, verifyNote } = Astro.props;
 const has = rows && rows.length > 0;
 ---
 
@@ -35,5 +36,8 @@ const has = rows && rows.length > 0;
         </table>
       )
     }
+    {has && verifyNote && (
+      <p style="margin-top:0.75rem"><span class="owner-copy">{verifyNote}</span></p>
+    )}
   </div>
 </section>

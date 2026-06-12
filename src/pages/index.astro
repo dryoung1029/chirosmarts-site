@@ -23,20 +23,20 @@ const heroSubhead = OWNER.hero.subhead ?? ownerCopy("hero subhead");
 const instructor = OWNER.instructor;
 
 const audience = [
-  { title: "I'm becoming a CA", desc: "Start your Oregon certification path.", href: "/guides/become-a-chiropractic-assistant-oregon" },
-  { title: "I need to renew", desc: "Check your renewal date and required hours.", href: "/renewal" },
-  { title: "I run a clinic", desc: "Train and track your whole team.", href: "/clinics" },
+  { title: "I'm becoming a CA", desc: "New to the field? See every step from hired to certified.", cta: "Start here →", href: "/guides/become-a-chiropractic-assistant-oregon" },
+  { title: "I need to renew", desc: "Find your deadline and exactly which hours Oregon requires of you this year.", cta: "Check my date →", href: "/renewal" },
+  { title: "I run a clinic", desc: "Buy seats, invite your team, and watch every certification stay current.", cta: "See how →", href: "/clinics" },
 ];
 const steps = [
-  { n: "1", t: "Sign up and get your roadmap", d: "Tell us your situation and we build your step-by-step Oregon path." },
-  { n: "2", t: "Complete your training", d: "Watch the course, pass the knowledge checks and final exam — at your pace." },
-  { n: "3", t: "Certificate issued and tracked", d: "Your certificate is issued, verifiable, and your renewal date is tracked for you." },
+  { n: "1", t: "Sign up, get your roadmap.", d: "Answer five questions; we build your personal step-by-step Oregon path — training, paperwork, exam, deadlines." },
+  { n: "2", t: "Train at your pace.", d: "Watch on any device, pick up where you left off, pass the final exam. Your hours are tracked automatically." },
+  { n: "3", t: "Certified — and never caught off guard again.", d: "Your certificate is issued instantly, verifiable by any employer, and your renewal deadline is tracked for you every year." },
 ];
 ---
 
 <MarketingLayout
   title="ChiroSmarts — Oregon Chiropractic Assistant training"
-  description="State-compliant Oregon Chiropractic Assistant training and continuing education: online courses, tracked completion, and verifiable certificates."
+  description="Oregon CA certification training online — state-required hours, exam prep, verifiable certificates, and automatic renewal tracking. Module 1 free."
   canonicalPath="/"
 >
   <!-- Hero -->
@@ -67,7 +67,7 @@ const steps = [
         <a class="mk-card" href={a.href} style="text-decoration:none;color:inherit">
           <strong style="color:var(--text);font-size:1.05rem">{a.title}</strong>
           <p style="margin:0.4rem 0 0;color:var(--muted)">{a.desc}</p>
-          <span style="color:var(--accent);font-size:0.9rem">Learn more →</span>
+          <span style="color:var(--accent);font-size:0.9rem">{a.cta}</span>
         </a>
       ))}
     </div>
@@ -134,10 +134,13 @@ const steps = [
     <div class="mk-container" style="max-width:680px">
       <LeadCapture
         source="checklist_pdf"
-        heading="Free Oregon CA certification checklist"
-        blurb="The steps to get certified in Oregon, in a printable one-pager. Confirm your email and we'll send it over."
+        heading="Free: the Oregon CA Certification Checklist"
+        blurb="Every step from job offer to certificate — the training hours, the hands-on log, the state application, the exam — on one printable page. Enter your email and we'll send it over."
         buttonLabel="Send me the checklist"
       />
+      <p class="muted" style="font-size:0.82rem;margin:0.5rem 0 0">
+        No spam. One useful PDF and an unsubscribe link in every email.
+      </p>
     </div>
   </section>
 
