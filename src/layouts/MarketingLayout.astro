@@ -1,4 +1,5 @@
 ---
+import "@/styles/tokens.css";
 import Logo from "@/components/Logo.astro";
 import { getSiteUrl } from "@/lib/env";
 import { LEGAL } from "@/config/legal";
@@ -53,31 +54,13 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
       />
     )}
     <style is:global>
-      :root {
-        color-scheme: dark;
-        --bg: #0f172a;
-        --bg-2: #0b1220;
-        --panel: #1e293b;
-        --panel-2: #1b2531;
-        --border: #334155;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --accent: #0ea5e9;
-        --accent-text: #fff;
-        --ok: #22c55e;
-        --warn: #f59e0b;
-      }
-      * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
         margin: 0;
         font-family: system-ui, -apple-system, sans-serif;
-        background: var(--bg);
-        color: var(--text);
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
       }
-      a { color: var(--accent); }
       img { max-width: 100%; height: auto; }
       .mk-container { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; }
       .mk-section { padding: 3.5rem 0; }
@@ -87,24 +70,12 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         max-width: 1080px; margin: 0 auto; padding: 1rem 1.25rem;
       }
       .mk-nav .spacer { flex: 1; }
-      .mk-nav a { color: var(--text); text-decoration: none; font-size: 0.95rem; }
-      .mk-nav a.cta { background: var(--accent); color: var(--accent-text); padding: 0.45rem 0.9rem; border-radius: 8px; }
-      .btn-primary {
-        display: inline-block; background: var(--accent); color: var(--accent-text);
-        padding: 0.7rem 1.3rem; border-radius: 10px; text-decoration: none; font-weight: 600;
-        border: 0; cursor: pointer; font-size: 1rem;
-      }
-      .btn-secondary {
-        display: inline-block; background: transparent; color: var(--text);
-        padding: 0.7rem 1.3rem; border-radius: 10px; text-decoration: none; font-weight: 600;
-        border: 1px solid var(--border);
-      }
-      .mk-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; }
+      .mk-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; }
+      /* Nav sign-in is a brand CTA, keeping --action reserved for the page's primary CTA. */
+      .mk-nav a.cta { background: var(--brand); color: var(--surface); padding: 0.45rem 0.9rem; border-radius: 8px; }
+      .btn-primary, .btn-secondary { border-radius: 10px; padding: 0.7rem 1.3rem; font-weight: 600; }
+      .mk-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; box-shadow: var(--shadow); }
       .mk-grid { display: grid; gap: 1rem; }
-      .owner-copy {
-        display: inline-block; background: #3a2a10; color: #fbbf24;
-        border: 1px dashed #b4791f; border-radius: 6px; padding: 0.1rem 0.5rem; font-size: 0.9rem;
-      }
       .mk-footer {
         border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
         margin-top: 2rem;
@@ -113,7 +84,7 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
       details.mk-faq { border-bottom: 1px solid var(--border); padding: 0.85rem 0; }
       details.mk-faq summary { cursor: pointer; font-weight: 600; list-style: none; }
       details.mk-faq summary::-webkit-details-marker { display: none; }
-      details.mk-faq[open] summary { color: var(--accent); }
+      details.mk-faq[open] summary { color: var(--brand); }
       @media (max-width: 640px) {
         .mk-section { padding: 2.25rem 0; }
       }

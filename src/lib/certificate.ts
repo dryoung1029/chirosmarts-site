@@ -317,10 +317,13 @@ export async function getCertificatePdf(
 // PDF rendering
 // ---------------------------------------------------------------------------
 
-const ACCENT = rgb(0.055, 0.647, 0.914); // #0ea5e9
-const INK = rgb(0.06, 0.09, 0.16);
-const MUTED = rgb(0.42, 0.47, 0.55);
-const WATERMARK = rgb(0.9, 0.93, 0.97);
+// Certificate palette: ink + brand teal + a gold accent (matches design tokens;
+// uses --brand/--gold, never --action).
+const ACCENT = rgb(0.043, 0.42, 0.388); // --brand #0B6B63
+const GOLD = rgb(0.722, 0.525, 0.043); // --gold #B8860B
+const INK = rgb(0.075, 0.153, 0.169); // --ink #13272B
+const MUTED = rgb(0.318, 0.392, 0.416); // --muted #51646A
+const WATERMARK = rgb(0.93, 0.95, 0.94);
 
 interface RenderArgs {
   legalName: string;
@@ -372,7 +375,7 @@ export async function renderCertificatePdf(
     y: 32,
     width: width - 64,
     height: height - 64,
-    borderColor: rgb(0.78, 0.85, 0.93),
+    borderColor: GOLD,
     borderWidth: 1,
   });
 

@@ -100,7 +100,7 @@ const resources = (await listCourseResources(db, course.id)).filter(
       <strong style="color:var(--text)">{pct}%</strong>{" "}
       ({fmtMin(seat.creditedSeconds)} of {fmtMin(seat.totalContentSeconds)} min).
     </p>
-    <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+    <div style="height:10px;background:var(--brand-tint);border-radius:6px;overflow:hidden;border:1px solid var(--border)">
       <div style={`height:100%;width:${pct}%;background:var(--accent)`}></div>
     </div>
     <p class="muted" style="margin:0.75rem 0 0">
@@ -187,7 +187,7 @@ const resources = (await listCourseResources(db, course.id)).filter(
 
   <div class="panel">
     <h2>Final exam {finalPassed && <span style="color:var(--ok);font-size:0.9rem">· ✓ passed</span>}</h2>
-    <div class="notice" style="background:#0b2942;border:1px solid #1e496b;color:#cfe8ff">
+    <div class="notice" style="background:var(--brand-tint);border:1px solid var(--brand);color:var(--ink)">
       <strong>Not the certification exam.</strong> This confirms you understood the
       training material. It does <strong>not</strong> certify you — Oregon CA
       certification requires the separate exam administered through the NBCE.
@@ -213,8 +213,8 @@ const resources = (await listCourseResources(db, course.id)).filter(
 
   {
     certificate && (
-      <div class="panel" style="border-color:#1e7a48">
-        <h2 style="color:#22c55e;margin-bottom:0.25rem">🎓 Certificate earned</h2>
+      <div class="panel" style="border-color:var(--success)">
+        <h2 style="color:var(--success);margin-bottom:0.25rem">🎓 Certificate earned</h2>
         <p style="margin-top:0">
           Certificate <strong>{certificate.certNumber}</strong> — issued to{" "}
           {certificate.legalNameSnapshot}. A copy was emailed to you.

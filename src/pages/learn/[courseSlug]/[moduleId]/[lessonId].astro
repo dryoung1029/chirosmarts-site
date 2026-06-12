@@ -56,7 +56,7 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
   <div id="status" class="notice" style="display:none"></div>
 
   <div class="panel" style="padding:0;overflow:hidden">
-    <div id="player" style="aspect-ratio:16/9;background:#000"></div>
+    <div id="player" style="aspect-ratio:16/9;background:var(--ink)"></div>
   </div>
 
   <div class="panel">
@@ -67,7 +67,7 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
       {" "}/ {fmtMin(ctx.lesson.durationSeconds)} min
       <span id="complete" style="color:var(--ok);margin-left:0.5rem">{progress.complete ? "✓ complete" : ""}</span>
     </p>
-    <div style="height:10px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+    <div style="height:10px;background:var(--brand-tint);border-radius:6px;overflow:hidden;border:1px solid var(--border)">
       <div id="bar" style={`height:100%;width:${ctx.lesson.durationSeconds ? Math.min(100, Math.round((progress.creditedSeconds / ctx.lesson.durationSeconds) * 100)) : 0}%;background:var(--accent)`}></div>
     </div>
     <p class="muted" style="margin:0.75rem 0 0">

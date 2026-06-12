@@ -1,0 +1,157 @@
+/**
+ * Design tokens — the single source of truth for color across the whole site.
+ * Components reference these custom properties only; no raw hexes in components.
+ * Imported by both layouts (app + marketing), so every page inherits them.
+ *
+ * Usage rules baked into the base styles below:
+ *  - --action is for PRIMARY CTAs only (one per viewport where possible).
+ *  - Secondary buttons are a --brand outline; links are --brand, underlined.
+ *  - success / warning / danger map to certification states (current /
+ *    renewal-approaching / lapsed) — never decorative.
+ *  - Text on amber tints uses --warning-ink (#633806), never white.
+ *  - Focus rings are --brand, 2px.
+ */
+:root {
+  color-scheme: light;
+
+  /* ---- Brand palette (authoritative) ---- */
+  --brand: #0b6b63;
+  --brand-tint: #ecf7f4;
+  --action: #c2410c;
+  --ink: #13272b;
+  --muted: #51646a;
+  --canvas: #fafaf7;
+  --surface: #ffffff;
+  --success: #15803d;
+  --success-tint: #dcf1ea;
+  --warning: #a16207;
+  --warning-tint: #fdf3e0;
+  --danger: #b91c1c;
+
+  /* ---- Derived UI tokens ---- */
+  --warning-ink: #633806; /* required: text on amber tints */
+  --danger-tint: #fbe9e9; /* derived: lapsed-state surface */
+  --gold: #b8860b; /* certificate accent (not --action) */
+  --sheen: rgba(255, 255, 255, 0.6); /* certificate shine highlight */
+  --border: #e3e7e4;
+  --focus: var(--brand);
+  --shadow: 0 12px 30px rgba(19, 39, 43, 0.08);
+  --accent-text: var(--surface);
+
+  /* ---- Back-compat aliases (older components reference these names) ---- */
+  --bg: var(--canvas);
+  --bg-2: var(--brand-tint);
+  --panel: var(--surface);
+  --panel-2: var(--brand-tint);
+  --text: var(--ink);
+  --accent: var(--brand);
+  --ok: var(--success);
+  --warn: var(--warning);
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Form fields */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+/* ---- Buttons ---- */
+/* Primary CTA = --action (the one high-emphasis action per viewport). */
+button,
+.btn,
+.btn-primary {
+  display: inline-block;
+  background: var(--action);
+  color: var(--surface);
+  border: 0;
+  padding: 0.7rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+/* Secondary = --brand outline. */
+.btn-secondary {
+  display: inline-block;
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  padding: 0.7rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+}
+/* Inline text button (e.g. "Sign out", "Delete"). */
+button.link,
+.link {
+  background: none;
+  color: var(--brand);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Notices / state surfaces (certification states) ---- */
+.notice {
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+.notice.ok {
+  background: var(--success-tint);
+  border-color: var(--success);
+  color: var(--success);
+}
+.notice.warn {
+  background: var(--warning-tint);
+  border-color: var(--warning);
+  color: var(--warning-ink);
+}
+.notice.err {
+  background: var(--danger-tint);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Pending owner-copy / verify chips use the amber-tint pairing. */
+.owner-copy {
+  display: inline-block;
+  background: var(--warning-tint);
+  color: var(--warning-ink);
+  border: 1px dashed var(--warning);
+  border-radius: 6px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.9rem;
+}

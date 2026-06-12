@@ -24,19 +24,19 @@ const { courseTitle, creditHours, instructorName } = Astro.props;
 <style>
   .cert-preview {
     position: relative; overflow: hidden;
-    background: linear-gradient(135deg, #11203a, #0b1626);
-    border: 1px solid var(--border); border-radius: 12px;
+    background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+    border: 1px solid var(--brand); border-top: 3px solid var(--gold); border-radius: 12px;
     padding: 1.5rem; text-align: center; max-width: 460px;
   }
   .cert-watermark {
     position: absolute; inset: 0; display: grid; place-items: center;
-    font-size: 3.5rem; font-weight: 800; color: rgba(148,163,184,0.08);
+    font-size: 3.5rem; font-weight: 800; color: var(--brand); opacity: 0.07;
     transform: rotate(-18deg); letter-spacing: 0.2em; pointer-events: none;
   }
-  .cert-head { color: var(--accent); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.8rem; }
+  .cert-head { color: var(--brand); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.8rem; }
   .cert-body { margin-top: 0.75rem; }
-  .cert-name { font-size: 1.5rem; font-weight: 700; color: var(--text); }
-  .cert-course { margin-top: 0.35rem; color: var(--text); }
+  .cert-name { font-size: 1.5rem; font-weight: 700; color: var(--ink); }
+  .cert-course { margin-top: 0.35rem; color: var(--ink); }
   .cert-meta { margin-top: 0.35rem; color: var(--muted); font-size: 0.85rem; }
   .cert-code { margin-top: 0.75rem; font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.8rem; }
 </style>

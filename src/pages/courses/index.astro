@@ -46,7 +46,7 @@ const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
     {
       courses.map((c) => (
         <div class="panel" style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
-          <span style="align-self:flex-start;font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;background:#23303f;color:var(--muted)">
+          <span style="align-self:flex-start;font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;background:var(--brand-tint);color:var(--muted)">
             {topicLabel[c.topicCategory] ?? c.topicCategory}
           </span>
           <a href={`/courses/${c.slug}`} style="font-weight:600;color:var(--text);text-decoration:none;font-size:1.05rem">

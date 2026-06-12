@@ -64,12 +64,12 @@ const caption = OWNER.hero.demoCaption;
   .hero-demo { margin: 0; }
   .caption { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 0.75rem 0 0; }
   .browser {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; box-shadow: var(--shadow);
   }
-  .bar { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.75rem; background: var(--bg-2); border-bottom: 1px solid var(--border); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: #475569; }
-  .url { margin-left: 0.6rem; font-size: 0.78rem; color: var(--muted); background: #0b1220; border-radius: 6px; padding: 0.15rem 0.6rem; }
+  .bar { display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.75rem; background: var(--brand-tint); border-bottom: 1px solid var(--border); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+  .url { margin-left: 0.6rem; font-size: 0.78rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.15rem 0.6rem; }
   .screen { padding: 1.1rem; min-height: 320px; position: relative; }
   .dash { position: relative; }
   .hello { font-size: 1.05rem; margin-bottom: 0.9rem; }
@@ -77,42 +77,43 @@ const caption = OWNER.hero.demoCaption;
   .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
   .row {
     display: flex; align-items: center; gap: 0.6rem;
-    background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.8rem;
+    background: var(--brand-tint); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.8rem;
     opacity: 0; transform: translateY(6px); transition: opacity .45s ease, transform .45s ease;
   }
-  .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; background: #1f2937; color: var(--muted); }
+  .mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
   .row .label { flex: 1; }
   .state { font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 6px; }
-  .state.done { background: #0b2e1a; color: #4ade80; }
-  .state.pass { background: #0b2e1a; color: #4ade80; opacity: 0; transition: opacity .4s ease; }
-  .chip { font-size: 0.78rem; padding: 0.1rem 0.5rem; border-radius: 6px; background: #1e293b; color: var(--muted); opacity: 0; transition: opacity .4s ease; }
-  .course-mark { color: var(--warn); }
+  .state.done { background: var(--success-tint); color: var(--success); }
+  .state.pass { background: var(--success-tint); color: var(--success); opacity: 0; transition: opacity .4s ease; }
+  .chip { font-size: 0.78rem; padding: 0.1rem 0.5rem; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); opacity: 0; transition: opacity .4s ease; }
+  .course-mark { color: var(--warning); }
   .ring {
     display: inline-flex; align-items: baseline; gap: 0.15rem; font-variant-numeric: tabular-nums;
-    color: var(--accent); font-weight: 700;
+    color: var(--brand); font-weight: 700;
   }
   .ring-unit { font-size: 0.7rem; color: var(--muted); }
 
-  /* certificate slides up from below, hidden initially */
+  /* certificate slides up from below, hidden initially. Ink + brand teal + gold. */
   .cert-card {
     position: relative; overflow: hidden; margin-top: 0.8rem;
-    background: linear-gradient(135deg, #11203a, #0b1626); border: 1px solid #1e3a5f; border-radius: 10px;
-    padding: 0.9rem; text-align: center;
+    background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+    border: 1px solid var(--brand); border-top: 3px solid var(--gold); border-radius: 10px;
+    padding: 0.9rem; text-align: center; color: var(--ink);
     opacity: 0; transform: translateY(16px); transition: opacity .5s ease, transform .5s ease;
   }
-  .cert-h { color: var(--accent); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .cert-h { color: var(--brand); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
   .cert-n { font-size: 1.2rem; font-weight: 700; margin-top: 0.2rem; }
   .cert-c { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
   .cert-v { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
-  .shine { position: absolute; top: 0; left: -60%; width: 50%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.12), transparent); }
+  .shine { position: absolute; top: 0; left: -60%; width: 50%; height: 100%; background: linear-gradient(100deg, transparent, var(--sheen), transparent); }
 
   .maintain { display: none; align-items: center; gap: 0.6rem; margin-top: 0.8rem; }
-  .renew { background: #2a2410; color: #fbbf24; border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.85rem; font-weight: 600; }
+  .renew { background: var(--brand-tint); color: var(--brand); border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.85rem; font-weight: 600; }
   .maintain-label { color: var(--muted); font-size: 0.8rem; }
   .toast {
     position: absolute; right: 0.8rem; bottom: 0.8rem;
-    background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
-    padding: 0.5rem 0.75rem; font-size: 0.82rem; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    background: var(--surface); border: 1px solid var(--brand); border-radius: 10px;
+    padding: 0.5rem 0.75rem; font-size: 0.82rem; box-shadow: var(--shadow);
     opacity: 0; transform: translateY(10px); transition: opacity .4s ease, transform .4s ease;
   }
 
@@ -125,9 +126,9 @@ const caption = OWNER.hero.demoCaption;
   .hero-demo .row[data-step="handson"] .chip,
   .hero-demo .row[data-step="exam"] .state.pass { opacity: 0; }
   .hero-demo.s3 .row[data-step="handson"] .chip { opacity: 1; }
-  .hero-demo.s3 .row[data-step="handson"] .mark { background: #0b2e1a; color: #4ade80; }
+  .hero-demo.s3 .row[data-step="handson"] .mark { background: var(--success-tint); color: var(--success); }
   .hero-demo.s4 .row[data-step="exam"] .state.pass { opacity: 1; }
-  .hero-demo.s4 .row[data-step="exam"] .mark { background: #0b2e1a; color: #4ade80; }
+  .hero-demo.s4 .row[data-step="exam"] .mark { background: var(--success-tint); color: var(--success); }
   .hero-demo.s5 .cert-card { opacity: 1; transform: none; }
   .hero-demo.s5 .shine { animation: shine 1.4s ease .3s 1; }
   .hero-demo.s6 .maintain { display: flex; }
@@ -145,7 +146,7 @@ const caption = OWNER.hero.demoCaption;
   .hero-demo.static .row[data-step="exam"] .state.pass,
   .hero-demo.static .toast { opacity: 1; transform: none; }
   .hero-demo.static .row[data-step="handson"] .mark,
-  .hero-demo.static .row[data-step="exam"] .mark { background: #0b2e1a; color: #4ade80; }
+  .hero-demo.static .row[data-step="exam"] .mark { background: var(--success-tint); color: var(--success); }
   .hero-demo.static .maintain { display: flex; }
   .hero-demo.static .shine { display: none; }
 

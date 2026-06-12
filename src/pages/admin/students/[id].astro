@@ -135,10 +135,10 @@ const flash = Astro.url.searchParams.get("done");
                   <span
                     style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.8rem;${
                       cert.status === "issued"
-                        ? "background:#0b2e1a;color:#4ade80"
+                        ? "background:var(--success-tint);color:var(--success)"
                         : cert.status === "revoked"
-                          ? "background:#3a1212;color:#f87171"
-                          : "background:#2a2410;color:#fbbf24"
+                          ? "background:var(--danger-tint);color:var(--danger)"
+                          : "background:var(--warning-tint);color:var(--warning-ink)"
                     }`}
                   >
                     {cert.status}
@@ -158,7 +158,7 @@ const flash = Astro.url.searchParams.get("done");
                         style="margin:0"
                         onsubmit="return confirm('Revoke this certificate? It will show as invalid on the public verify page.')"
                       >
-                        <button class="link" type="submit" style="color:#f87171">Revoke</button>
+                        <button class="link" type="submit" style="color:var(--danger)">Revoke</button>
                       </form>
                     </>
                   )}
@@ -198,7 +198,7 @@ const flash = Astro.url.searchParams.get("done");
                   <td style="padding:0.3rem 0.4rem">{quiz?.kind ?? "—"}</td>
                   <td style="padding:0.3rem 0.4rem">{a.attemptNumber}</td>
                   <td style="padding:0.3rem 0.4rem">{Math.round(a.score * 100)}%</td>
-                  <td style={`padding:0.3rem 0.4rem;${a.passed ? "color:var(--ok)" : "color:#f87171"}`}>
+                  <td style={`padding:0.3rem 0.4rem;${a.passed ? "color:var(--ok)" : "color:var(--danger)"}`}>
                     {a.passed ? "pass" : "fail"}
                   </td>
                   <td style="padding:0.3rem 0.4rem">{formatPacific(a.submittedAt, { dateStyle: "short", timeStyle: "short" })}</td>

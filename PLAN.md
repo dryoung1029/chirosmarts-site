@@ -16,6 +16,10 @@
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
 
+### Design tokens (shipped)
+- **One source of truth:** `src/styles/tokens.css` defines the brand palette (--brand teal, --action orange, --ink/--muted, --canvas/--surface, success/warning/danger + tints, gold, derived --border/--focus/--shadow) and is imported by both layouts — components reference tokens only, **no raw hexes** (emails keep inline hex; CSS vars don't work in mail clients). Back-compat aliases (`--bg/--panel/--text/--accent/--ok/--warn`) re-map the existing app to the light theme.
+- **Usage rules** baked into base styles: --action for primary CTAs only; secondary = --brand outline; links = --brand underlined; success/warning/danger map to cert states (current/approaching/lapsed), never decorative; amber-tint text uses --warning-ink (#633806); focus rings --brand 2px. Hero demo, logo, and certificate (PDF + preview) retokenized to ink+teal+gold. **WCAG verified** — body ≥4.5:1, state/large ≥3:1 on every pairing.
+
 ### Marketing storefront + funnel — first slice (shipped)
 Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top of the app. Cloudflare Web Analytics only (no other trackers); prices/titles/hours always from the DB.
 - **Shipped:** homepage `/` (hero + owner-copy CTAs + **animated hero demo**, audience router, stats bar, how-it-works, instructor block, testimonials grid, DB catalog teaser, FAQ, preserved NBCE disclaimer); upgraded course landing `/courses/[slug]` (requirements-mapping table, certificate preview, syllabus, course-tagged testimonials, course FAQ, sticky mobile CTA, refund line → Terms); `/clinics`, `/renewal` (checker slot), `/about`; **guides system** (`src/content/guides/`) with ToC + Article JSON-LD + byline + related-course card and two stub entries; `sitemap.xml`, `robots.txt`; SEO component with canonical/OG/Twitter; JSON-LD **Organization** (sitewide), **Course**, **FAQPage**, **Article**.

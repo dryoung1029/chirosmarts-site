@@ -39,10 +39,10 @@ for (const l of lessons) {
         <span
           style={`padding:0.15rem 0.6rem;border-radius:6px;font-size:0.8rem;${
             c.status === "published"
-              ? "background:#0b2e1a;color:#4ade80"
+              ? "background:var(--success-tint);color:var(--success)"
               : c.status === "archived"
-                ? "background:#3a1212;color:#f87171"
-                : "background:#23303f;color:var(--muted)"
+                ? "background:var(--danger-tint);color:var(--danger)"
+                : "background:var(--brand-tint);color:var(--muted)"
           }`}
         >
           {c.status}
