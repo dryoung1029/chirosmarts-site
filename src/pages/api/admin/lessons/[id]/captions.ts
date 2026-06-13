@@ -61,8 +61,9 @@ export const POST: APIRoute = async ({ params, locals }) => {
     const chunks = parseTranscript(vtt);
     if (chunks.length === 0) return json({ error: "The caption had no cues to ingest." }, 400);
 
-    // Replace any prior transcript for this lesson, then insert in batches
-    // (SQLite caps bound variables, so don't insert hundreds of rows at once).
+    // Replace any prior transcript for this lesson, then insert in batches.
+    // D1 caps bound variables at 100 per query and each row binds 6 columns,
+    // so insert at most 16 rows (16×6=96) at a time.
     await db.delete(schema.lessonTranscripts).where(eq(schema.lessonTranscripts.lessonId, id));
     const rows = chunks.map((c) => ({
       id: `lt_${id}_${c.index}`,
@@ -72,8 +73,8 @@ export const POST: APIRoute = async ({ params, locals }) => {
       endSeconds: c.endSeconds,
       text: c.text,
     }));
-    for (let i = 0; i < rows.length; i += 100) {
-      await db.insert(schema.lessonTranscripts).values(rows.slice(i, i + 100));
+    for (let i = 0; i < rows.length; i += 16) {
+      await db.insert(schema.lessonTranscripts).values(rows.slice(i, i + 16));
     }
     return json({ status: "ready", cues: rows.length });
   } catch (e) {
