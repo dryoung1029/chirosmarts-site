@@ -251,6 +251,13 @@ if (lessonIds.length) {
                     </span>
                   </div>
                 )}
+                <div style="flex:1 1 100%;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem">
+                  <input type="file" accept="video/*" id={`vid-${l.id}`} class="video-file" data-lesson={l.id} style="display:none" />
+                  <button type="button" class="upload-video" data-lesson={l.id} data-module={module.id} style="font-size:0.85rem">
+                    {l.streamVideoUid ? "⤴ Replace video" : "⤴ Upload video to Stream"}
+                  </button>
+                  <span class="upload-status muted" data-for={l.id} style="font-size:0.8rem"></span>
+                </div>
               </form>
             ))
           )}
@@ -344,6 +351,65 @@ if (lessonIds.length) {
       } finally {
         btn.disabled = false;
       }
+    });
+  </script>
+
+  <script>
+    // Resumable video upload straight to Cloudflare Stream (tus). The file bytes
+    // go browser → Cloudflare; our endpoint only mints the one-time upload URL.
+    import * as tus from "tus-js-client";
+
+    document.querySelectorAll<HTMLButtonElement>(".upload-video").forEach((btn) => {
+      const lessonId = btn.dataset.lesson!;
+      const moduleId = btn.dataset.module!;
+      const input = document.getElementById(`vid-${lessonId}`) as HTMLInputElement | null;
+      const status = document.querySelector(`.upload-status[data-for="${lessonId}"]`);
+      const set = (m: string) => { if (status) status.textContent = m; };
+      if (!input) return;
+
+      btn.addEventListener("click", () => input.click());
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        btn.disabled = true;
+        set("Preparing upload…");
+        let mediaId: string | null = null;
+
+        const upload = new tus.Upload(file, {
+          endpoint: `/api/admin/lessons/${lessonId}/upload-url`,
+          chunkSize: 150 * 1024 * 1024,
+          retryDelays: [0, 3000, 6000, 12000, 24000],
+          metadata: { name: file.name, filetype: file.type },
+          onError(err) {
+            set("Upload failed: " + (err?.message ?? String(err)));
+            btn.disabled = false;
+          },
+          onProgress(sent, total) {
+            set(`Uploading… ${Math.floor((sent / total) * 100)}% — keep this tab open.`);
+          },
+          onAfterResponse(_req, res) {
+            const id = res.getHeader("stream-media-id");
+            if (id) mediaId = id;
+          },
+          async onSuccess() {
+            set("Uploaded — attaching to lesson…");
+            try {
+              if (!mediaId) throw new Error("missing video id");
+              await fetch(`/api/admin/lessons/${lessonId}/attach-uploaded`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ uid: mediaId }),
+              });
+              const msg = "Video uploaded — once Cloudflare finishes processing, click Save on the lesson to record its length.";
+              window.location.href = `${window.location.pathname}?done=${encodeURIComponent(msg)}#mod-${moduleId}`;
+            } catch (e) {
+              set("Uploaded, but couldn't attach automatically — " + (e instanceof Error ? e.message : ""));
+              btn.disabled = false;
+            }
+          },
+        });
+        upload.start();
+      });
     });
   </script>
 </Layout>

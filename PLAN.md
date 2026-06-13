@@ -174,7 +174,7 @@ Owner chose to **build a real clinic roadmap template** (M1.5, above): clinic ow
 Astro 5 SSR on Cloudflare; D1 / R2 / Stream; Stripe Checkout (test mode); Resend transactional + magic-link auth; Brevo deferred (capture marketing-consent now, structure attributes for later sync); TypeScript; logic in Astro endpoints/actions (no separate API service); minimal deps; times stored UTC, displayed America/Los_Angeles; **`SITE_URL` env var from day one** (magic links, Stripe redirects, cert verification links — never hard-coded).
 
 ### Approved dependency budget
-Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **qrcode** (M4, cert QR) · **Anthropic SDK** (M6 only). The Anthropic API powers the M6 tutor. Anything else, I ask first.
+Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **qrcode** (M4, cert QR) · **Anthropic SDK** (M6 only) · **tus-js-client** (admin video upload to Stream — owner-approved 2026-06). The Anthropic API powers the M6 tutor. Anything else, I ask first.
 
 ---
 
