@@ -41,5 +41,5 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     title: parsed.data.title,
     // duration_seconds defaults to 0; attach a Stream video to set the real runtime.
   });
-  return redirect(`/admin/content/${courseId}?done=Lesson+added`, 303);
+  return redirect(`/admin/content/${courseId}?done=Lesson+added#mod-${moduleId}`, 303);
 };

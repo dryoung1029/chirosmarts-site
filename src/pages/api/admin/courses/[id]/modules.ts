@@ -36,13 +36,14 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     .all();
   const nextPos = existing.reduce((m, r) => Math.max(m, r.position), 0) + 1;
 
+  const newModuleId = newId("mod");
   await db.insert(schema.modules).values({
-    id: newId("mod"),
+    id: newModuleId,
     courseId,
     position: nextPos,
     title: d.title,
     description: d.description || null,
     isFreePreview: !!d.isFreePreview,
   });
-  return redirect(`/admin/content/${courseId}?done=Module+added`, 303);
+  return redirect(`/admin/content/${courseId}?done=Module+added#mod-${newModuleId}`, 303);
 };

@@ -34,8 +34,9 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     .where(eq(schema.modules.id, lesson.moduleId))
     .get();
   const courseId = module?.courseId ?? "";
+  // Anchor back to the lesson's module so saving doesn't jump to the top.
   const back = (msg: string) =>
-    redirect(`/admin/content/${courseId}?done=${encodeURIComponent(msg)}`, 303);
+    redirect(`/admin/content/${courseId}?done=${encodeURIComponent(msg)}#mod-${lesson.moduleId}`, 303);
 
   const form = Object.fromEntries(await request.formData());
   const parsed = Body.safeParse(form);

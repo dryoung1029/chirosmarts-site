@@ -154,7 +154,7 @@ if (streamReady) {
   <h2 style="margin-top:1.5rem">Modules &amp; lessons</h2>
   {
     structure.map(({ module, lessons }) => (
-      <div class="panel">
+      <div class="panel" id={`mod-${module.id}`} style="scroll-margin-top:1rem">
         <form method="POST" action={`/api/admin/modules/${module.id}`}>
           <div class="row" style="align-items:flex-end">
             <div style="flex:0 0 5rem">

@@ -36,5 +36,6 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
       isFreePreview: !!d.isFreePreview, // unchecked box → field absent → false
     })
     .where(eq(schema.modules.id, id));
-  return redirect(`/admin/content/${module.courseId}?done=Module+saved`, 303);
+  // Anchor back to the module so saving doesn't jump to the top of the page.
+  return redirect(`/admin/content/${module.courseId}?done=Module+saved#mod-${id}`, 303);
 };
