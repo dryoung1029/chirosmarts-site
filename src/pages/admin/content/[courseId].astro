@@ -193,8 +193,39 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
               </form>
             ))
           )}
+
+          <form
+            method="POST"
+            action={`/api/admin/modules/${module.id}/lessons`}
+            style="display:flex;gap:0.5rem;align-items:flex-end;margin:0.25rem 0 0"
+          >
+            <div style="flex:1">
+              <label style="margin:0">New lesson title</label>
+              <input type="text" name="title" placeholder="e.g. Welcome & orientation" required />
+            </div>
+            <button type="submit" style="margin:0">+ Add lesson</button>
+          </form>
         </div>
       </div>
     ))
   }
+
+  <!-- Add a module -->
+  <form class="panel" method="POST" action={`/api/admin/courses/${course.id}/modules`} style="border-style:dashed">
+    <h3 style="margin:0 0 0.75rem">Add a module</h3>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:3">
+        <label>Module title</label>
+        <input type="text" name="title" placeholder="e.g. Module 2 — Scope of Practice" required />
+      </div>
+    </div>
+    <label>Description (optional)</label>
+    <input type="text" name="description" placeholder="Short summary shown on the course page" />
+    <label class="check" style="margin-top:0.75rem">
+      <input type="checkbox" name="isFreePreview" />
+      <span>Free preview (no paywall)</span>
+    </label>
+    <button type="submit" style="margin-top:0.75rem">+ Add module</button>
+    <p class="muted" style="margin:0.5rem 0 0;font-size:0.8rem">New modules are added at the end; change the Position fields above to reorder.</p>
+  </form>
 </Layout>
