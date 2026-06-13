@@ -229,4 +229,42 @@ const flash = Astro.url.searchParams.get("done");
       )
     }
   </div>
+
+  <div class="panel" style="border-color:var(--warn);margin-top:1.5rem">
+    <h2 style="margin-top:0;color:var(--warn)">Danger zone</h2>
+
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start">
+      <form method="POST" action={`/api/admin/users/${userId}/reset`} class="reset-form" style="flex:1 1 18rem;margin:0">
+        <strong>Reset progress</strong>
+        <p class="muted" style="margin:0.25rem 0 0.5rem;font-size:0.85rem">
+          Keeps the account, intake, and roadmap. Clears enrollments, seat-time
+          events, quiz attempts, certificates, and uploaded documents so they can
+          start over. Cannot be undone.
+        </p>
+        <button type="submit">Reset this user's progress</button>
+      </form>
+
+      <form method="POST" action={`/api/admin/users/${userId}/delete`} class="delete-form" style="flex:1 1 18rem;margin:0">
+        <strong style="color:var(--warn)">Delete user</strong>
+        <p class="muted" style="margin:0.25rem 0 0.5rem;font-size:0.85rem">
+          Permanently removes {student.email} and ALL their data (account,
+          progress, certificates, documents, clinic, sessions). Cannot be undone.
+          Type the email to confirm.
+        </p>
+        <input type="email" name="confirmEmail" placeholder={student.email} autocomplete="off"
+          style="width:100%;max-width:24rem;margin-bottom:0.5rem" />
+        <br />
+        <button type="submit" style="background:var(--warn);border-color:var(--warn)">Delete this user</button>
+      </form>
+    </div>
+  </div>
+
+  <script is:inline>
+    document.querySelector(".reset-form")?.addEventListener("submit", (e) => {
+      if (!confirm("Reset this user's progress? Enrollments, seat time, attempts, and certificates will be permanently cleared.")) e.preventDefault();
+    });
+    document.querySelector(".delete-form")?.addEventListener("submit", (e) => {
+      if (!confirm("Permanently DELETE this user and all their data? This cannot be undone.")) e.preventDefault();
+    });
+  </script>
 </Layout>
