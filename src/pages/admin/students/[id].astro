@@ -165,6 +165,19 @@ const flash = Astro.url.searchParams.get("done");
                 </div>
               ))
             )}
+            {!certs.some((c) => c.status === "issued") && (
+              <form method="POST" action={`/api/admin/users/${userId}/certificate`} style="margin:0.75rem 0 0">
+                <input type="hidden" name="courseId" value={course.id} />
+                <button type="submit" disabled={!student.legalName?.trim()}>
+                  Issue certificate for this course
+                </button>
+                {!student.legalName?.trim() && (
+                  <span class="muted" style="margin-left:0.5rem;font-size:0.85rem">
+                    Needs a legal name (student must complete intake).
+                  </span>
+                )}
+              </form>
+            )}
           </div>
         </div>
       ))
