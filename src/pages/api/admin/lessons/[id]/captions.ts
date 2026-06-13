@@ -12,6 +12,7 @@
 import type { APIRoute } from "astro";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { describeDbError } from "@/lib/db-errors";
 import {
   isStreamManagementConfigured,
   listStreamCaptions,
@@ -78,6 +79,6 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }
     return json({ status: "ready", cues: rows.length });
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "Caption step failed." }, 502);
+    return json({ error: describeDbError(e) }, 502);
   }
 };
