@@ -5,8 +5,15 @@ import { getDb, schema } from "@/db/client";
 import { sql, eq, desc } from "drizzle-orm";
 import { formatPacific } from "@/lib/time";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 const flash = Astro.url.searchParams.get("done");
+
+// Email config snapshot for the diagnostics panel.
+const emailHasKey = !!env.RESEND_API_KEY;
+const emailFrom = env.EMAIL_FROM || "onboarding@resend.dev (default sandbox)";
+const emailReplyTo = env.EMAIL_REPLY_TO || "(none)";
+const emailIsSandbox = /@resend\.dev/i.test(emailFrom) || !env.EMAIL_FROM;
 
 const totalUsers = await db
   .select({ n: sql<number>`count(*)` })
@@ -126,7 +133,58 @@ const stats = [
     <span id="embed-status" class="muted" style="margin-left:0.75rem"></span>
   </div>
 
+  <div class="panel">
+    <h2>Email diagnostics</h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Whether transactional mail (sign-in links, receipts, certificates) can
+      actually be delivered. Send a test and read Resend's real response.
+    </p>
+    <ul style="font-size:0.9rem;line-height:1.7;margin:0 0 0.75rem;padding-left:1.1rem">
+      <li>API key (RESEND_API_KEY): <strong style={emailHasKey ? "color:var(--ok)" : "color:var(--warn)"}>{emailHasKey ? "set" : "NOT set — nothing will send"}</strong></li>
+      <li>From (EMAIL_FROM): <code>{emailFrom}</code></li>
+      <li>Reply-to (EMAIL_REPLY_TO): <code>{emailReplyTo}</code></li>
+      {emailIsSandbox && (
+        <li style="color:var(--warn)">
+          Using Resend's sandbox domain — it only delivers to your own Resend
+          account email; everyone else gets nothing. Verify a sending domain and
+          set EMAIL_FROM to fix.
+        </li>
+      )}
+    </ul>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+      <input type="email" id="email-test-to" placeholder="you@example.com" style="flex:1 1 16rem;max-width:24rem" />
+      <button type="button" id="email-test-btn">Send test email</button>
+    </div>
+    <p id="email-test-status" class="muted" style="font-size:0.85rem;margin:0.5rem 0 0;white-space:pre-wrap"></p>
+  </div>
+
   <script is:inline>
+    document.getElementById("email-test-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("email-test-btn");
+      const status = document.getElementById("email-test-status");
+      const to = document.getElementById("email-test-to").value.trim();
+      if (!to) { status.textContent = "Enter an address first."; return; }
+      btn.disabled = true;
+      status.textContent = "Sending…";
+      try {
+        const res = await fetch("/api/admin/email-test", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ to }),
+        });
+        const d = await res.json();
+        if (d.delivered) {
+          status.textContent = `✓ Accepted by Resend (id ${d.id}). Check the inbox (and spam). From: ${d.from}`;
+        } else {
+          status.textContent = `✗ Not delivered. ${d.error || "Unknown error."}\nFrom: ${d.from} · API key: ${d.hasKey ? "set" : "NOT set"}`;
+        }
+      } catch (e) {
+        status.textContent = "Network error sending the test.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     document.getElementById("embed-btn").addEventListener("click", async () => {
       const btn = document.getElementById("embed-btn");
       const status = document.getElementById("embed-status");

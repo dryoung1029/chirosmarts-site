@@ -73,7 +73,9 @@ export async function sendEmail(
     if (!res.ok) {
       const body = await res.text();
       console.error(`[email] Resend error ${res.status}: ${body}`);
-      return { delivered: false, error: `Resend ${res.status}` };
+      // Surface Resend's own message (e.g. sandbox "you can only send to your
+      // own email") so admin diagnostics can show the real reason.
+      return { delivered: false, error: `Resend ${res.status}: ${body.slice(0, 500)}` };
     }
 
     const data = (await res.json()) as { id?: string };
