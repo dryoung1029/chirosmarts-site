@@ -73,6 +73,118 @@ export async function signStreamToken(
   return `${signingInput}.${base64url(new Uint8Array(sig))}`;
 }
 
+/**
+ * Whether the Stream MANAGEMENT API (account id + API token) is available. This
+ * is separate from playback signing — it lets the Worker read a video's true
+ * duration when an admin attaches an existing Stream UID to a lesson.
+ */
+export function isStreamManagementConfigured(env: CloudflareEnv): boolean {
+  return !!(env.CF_ACCOUNT_ID && env.CF_STREAM_API_TOKEN);
+}
+
+/**
+ * Read a Stream video's true runtime (seconds) via the management API. Used when
+ * registering an existing video on a lesson — `duration_seconds` is the seat-time
+ * gate's denominator, so it must be Stream's real value, never a guess.
+ */
+export async function fetchStreamDuration(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<{ ok: true; duration: number } | { ok: false; error: string }> {
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}`,
+    { headers: { Authorization: `Bearer ${env.CF_STREAM_API_TOKEN}` } },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (res.status === 404 || data?.success === false) {
+    return { ok: false, error: `No Stream video found for UID "${uid}" (check the UID).` };
+  }
+  const r = data?.result;
+  if (!r?.readyToStream) {
+    return { ok: false, error: `Video "${uid}" is still processing — try again shortly.` };
+  }
+  const duration = Math.round(r.duration ?? 0);
+  if (!duration || duration <= 0) {
+    return { ok: false, error: `Stream reports a 0s duration for "${uid}".` };
+  }
+  return { ok: true, duration };
+}
+
+const STREAM_MGMT = "https://api.cloudflare.com/client/v4";
+const mgmtHeaders = (env: CloudflareEnv) => ({
+  Authorization: `Bearer ${env.CF_STREAM_API_TOKEN}`,
+});
+
+export interface StreamCaption {
+  language: string;
+  label?: string;
+  generated?: boolean;
+  status?: "inprogress" | "ready" | "error";
+}
+
+/** List the caption tracks on a Stream video (management API). */
+export async function listStreamCaptions(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<StreamCaption[]> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions`,
+    { headers: mgmtHeaders(env) },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok || data?.success === false) {
+    throw new Error(`Stream captions list failed: ${JSON.stringify(data?.errors ?? data)}`);
+  }
+  return (data?.result ?? []) as StreamCaption[];
+}
+
+/** Kick off AI caption generation for a language (returns immediately). */
+export async function generateStreamCaption(
+  env: CloudflareEnv,
+  uid: string,
+  language = "en",
+): Promise<void> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions/${language}/generate`,
+    { method: "POST", headers: mgmtHeaders(env) },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok || data?.success === false) {
+    throw new Error(`Stream caption generate failed: ${JSON.stringify(data?.errors ?? data)}`);
+  }
+}
+
+/** Download a generated caption as WebVTT text. */
+export async function fetchStreamCaptionVtt(
+  env: CloudflareEnv,
+  uid: string,
+  language = "en",
+): Promise<string> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions/${language}/vtt`,
+    { headers: mgmtHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`Stream caption VTT download failed (HTTP ${res.status}).`);
+  return res.text();
+}
+
+/** Whether a video has finished processing, plus its true runtime (seconds). */
+export async function fetchStreamVideoStatus(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<{ found: boolean; ready: boolean; duration: number }> {
+  const res = await fetch(`${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}`, {
+    headers: mgmtHeaders(env),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (res.status === 404 || data?.success === false) {
+    return { found: false, ready: false, duration: 0 };
+  }
+  const r = data?.result;
+  const duration = Math.round(r?.duration ?? 0);
+  return { found: true, ready: !!r?.readyToStream && duration > 0, duration };
+}
+
 export interface StreamPlaybackUrls {
   iframe: string;
   hls: string;

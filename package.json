@@ -9,10 +9,12 @@
     "preview": "wrangler pages dev ./dist",
     "deploy": "astro build && wrangler pages deploy ./dist",
     "astro": "astro",
+    "assets:illustrations": "node scripts/build-illustration-assets.mjs",
     "typecheck": "astro check",
     "test": "vitest run",
     "test:watch": "vitest",
     "stream:upload": "node --experimental-strip-types scripts/upload-to-stream.ts",
+    "captions": "node --experimental-strip-types scripts/generate-captions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply chirosmarts --local",
     "db:migrate:remote": "wrangler d1 migrations apply chirosmarts --remote",
@@ -29,6 +31,7 @@
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "stripe": "^22.2.0",
+    "tus-js-client": "^4.3.1",
     "zod": "^3.25.0"
   },
   "devDependencies": {

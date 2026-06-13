@@ -4,6 +4,54 @@ This file keeps future sessions aligned. Read it before making changes.
 The authoritative project state (current milestone, decisions, open questions)
 lives in **PLAN.md** — update it every session.
 
+## Session handoff — current state & next task (2026-06, read first)
+
+**Shipped & live** (prod: `https://chirosmarts-site.pages.dev`, branch
+`claude/blissful-archimedes-60fn4w`): M0–M6 complete, plus **multi-course Phases
+1–3** (catalog, course landing, `course_resources`, `requiredSeatMinutes` exam
+gate, bundle fulfilment), **pricing model** (DB-only prices, `bundle_items`),
+**legal pages** (`/terms`,`/privacy` from `src/content/legal/*.md` — real draft
+text + entity values in; **effective date + `[VERIFY]` flags pending owner**),
+**marketing storefront + funnel** (homepage w/ animated hero demo, course pages,
+`/clinics`, `/renewal` + renewal-date checker, `/about`, guides system, lead
+capture w/ **double opt-in**, Brevo groundwork), **light design-token theme**
+(`src/styles/tokens.css` — single source, no raw hexes), and a **semantic tutor**
+(Workers AI `bge-small` embeddings in `transcript_embeddings`, cosine in-JS,
+hybrid w/ keyword; all prod transcripts embedded). PLAN.md has the full registry,
+the `[VERIFY]` launch-blockers, and the owner-placeholder list.
+
+**IN-FLIGHT NEXT TASK — illustration integration (NOT started):** 15 real
+illustrations are committed at `src/assets/illustrations/illustration-NN-*.png`
+(4–5 MB each). Requirements: (1) serve every one through Astro's image pipeline
+(`astro:assets` `<Picture>`, AVIF/WebP, responsive srcset, explicit w/h — never
+raw PNGs); (2) placement map → audience cards 02–04, course pages 05–07,
+how-it-works/emails 08–09, empty states 10, clinics 11, guide headers 12, 404 14;
+(3) all DECORATIVE (`alt=""`, aria-hidden, never replace text); (4) lazy-load
+below fold, keep homepage Lighthouse ≥90 (downscale + note in PLAN if it drops);
+(5) build `public/og-default.png` (1200×630) = wordmark over illustration-13
+(text in left negative space), update OG meta, retire `og-default.svg`; (6) use
+09 (renewal) + 07 (certificate) in the Resend email templates as **hosted absolute
+`SITE_URL` images** (downscale to ~600px PNG in `public/email/` — email clients
+don't do WebP/AVIF); (7) native aspect ratio, pad with `#FAFAF7` (or transparent)
+rather than crop/stretch; list unfilled slots in PLAN. Recon done: **sharp is
+installed**; **no image service configured** → add `imageService: 'compile'` to
+the Cloudflare adapter so static imports optimize at build (runtime passthrough);
+illustrations **01 (roadmap)** and **15 (patient-checkin)** have NO slot in the
+map (extras — note them). ARs: 02–04,06,07,10 square; 05,08 ≈1.49; 09,11,12,14
+≈2.0; 13 ≈1.79; 15 ≈1.83.
+
+**Also pending:** Phase 4 per-course clinic seat pools — concrete DDL ready for
+review at `docs/phase4-seat-pools-ddl.md` (approved design in PLAN.md), not built.
+
+**Ops gotchas:** deploy with `wrangler pages deploy ./dist`; **Pages applies env
+var / secret / binding changes only on the NEXT deploy**. Migrations: edit
+`schema.ts` → `npm run db:generate` → `db:migrate:local`/`:remote`; **D1 can't
+rebuild a table inside a migration** (FK pragma is a no-op in the txn) — keep
+migrations additive (see migration 0006 note). Re-embed the tutor after new
+transcripts via **Admin → AI tutor → Embed transcripts**. Git: the owner pushed
+from a stale clone and force-rewound this branch once (recovered via merge
+`5495f97`); pull before pushing, never force-push, prefer a fresh clone.
+
 ## What this is
 
 A continuing-education + compliance platform for ChiroSmarts.com (owner: Dr.

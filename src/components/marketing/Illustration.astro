@@ -1,0 +1,56 @@
+---
+/**
+ * Decorative illustration served as static, pre-optimized AVIF/WebP/PNG.
+ *
+ * Every ChiroSmarts illustration is DECORATIVE: empty alt + aria-hidden, never
+ * replaces text. Variants are generated at build time by
+ * scripts/build-illustration-assets.mjs (the site is SSR on Cloudflare, where
+ * astro:assets is a runtime passthrough — see that script's header). We emit a
+ * plain <picture> with AVIF→WebP→PNG and a responsive srcset; explicit width/
+ * height (from the intrinsic aspect ratio) reserves space to avoid layout shift.
+ * Default loading is lazy — pass loading="eager" only above the fold.
+ */
+import { ILLUSTRATIONS, type IllustrationName } from "@/lib/illustration-manifest";
+
+interface Props {
+  name: IllustrationName;
+  /** Cap the rendered display width (px). Defaults to the largest variant. */
+  maxWidth?: number;
+  /** `sizes` attribute; defaults from maxWidth. */
+  sizes?: string;
+  loading?: "lazy" | "eager";
+  class?: string;
+  /** Extra inline styles appended to the <img>. */
+  style?: string;
+}
+
+const { name, loading = "lazy", class: className, style = "" } = Astro.props;
+const meta = ILLUSTRATIONS[name];
+const largest = meta.widths[meta.widths.length - 1];
+const maxWidth = Astro.props.maxWidth ?? largest;
+const sizes = Astro.props.sizes ?? `(max-width: 640px) 90vw, ${maxWidth}px`;
+
+const srcset = (ext: string) =>
+  meta.widths.map((w) => `/illustrations/${name}-${w}.${ext} ${w}w`).join(", ");
+
+// Explicit intrinsic dimensions (at display cap) reserve layout space.
+const w = maxWidth;
+const h = Math.round(maxWidth / meta.ar);
+// Layout/positioning lives on the <picture>; the <img> simply fills it.
+const pictureStyle = `display:block;max-width:${maxWidth}px;${style}`;
+---
+
+<picture class={className} style={pictureStyle}>
+  <source type="image/avif" srcset={srcset("avif")} sizes={sizes} />
+  <source type="image/webp" srcset={srcset("webp")} sizes={sizes} />
+  <img
+    src={`/illustrations/${name}.png`}
+    alt=""
+    aria-hidden="true"
+    loading={loading}
+    decoding="async"
+    width={w}
+    height={h}
+    style="display:block;width:100%;height:auto;background:var(--canvas);border-radius:14px"
+  />
+</picture>

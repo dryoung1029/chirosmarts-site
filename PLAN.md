@@ -9,7 +9,7 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **Marketing storefront + funnel** — first slice built (homepage, hero demo, course landing upgrade, clinics/renewal/about, guides system, SEO/sitemap). Funnel (renewal checker, lead magnet, Brevo) deferred. Multi-course Phases 1–3 + pricing + legal shipped; Phase 4 seat pools pending DDL review. M0–M6 shipped. |
+| Current milestone | **Marketing + funnel + light design-token theme + semantic tutor + illustration integration — all shipped.** M0–M6, multi-course Phases 1–3, pricing, legal (draft), funnel (renewal checker, lead capture double-opt-in, Brevo groundwork), and the 15-illustration pass (see "Illustration integration (shipped)" below) done. Phase 4 seat pools pending DDL review (`docs/phase4-seat-pools-ddl.md`). |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
@@ -40,7 +40,7 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 - **Stats** — kept EMPTY (owner's numeric stats were `[VERIFY]`; "only real numbers can ship"). Fill `OWNER.stats` with confirmed figures to show the bar.
 - **Testimonials** — none yet; add `src/content/testimonials/*.md` (real only).
 - **Instructor photo / About story**; **guide last-updated dates** (frontmatter `lastUpdated: "[ADD DATE]"` — JSON-LD date is omitted until set); **clinic dashboard image** + **overview video** Stream UID.
-- Assets: proper per-page OG PNG (currently the branded `og-default.svg`).
+- Assets: ~~proper per-page OG PNG (currently the branded `og-default.svg`)~~ → **done** for the default card (`public/og-default.png`, 1200×630, illustration-13 + wordmark; `og-default.svg` retired). Per-PAGE OG cards still deferred.
 - Config: `effectiveDate` (legal), `CF_WEB_ANALYTICS_TOKEN`, Brevo keys, Oregon renewal hour figures, the lead-magnet checklist PDF in R2.
 
 #### Funnel layer (shipped)
@@ -57,6 +57,15 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 #### Still deferred
 Per-course OG images; light marketing framing on `/verify`; embedding the renewal checker on the homepage; (MDX for inline-CTA-in-markdown was avoided to respect the dependency policy — guides use a fixed related-course card).
 
+### Illustration integration (shipped)
+15 illustrations live at `src/assets/illustrations/illustration-NN-*.png` (4–5 MB each). All placed images are **DECORATIVE** (`alt=""`, `aria-hidden`, never replace text), lazy-loaded (except the 404 hero), padded with `--canvas` (#FAFAF7) at native aspect ratio (never cropped/stretched), with explicit width/height to avoid CLS.
+
+- **Delivery — IMPORTANT deviation from the handoff.** The handoff assumed `astro:assets <Picture>` + `imageService: 'compile'` would optimize at build. It does **not** for this site: every page is SSR (`output: server`, D1-backed, nothing prerendered), and on Cloudflare the compile service's `/_image` endpoint is a **runtime passthrough** (`fetch(original)`, no sharp at the edge) — it would ship the raw 4–5 MB PNGs and tank Lighthouse. **Resolution:** a build script (`scripts/build-illustration-assets.mjs`, `npm run assets:illustrations`) pre-generates responsive **AVIF + WebP + a PNG fallback** at per-placement width ladders into `public/illustrations/`, plus a typed manifest `src/lib/illustration-manifest.ts` (intrinsic AR + width ladder). `src/components/marketing/Illustration.astro` renders a plain `<picture>` (`name=` prop, manifest-driven srcset). Total generated payload **~1.1 MB** for all variants. `imageService: 'compile'` is kept only so incidental `astro:assets` use builds cleanly.
+- **Placement map (filled):** audience cards 02/03/04 (`index`), how-it-works 08 (`index`), course syllabus 05 (oregon-ca-initial) / 06 (vitals-monitoring) + certificate-moment 07 in every course's final CTA (`courses/[slug]`), dashboard empty-state 10, clinics dashboard 11 (replaced the dashed `owner-copy` placeholder), guide header 12 (all guides, `guides/[slug]`), 404 hero 14 (**new `src/pages/404.astro`**).
+- **OG + email:** `og-default.png` (1200×630) = illustration-13 + teal wordmark in the left negative space; `MarketingLayout` defaults to it and emits `og:image:width/height` + `twitter:image`; `og-default.svg` deleted. Email images downscaled to ≤600px email-safe PNG in `public/email/` and embedded as **absolute `SITE_URL` URLs**: certificate-moment 07 in `lib/email/certificate.ts`, renewal-reminder 09 in the renewal lead-confirm mail (`lib/leads.ts`, renewal source only).
+- **Unfilled slots / notes:** illustrations **01 (roadmap)** and **15 (patient-checkin)** have no slot in the map (extras — unused). Courses other than oregon-ca-initial/vitals (hipaa, cultural, cbt, renewal bundle) get no per-course syllabus visual (no mapping; the generic certificate-moment still shows). Per-page OG cards still deferred. Lighthouse not re-measured in this environment (no headless browser); payloads are small (cards ≤320px AVIF, largest below-fold image ~1456px clinic dashboard) and all below-fold images are lazy — homepage score expected to hold ≥90; **re-run Lighthouse after deploy** to confirm.
+- **Regenerating:** edit the `PLACED` list / OG / email logic in `scripts/build-illustration-assets.mjs`, run `npm run assets:illustrations`, commit the regenerated `public/illustrations/**`, `public/og-default.png`, `public/email/**`, and `src/lib/illustration-manifest.ts`.
+
 ### Multi-course expansion — Phases 1–3 (shipped)
 - **Phase 1 — exam gate / `required_seat_minutes`.** New nullable `courses.required_seat_minutes` (content-minutes floor, clamped to runtime so never unsatisfiable), **decoupled from `credit_hours`** (cert figure only). Note: the live gate never actually used `credit_hours × 60` — it was already per-lesson-90% coverage; this adds the explicit floor + admin knob. Seeded single-module **Vitals** ($39, `rsm=5`, credit 1h) and **HIPAA** ($35) courses.
 - **Phase 2 — catalog + multi-course.** Public `/courses` catalog + `/courses/[slug]` landing (only content is gated, Q6). Dashboard "Your courses" grid. Checkout + webhook generalized to a **course-id list** (bundle-ready).
@@ -72,6 +81,19 @@ Per-course OG images; light marketing framing on `/verify`; embedding the renewa
 - `/terms` + `/privacy` rendered from `src/content/legal/*.md` (content collection) — owner edits via commit; "Last updated" from frontmatter. **`legal-policies.md` was not in the repo**, so the bodies are visible placeholders (no invented legal text). Placeholders (`[LEGAL ENTITY NAME]`, `[CONTACT EMAIL]`, `[EFFECTIVE DATE]`) + version strings centralized in `src/config/legal.ts`.
 - Footer links both pages on every page. Checkout entry points show "By purchasing you agree to the Terms of Service"; intake shows a required "By creating an account you agree to the Terms of Service and Privacy Policy" line (in addition to the optional marketing checkbox). `terms_accepted` event (with `termsVersion`) written at signup and at each purchase, so future policy updates can require re-acceptance (no re-acceptance UX built).
 - **Before first real payment:** owner must paste the real ToS/Privacy text and set the `src/config/legal.ts` constants.
+
+### Public free preview (shipped 2026-06)
+Per-lesson **public free preview** so logged-out visitors can watch the start of a
+lesson on the course landing page. Schema: `lessons.is_preview` + `preview_seconds`
+(migration 0009, additive). Admin content editor has a **Free preview** checkbox +
+**Preview (s)** field per lesson. Unauthenticated `POST /api/stream/preview-token`
+mints a signed Stream token **only** for `is_preview` lessons (hard-gated; can't be
+used for paywalled content) — allowlisted in middleware. `/courses/[slug]` renders a
+"Watch a free preview" player (`public/preview-player.js`) that embeds the Stream
+player and **hard-stops at `preview_seconds`** with an enroll overlay. **Marketing
+only — previews accrue NO seat time / heartbeats.** Cap is client-side (a determined
+viewer could fetch more via the token; the rest of the course stays paywalled). Owner
+action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
 
 ### Phase 4 — per-course clinic seat pools (APPROVED design, DDL pending review)
 Decisions locked for the build (NOT yet implemented — DDL produced separately for review):
@@ -165,7 +187,7 @@ Owner chose to **build a real clinic roadmap template** (M1.5, above): clinic ow
 Astro 5 SSR on Cloudflare; D1 / R2 / Stream; Stripe Checkout (test mode); Resend transactional + magic-link auth; Brevo deferred (capture marketing-consent now, structure attributes for later sync); TypeScript; logic in Astro endpoints/actions (no separate API service); minimal deps; times stored UTC, displayed America/Los_Angeles; **`SITE_URL` env var from day one** (magic links, Stripe redirects, cert verification links — never hard-coded).
 
 ### Approved dependency budget
-Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **qrcode** (M4, cert QR) · **Anthropic SDK** (M6 only). The Anthropic API powers the M6 tutor. Anything else, I ask first.
+Astro Cloudflare adapter · Stripe SDK · Resend SDK · **Drizzle** (+ drizzle-kit) · zod · **pdf-lib** (M4) · **qrcode** (M4, cert QR) · **Anthropic SDK** (M6 only) · **tus-js-client** (admin video upload to Stream — owner-approved 2026-06). The Anthropic API powers the M6 tutor. Anything else, I ask first.
 
 ---
 

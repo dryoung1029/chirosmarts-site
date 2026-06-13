@@ -16,7 +16,8 @@ export async function sendCertificateEmail(
     pdf: Uint8Array;
   },
 ): Promise<{ url: string; delivered: boolean }> {
-  const url = `${getSiteUrl(env)}/verify/${args.verificationCode}`;
+  const site = getSiteUrl(env).replace(/\/$/, "");
+  const url = `${site}/verify/${args.verificationCode}`;
   const subject = `Your ChiroSmarts certificate — ${args.courseTitle}`;
   const result = await sendEmail(env, {
     to: args.to,
@@ -26,7 +27,7 @@ export async function sendCertificateEmail(
       `You've completed "${args.courseTitle}". Your certificate is attached.\n\n` +
       `Certificate No. ${args.certNumber}\n` +
       `Verify it anytime at:\n${url}\n`,
-    html: certHtml(url, args),
+    html: certHtml(url, `${site}/email/certificate.png`, args),
     attachments: [
       { filename: `ChiroSmarts-Certificate-${args.certNumber}.pdf`, content: base64(args.pdf) },
     ],
@@ -36,9 +37,11 @@ export async function sendCertificateEmail(
 
 function certHtml(
   url: string,
+  imgUrl: string,
   args: { legalName: string; courseTitle: string; certNumber: string },
 ): string {
   return `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#0f172a">
+  <img src="${imgUrl}" alt="" width="300" style="display:block;max-width:300px;height:auto;margin:0 0 12px">
   <h2>Congratulations, ${args.legalName}! 🎉</h2>
   <p>You've completed <strong>${args.courseTitle}</strong>. Your certificate is attached to this email.</p>
   <p><strong>Certificate No.</strong> ${args.certNumber}</p>

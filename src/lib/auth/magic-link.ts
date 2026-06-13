@@ -10,6 +10,7 @@ import { getSiteUrl } from "@/lib/env";
 import { randomToken, sha256Hex, newId } from "@/lib/crypto";
 import { isoInSeconds, nowIso, isPast } from "@/lib/time";
 import { sendEmail } from "@/lib/email/resend";
+import { emailFooterHtml, emailFooterText } from "@/lib/email/footer";
 
 const TOKEN_TTL_SECONDS = 60 * 15; // 15 minutes
 
@@ -42,7 +43,9 @@ export async function createAndSendMagicLink(
     expiresAt: isoInSeconds(TOKEN_TTL_SECONDS),
   });
 
-  const url = `${getSiteUrl(env)}/auth/callback?token=${token}`;
+  const siteUrl = getSiteUrl(env);
+  const url = `${siteUrl}/auth/callback?token=${token}`;
+  const reason = "You're receiving this because someone entered this address to sign in to ChiroSmarts.";
 
   const result = await sendEmail(env, {
     to: normalized,
@@ -50,8 +53,9 @@ export async function createAndSendMagicLink(
     text:
       `Sign in to ChiroSmarts:\n\n${url}\n\n` +
       `This link expires in 15 minutes and can be used once. ` +
-      `If you didn't request it, you can ignore this email.`,
-    html: magicLinkHtml(url),
+      `If you didn't request it, you can ignore this email.` +
+      emailFooterText(siteUrl, reason),
+    html: magicLinkHtml(url, emailFooterHtml(siteUrl, reason)),
   });
 
   return { url, delivered: result.delivered };
@@ -86,12 +90,13 @@ export async function consumeMagicLink(
   return { ok: true, email: link.email };
 }
 
-function magicLinkHtml(url: string): string {
+function magicLinkHtml(url: string, footer = ""): string {
   return `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#0f172a">
   <h2>Sign in to ChiroSmarts</h2>
   <p>Click the button below to sign in. This link expires in 15 minutes and can be used once.</p>
   <p><a href="${url}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">Sign in</a></p>
   <p style="color:#64748b;font-size:14px">Or paste this URL into your browser:<br>${url}</p>
   <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+  ${footer}
   </body></html>`;
 }

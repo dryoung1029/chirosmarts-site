@@ -2,11 +2,14 @@
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getCourseStructure } from "@/lib/courses";
+import { getModuleQuiz, getQuizWithQuestions, type QuizWithQuestions } from "@/lib/quiz";
 import { listCourseResources } from "@/lib/course-resources";
+import { isStreamConfigured, signStreamToken, streamPlaybackUrls } from "@/lib/stream";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 const courseId = Astro.params.courseId!;
 const course = await db
   .select()
@@ -19,6 +22,45 @@ const structure = await getCourseStructure(db, courseId);
 const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
+const pct = (f: number) => `${Math.round(f * 100)}%`;
+const coursePassPct = pct(course.passThreshold);
+
+// Each module's knowledge-check quiz (with questions) for the quiz editor.
+const moduleQuiz: Record<string, QuizWithQuestions> = {};
+for (const { module } of structure) {
+  const q = await getModuleQuiz(db, module.id);
+  if (q) {
+    const full = await getQuizWithQuestions(db, q.id);
+    if (full) moduleQuiz[module.id] = full;
+  }
+}
+
+// Signed Stream preview URLs per lesson (admin is authenticated; tokens are short
+// lived). Only built when Stream playback is configured in this environment.
+const streamReady = isStreamConfigured(env);
+const previews: Record<string, { iframe: string; thumbnail: string }> = {};
+if (streamReady) {
+  for (const { lessons } of structure) {
+    for (const l of lessons) {
+      if (l.streamVideoUid) {
+        const token = await signStreamToken(env, l.streamVideoUid);
+        previews[l.id] = streamPlaybackUrls(env, token);
+      }
+    }
+  }
+}
+
+// How many transcript cues each lesson already has (drives the captions button label).
+const lessonIds = structure.flatMap(({ lessons }) => lessons.map((l) => l.id));
+const transcriptCounts: Record<string, number> = {};
+if (lessonIds.length) {
+  const rows = await db
+    .select({ lessonId: schema.lessonTranscripts.lessonId })
+    .from(schema.lessonTranscripts)
+    .where(inArray(schema.lessonTranscripts.lessonId, lessonIds))
+    .all();
+  for (const r of rows) transcriptCounts[r.lessonId] = (transcriptCounts[r.lessonId] ?? 0) + 1;
+}
 ---
 
 <Layout title={`Edit ${course.title} · Admin`} showNav={true}>
@@ -137,7 +179,7 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
   <h2 style="margin-top:1.5rem">Modules &amp; lessons</h2>
   {
     structure.map(({ module, lessons }) => (
-      <div class="panel">
+      <div class="panel" id={`mod-${module.id}`} style="scroll-margin-top:1rem">
         <form method="POST" action={`/api/admin/modules/${module.id}`}>
           <div class="row" style="align-items:flex-end">
             <div style="flex:0 0 5rem">
@@ -150,7 +192,11 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
             </div>
           </div>
           <label>Description</label>
-          <input type="text" name="description" value={module.description ?? ""} />
+          <textarea name="description" rows="2" id={`mod-desc-${module.id}`} style="width:100%;font:inherit;box-sizing:border-box" set:text={module.description ?? ""}></textarea>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem">
+            <button type="button" class="suggest-desc" data-module={module.id} data-target={`mod-desc-${module.id}`} style="font-size:0.85rem">✨ Suggest from transcript</button>
+            <span class="suggest-status muted" data-for={module.id} style="font-size:0.8rem"></span>
+          </div>
           <label class="check" style="margin-top:0.75rem">
             <input type="checkbox" name="isFreePreview" checked={module.isFreePreview} />
             <span>Free preview (no paywall)</span>
@@ -166,23 +212,347 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
               <form
                 method="POST"
                 action={`/api/admin/lessons/${l.id}`}
-                style="display:flex;gap:0.5rem;align-items:flex-end;margin:0 0 0.5rem"
+                style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0 0 0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border)"
               >
                 <div style="flex:0 0 4rem">
                   <label style="margin:0">Pos</label>
                   <input type="text" name="position" value={String(l.position)} />
                 </div>
-                <div style="flex:1">
+                <div style="flex:1 1 12rem">
                   <label style="margin:0">Lesson title</label>
                   <input type="text" name="title" value={l.title} required />
                 </div>
-                <span class="muted" style="font-size:0.82rem;white-space:nowrap">{fmtMin(l.durationSeconds)}m</span>
+                <div style="flex:1 1 14rem">
+                  <label style="margin:0">Stream video UID</label>
+                  <input type="text" name="streamVideoUid" value={l.streamVideoUid ?? ""} placeholder="paste from Cloudflare Stream" />
+                </div>
+                <div style="flex:0 0 7rem">
+                  <label style="margin:0">Duration (s)</label>
+                  <input type="text" name="durationSeconds" value="" placeholder={l.durationSeconds ? `${l.durationSeconds} (auto)` : "auto"} />
+                </div>
+                <div style="flex:0 0 auto;display:flex;align-items:center;gap:0.35rem;align-self:flex-end;padding-bottom:0.4rem">
+                  <input type="checkbox" name="isPreview" id={`prev-${l.id}`} checked={l.isPreview} style="width:auto;margin:0" />
+                  <label for={`prev-${l.id}`} style="margin:0;white-space:nowrap" title="Let logged-out visitors watch the start of this lesson on the public course page.">Free preview</label>
+                </div>
+                <div style="flex:0 0 6rem">
+                  <label style="margin:0">Preview (s)</label>
+                  <input type="text" name="previewSeconds" value={String(l.previewSeconds ?? 300)} />
+                </div>
                 <button type="submit" style="margin:0">Save</button>
+                <p class="muted" style="flex:1 1 100%;margin:0.25rem 0 0;font-size:0.78rem">
+                  {l.streamVideoUid
+                    ? `Video attached · ${fmtMin(l.durationSeconds)} min runtime.`
+                    : "No video yet."} Paste a Stream UID to attach — duration is read from Stream automatically (leave Duration blank). Only override it if you know the exact runtime in seconds.
+                </p>
+                {l.streamVideoUid && (previews[l.id] ? (
+                  <details style="flex:1 1 100%;margin:0.35rem 0 0">
+                    <summary style="cursor:pointer;font-size:0.85rem;color:var(--accent)">▶ Preview video</summary>
+                    <div style="position:relative;aspect-ratio:16/9;max-width:480px;margin-top:0.5rem;border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+                      <iframe
+                        src={previews[l.id].iframe}
+                        loading="lazy"
+                        style="position:absolute;inset:0;width:100%;height:100%;border:0"
+                        allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
+                        allowfullscreen
+                      ></iframe>
+                    </div>
+                  </details>
+                ) : (
+                  <p class="muted" style="flex:1 1 100%;margin:0.2rem 0 0;font-size:0.78rem">
+                    Video preview isn't available here (Stream playback not configured in this environment).
+                  </p>
+                ))}
+                {l.streamVideoUid && (
+                  <div style="flex:1 1 100%;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem">
+                    <button type="button" class="gen-captions" data-lesson={l.id} style="font-size:0.85rem">
+                      {transcriptCounts[l.id] ? "↻ Regenerate captions & transcript" : "✨ Generate captions & transcript"}
+                    </button>
+                    <span class="captions-status muted" data-for={l.id} style="font-size:0.8rem">
+                      {transcriptCounts[l.id] ? `Transcript on file (${transcriptCounts[l.id]} cues).` : ""}
+                    </span>
+                  </div>
+                )}
+                <div style="flex:1 1 100%;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem">
+                  <input type="file" accept="video/*" id={`vid-${l.id}`} class="video-file" data-lesson={l.id} style="display:none" />
+                  <button type="button" class="upload-video" data-lesson={l.id} data-module={module.id} style="font-size:0.85rem">
+                    {l.streamVideoUid ? "⤴ Replace video" : "⤴ Upload video to Stream"}
+                  </button>
+                  <span class="upload-status muted" data-for={l.id} style="font-size:0.8rem"></span>
+                </div>
               </form>
             ))
           )}
+
+          <form
+            method="POST"
+            action={`/api/admin/modules/${module.id}/lessons`}
+            style="display:flex;gap:0.5rem;align-items:flex-end;margin:0.25rem 0 0"
+          >
+            <div style="flex:1">
+              <label style="margin:0">New lesson title</label>
+              <input type="text" name="title" placeholder="e.g. Welcome & orientation" required />
+            </div>
+            <button type="submit" style="margin:0">+ Add lesson</button>
+          </form>
+
+          {/* ---- Module quiz ---- */}
+          <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:0.75rem">
+            {moduleQuiz[module.id] ? (
+              <div>
+                <form method="POST" action={`/api/admin/modules/${module.id}/quiz`} style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0">
+                  <strong style="flex:1 1 100%">Module quiz</strong>
+                  <div style="flex:1 1 16rem">
+                    <label style="margin:0">Quiz title</label>
+                    <input type="text" name="title" value={moduleQuiz[module.id].quiz.title} />
+                  </div>
+                  <div style="flex:0 0 9rem">
+                    <label style="margin:0">Pass score (%)</label>
+                    <input type="text" name="passThreshold"
+                      value={moduleQuiz[module.id].quiz.passThreshold != null ? String(Math.round(moduleQuiz[module.id].quiz.passThreshold! * 100)) : ""}
+                      placeholder={`course default ${coursePassPct}`} />
+                  </div>
+                  <button type="submit" style="margin:0">Save</button>
+                </form>
+
+                <ol style="margin:0.6rem 0 0;padding-left:1.2rem;font-size:0.9rem">
+                  {moduleQuiz[module.id].questions.map((q) => (
+                    <li style="margin-bottom:0.5rem">
+                      <div style="display:flex;gap:0.5rem;align-items:flex-start">
+                        <span style="flex:1">{q.prompt}</span>
+                        <form method="POST" action={`/api/admin/questions/${q.id}/delete`} class="q-del" style="margin:0">
+                          <button type="submit" title="Delete question" style="font-size:0.75rem;padding:0.1rem 0.4rem">✕</button>
+                        </form>
+                      </div>
+                      <ul style="list-style:none;padding:0;margin:0.2rem 0 0">
+                        {q.options.map((o) => (
+                          <li style={o.isCorrect ? "color:var(--ok)" : "color:var(--muted)"}>
+                            {o.isCorrect ? "✓ " : "• "}{o.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+                {moduleQuiz[module.id].questions.length === 0 && (
+                  <p class="muted" style="margin:0.4rem 0;font-size:0.85rem">No questions yet — generate with AI or add one below.</p>
+                )}
+
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.5rem">
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/generate`} style="display:flex;gap:0.4rem;align-items:flex-end;margin:0">
+                    <div style="flex:0 0 6rem">
+                      <label style="margin:0">AI questions</label>
+                      <input type="number" name="count" value="5" min="1" max="20" />
+                    </div>
+                    <button type="submit" style="margin:0">✨ Generate</button>
+                  </form>
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/delete`} class="quiz-del" style="margin:0;align-self:flex-end">
+                    <button type="submit" style="font-size:0.8rem">Delete quiz</button>
+                  </form>
+                </div>
+
+                <details style="margin-top:0.6rem">
+                  <summary style="cursor:pointer;font-size:0.85rem;color:var(--accent)">+ Add a question manually</summary>
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/questions`} style="margin-top:0.5rem;font-size:0.9rem">
+                    <label style="margin:0">Question</label>
+                    <input type="text" name="prompt" required style="width:100%;box-sizing:border-box" />
+                    <div style="margin:0.4rem 0">
+                      <label style="margin:0">Options (select the correct one)</label>
+                      {[0, 1, 2, 3].map((i) => (
+                        <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.2rem">
+                          <input type="radio" name="correct" value={String(i)} checked={i === 0} style="width:auto;margin:0" />
+                          <input type="text" name={`opt${i}`} placeholder={`Option ${i + 1}`} style="flex:1" />
+                        </div>
+                      ))}
+                    </div>
+                    <input type="hidden" name="type" value="single_choice" />
+                    <label style="margin:0">Explanation (optional)</label>
+                    <input type="text" name="explanation" style="width:100%;box-sizing:border-box" />
+                    <button type="submit" style="margin-top:0.5rem">Add question</button>
+                  </form>
+                </details>
+              </div>
+            ) : (
+              <form method="POST" action={`/api/admin/modules/${module.id}/quiz`} style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0">
+                <strong style="flex:1 1 100%">Module quiz</strong>
+                <span class="muted" style="flex:1 1 100%;font-size:0.85rem;margin:-0.3rem 0 0.2rem">
+                  Create a knowledge check for this module, then generate questions with AI or add your own.
+                </span>
+                <div style="flex:1 1 16rem">
+                  <label style="margin:0">Quiz title</label>
+                  <input type="text" name="title" placeholder={`${module.title} — knowledge check`} />
+                </div>
+                <div style="flex:0 0 9rem">
+                  <label style="margin:0">Pass score (%)</label>
+                  <input type="text" name="passThreshold" placeholder={`course default ${coursePassPct}`} />
+                </div>
+                <button type="submit" style="margin:0">Create quiz</button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     ))
   }
+
+  <!-- Add a module -->
+  <form class="panel" method="POST" action={`/api/admin/courses/${course.id}/modules`} style="border-style:dashed">
+    <h3 style="margin:0 0 0.75rem">Add a module</h3>
+    <div class="row" style="align-items:flex-end">
+      <div style="flex:3">
+        <label>Module title</label>
+        <input type="text" name="title" placeholder="e.g. Module 2 — Scope of Practice" required />
+      </div>
+    </div>
+    <label>Description (optional)</label>
+    <input type="text" name="description" placeholder="Short summary shown on the course page" />
+    <label class="check" style="margin-top:0.75rem">
+      <input type="checkbox" name="isFreePreview" />
+      <span>Free preview (no paywall)</span>
+    </label>
+    <button type="submit" style="margin-top:0.75rem">+ Add module</button>
+    <p class="muted" style="margin:0.5rem 0 0;font-size:0.8rem">New modules are added at the end; change the Position fields above to reorder.</p>
+  </form>
+
+  <script is:inline>
+    // AI-suggest a module description from its transcripts.
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".suggest-desc");
+      if (!btn) return;
+      const moduleId = btn.dataset.module;
+      const target = document.getElementById(btn.dataset.target);
+      const status = document.querySelector(`.suggest-status[data-for="${moduleId}"]`);
+      btn.disabled = true;
+      if (status) status.textContent = "Thinking…";
+      try {
+        const res = await fetch(`/api/admin/modules/${moduleId}/suggest-description`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Couldn't generate a description.");
+        if (target) target.value = data.description;
+        if (status) status.textContent = "Suggested — review, edit, then Save module.";
+      } catch (err) {
+        if (status) status.textContent = err.message || "Failed.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Generate Stream captions + ingest the transcript (poll the idempotent endpoint).
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".gen-captions");
+      if (!btn) return;
+      const lessonId = btn.dataset.lesson;
+      const status = document.querySelector(`.captions-status[data-for="${lessonId}"]`);
+      btn.disabled = true;
+      const set = (msg) => { if (status) status.textContent = msg; };
+      set("Starting…");
+      const deadline = Date.now() + 25 * 60 * 1000; // 25 min ceiling
+      try {
+        while (true) {
+          const res = await fetch(`/api/admin/lessons/${lessonId}/captions`, { method: "POST" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Captioning failed.");
+          if (data.status === "ready") {
+            set(`Done — ${data.cues} cues ingested. Re-embed the tutor in AI tutor → Embed transcripts.`);
+            break;
+          }
+          if (Date.now() > deadline) {
+            set("Still transcribing on Cloudflare — long video. Click again later to finish.");
+            break;
+          }
+          set("Transcribing on Cloudflare… this can take a few minutes. Keep this tab open.");
+          await new Promise((r) => setTimeout(r, 6000));
+        }
+      } catch (err) {
+        set(err.message || "Failed.");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+
+  <script is:inline>
+    document.querySelectorAll(".q-del").forEach((f) =>
+      f.addEventListener("submit", (e) => { if (!confirm("Delete this question?")) e.preventDefault(); }),
+    );
+    document.querySelectorAll(".quiz-del").forEach((f) =>
+      f.addEventListener("submit", (e) => { if (!confirm("Delete this quiz and all its questions?")) e.preventDefault(); }),
+    );
+  </script>
+
+  <script>
+    // Resumable video upload straight to Cloudflare Stream (tus). The file bytes
+    // go browser → Cloudflare; our endpoint only mints the one-time upload URL.
+    import * as tus from "tus-js-client";
+
+    document.querySelectorAll<HTMLButtonElement>(".upload-video").forEach((btn) => {
+      const lessonId = btn.dataset.lesson!;
+      const moduleId = btn.dataset.module!;
+      const input = document.getElementById(`vid-${lessonId}`) as HTMLInputElement | null;
+      const status = document.querySelector(`.upload-status[data-for="${lessonId}"]`);
+      const set = (m: string) => { if (status) status.textContent = m; };
+      if (!input) return;
+
+      btn.addEventListener("click", () => input.click());
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        btn.disabled = true;
+        set("Preparing upload…");
+        let mediaId: string | null = null;
+
+        const upload = new tus.Upload(file, {
+          endpoint: `/api/admin/lessons/${lessonId}/upload-url`,
+          chunkSize: 150 * 1024 * 1024,
+          retryDelays: [0, 3000, 6000, 12000, 24000],
+          metadata: { name: file.name, filetype: file.type },
+          onError(err) {
+            set("Upload failed: " + (err?.message ?? String(err)));
+            btn.disabled = false;
+          },
+          onProgress(sent, total) {
+            set(`Uploading… ${Math.floor((sent / total) * 100)}% — keep this tab open.`);
+          },
+          onAfterResponse(_req, res) {
+            const id = res.getHeader("stream-media-id");
+            if (id) mediaId = id;
+          },
+          async onSuccess() {
+            set("Uploaded — attaching to lesson…");
+            try {
+              if (!mediaId) throw new Error("missing video id");
+              await fetch(`/api/admin/lessons/${lessonId}/attach-uploaded`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ uid: mediaId }),
+              });
+            } catch (e) {
+              set("Uploaded, but couldn't attach automatically — " + (e instanceof Error ? e.message : ""));
+              btn.disabled = false;
+              return;
+            }
+            // Poll until Cloudflare finishes processing; the duration is recorded
+            // automatically the moment the video is ready.
+            const deadline = Date.now() + 12 * 60 * 1000;
+            let flash = "Video uploaded — still processing on Cloudflare. Its length records automatically once ready (or Save the lesson later).";
+            while (Date.now() < deadline) {
+              try {
+                const res = await fetch(`/api/admin/lessons/${lessonId}/record-duration`, { method: "POST" });
+                const data = (await res.json()) as { status?: string; seconds?: number };
+                if (data.status === "ready") {
+                  flash = `Video uploaded and ready — ${Math.round((data.seconds ?? 0) / 60)} min runtime recorded.`;
+                  break;
+                }
+              } catch {
+                /* transient — keep polling */
+              }
+              set("Cloudflare is processing the video… keep this tab open.");
+              await new Promise((r) => setTimeout(r, 5000));
+            }
+            window.location.href = `${window.location.pathname}?done=${encodeURIComponent(flash)}#mod-${moduleId}`;
+          },
+        });
+        upload.start();
+      });
+    });
+  </script>
 </Layout>

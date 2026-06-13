@@ -76,7 +76,7 @@ export interface CourseSeatTime {
   completionThreshold: number; // unlock threshold per lesson
   requiredSeconds: number; // explicit content-minutes floor for the exam (0 = none)
   examUnlocked: boolean;
-  perLesson: (LessonProgress & { fraction: number; meetsThreshold: boolean })[];
+  perLesson: (LessonProgress & { title: string; fraction: number; meetsThreshold: boolean })[];
 }
 
 // The final exam unlocks once the student has watched at least this fraction of
@@ -120,7 +120,7 @@ export async function getCourseSeatTime(
       const fraction =
         p.durationSeconds > 0 ? p.creditedSeconds / p.durationSeconds : 1;
       const meetsThreshold = fraction >= COMPLETION_THRESHOLD;
-      perLesson.push({ ...p, fraction, meetsThreshold });
+      perLesson.push({ ...p, title: lesson.title, fraction, meetsThreshold });
       total += p.creditedSeconds;
       totalDuration += p.durationSeconds;
     }

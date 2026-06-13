@@ -239,6 +239,11 @@ export const lessons = sqliteTable(
     title: text("title").notNull(),
     streamVideoUid: text("stream_video_uid"),
     durationSeconds: integer("duration_seconds").notNull().default(0),
+    // Public free preview: when true, anyone (no login) can watch the first
+    // `previewSeconds` of this lesson on the course landing page. Marketing only —
+    // previews never accrue compliance seat time.
+    isPreview: integer("is_preview", { mode: "boolean" }).notNull().default(false),
+    previewSeconds: integer("preview_seconds").notNull().default(300),
     // Future live events credit by attendance instead of playback:
     evidenceType: text("evidence_type", {
       enum: ["playback_heartbeat", "live_attendance"],

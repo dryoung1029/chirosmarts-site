@@ -9,7 +9,7 @@ interface Props {
   title: string;
   description: string;
   canonicalPath?: string; // defaults to current path
-  ogImage?: string; // absolute or root-relative; defaults to /og-default.svg
+  ogImage?: string; // absolute or root-relative; defaults to /og-default.png (1200x630)
   jsonLd?: unknown[]; // additional structured-data objects for this page
 }
 
@@ -18,9 +18,9 @@ const env = Astro.locals.runtime.env;
 const siteUrl = getSiteUrl(env).replace(/\/$/, "");
 const path = canonicalPath ?? Astro.url.pathname;
 const canonical = `${siteUrl}${path}`;
-const og = (ogImage ?? "/og-default.svg").startsWith("http")
+const og = (ogImage ?? "/og-default.png").startsWith("http")
   ? ogImage!
-  : `${siteUrl}${ogImage ?? "/og-default.svg"}`;
+  : `${siteUrl}${ogImage ?? "/og-default.png"}`;
 const fullTitle = title.includes("ChiroSmarts") ? title : `${title} · ChiroSmarts`;
 
 const user = Astro.locals.user;
@@ -42,7 +42,10 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={og} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={og} />
     {ld.map((obj) => (
       <script type="application/ld+json" set:html={JSON.stringify(obj)} />
     ))}

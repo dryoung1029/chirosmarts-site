@@ -24,6 +24,7 @@ interface CloudflareEnv {
   // Secrets (set via .dev.vars locally, wrangler secrets in prod)
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  EMAIL_REPLY_TO?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   CF_ACCOUNT_ID?: string;

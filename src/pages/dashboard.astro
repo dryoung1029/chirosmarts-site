@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
@@ -93,9 +94,12 @@ const statusColor: Record<string, string> = {
     </div>
     {
       activeCourses.length === 0 ? (
-        <p class="muted" style="margin:0.75rem 0 0">
-          You're not enrolled in any courses yet. <a href="/courses">Browse the catalog</a> to get started.
-        </p>
+        <div style="margin:0.75rem 0 0;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+          <Illustration name="empty-state" maxWidth={200} />
+          <p class="muted" style="margin:0;flex:1;min-width:220px">
+            You're not enrolled in any courses yet. <a href="/courses">Browse the catalog</a> to get started.
+          </p>
+        </div>
       ) : (
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-top:0.75rem">
           {activeCourses.map((c) => (
