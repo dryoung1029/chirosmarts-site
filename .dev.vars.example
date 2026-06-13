@@ -22,7 +22,7 @@ RESEND_API_KEY=""
 # resend.dev sandbox is spam-filtered by real inboxes.
 EMAIL_FROM="ChiroSmarts <onboarding@resend.dev>"
 # Optional reply-to (a monitored inbox). Improves trust/deliverability.
-EMAIL_REPLY_TO="support@chirosmarts.com"
+EMAIL_REPLY_TO="contact@chirosmarts.com"
 
 # --- Stripe (test mode throughout the build) ---
 STRIPE_SECRET_KEY=""
