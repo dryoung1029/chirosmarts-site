@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "stream:upload": "node --experimental-strip-types scripts/upload-to-stream.ts",
+    "captions": "node --experimental-strip-types scripts/generate-captions.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply chirosmarts --local",
     "db:migrate:remote": "wrangler d1 migrations apply chirosmarts --remote",
