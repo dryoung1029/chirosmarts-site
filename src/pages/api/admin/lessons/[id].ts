@@ -12,6 +12,8 @@ const Body = z.object({
   streamVideoUid: z.string().trim().default(""),
   // Optional manual runtime override (seconds). Blank → auto-detect from Stream.
   durationSeconds: z.coerce.number().int().min(0).optional(),
+  // Public free-preview length (seconds); only applied when isPreview is on.
+  previewSeconds: z.coerce.number().int().min(5).max(86400).optional(),
 });
 
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
@@ -43,6 +45,10 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   if (!parsed.success) return back("Invalid input");
   const d = parsed.data;
 
+  // Checkboxes only submit when checked; absence means "off".
+  const isPreview = form.isPreview === "on" || form.isPreview === "true";
+  const previewSeconds = d.previewSeconds ?? 300;
+
   const newUid = d.streamVideoUid || null;
   const manualDuration = d.durationSeconds && d.durationSeconds > 0 ? d.durationSeconds : null;
 
@@ -68,7 +74,14 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
 
   await db
     .update(schema.lessons)
-    .set({ title: d.title, position: d.position, streamVideoUid: newUid, durationSeconds: duration })
+    .set({
+      title: d.title,
+      position: d.position,
+      streamVideoUid: newUid,
+      durationSeconds: duration,
+      isPreview,
+      previewSeconds,
+    })
     .where(eq(schema.lessons.id, id));
 
   const note = newUid

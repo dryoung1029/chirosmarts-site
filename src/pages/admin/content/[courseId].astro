@@ -217,6 +217,14 @@ if (lessonIds.length) {
                   <label style="margin:0">Duration (s)</label>
                   <input type="text" name="durationSeconds" value="" placeholder={l.durationSeconds ? `${l.durationSeconds} (auto)` : "auto"} />
                 </div>
+                <div style="flex:0 0 auto;display:flex;align-items:center;gap:0.35rem;align-self:flex-end;padding-bottom:0.4rem">
+                  <input type="checkbox" name="isPreview" id={`prev-${l.id}`} checked={l.isPreview} style="width:auto;margin:0" />
+                  <label for={`prev-${l.id}`} style="margin:0;white-space:nowrap" title="Let logged-out visitors watch the start of this lesson on the public course page.">Free preview</label>
+                </div>
+                <div style="flex:0 0 6rem">
+                  <label style="margin:0">Preview (s)</label>
+                  <input type="text" name="previewSeconds" value={String(l.previewSeconds ?? 300)} />
+                </div>
                 <button type="submit" style="margin:0">Save</button>
                 <p class="muted" style="flex:1 1 100%;margin:0.25rem 0 0;font-size:0.78rem">
                   {l.streamVideoUid

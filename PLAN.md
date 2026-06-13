@@ -82,6 +82,19 @@ Per-course OG images; light marketing framing on `/verify`; embedding the renewa
 - Footer links both pages on every page. Checkout entry points show "By purchasing you agree to the Terms of Service"; intake shows a required "By creating an account you agree to the Terms of Service and Privacy Policy" line (in addition to the optional marketing checkbox). `terms_accepted` event (with `termsVersion`) written at signup and at each purchase, so future policy updates can require re-acceptance (no re-acceptance UX built).
 - **Before first real payment:** owner must paste the real ToS/Privacy text and set the `src/config/legal.ts` constants.
 
+### Public free preview (shipped 2026-06)
+Per-lesson **public free preview** so logged-out visitors can watch the start of a
+lesson on the course landing page. Schema: `lessons.is_preview` + `preview_seconds`
+(migration 0009, additive). Admin content editor has a **Free preview** checkbox +
+**Preview (s)** field per lesson. Unauthenticated `POST /api/stream/preview-token`
+mints a signed Stream token **only** for `is_preview` lessons (hard-gated; can't be
+used for paywalled content) — allowlisted in middleware. `/courses/[slug]` renders a
+"Watch a free preview" player (`public/preview-player.js`) that embeds the Stream
+player and **hard-stops at `preview_seconds`** with an enroll overlay. **Marketing
+only — previews accrue NO seat time / heartbeats.** Cap is client-side (a determined
+viewer could fetch more via the token; the rest of the course stays paywalled). Owner
+action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
+
 ### Phase 4 — per-course clinic seat pools (APPROVED design, DDL pending review)
 Decisions locked for the build (NOT yet implemented — DDL produced separately for review):
 - **Normalized `seat_assignments(memberId, courseId, status, enrollmentId, …)`**; `clinic_members` stays one row per person and keeps the invite/claim machinery. Assigning an **already-active** member requires **no invite**. (Rationale: annual renewal re-grants courses yearly; per-person-per-course-per-year roster rows would explode.)
