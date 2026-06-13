@@ -168,6 +168,23 @@ export async function fetchStreamCaptionVtt(
   return res.text();
 }
 
+/** Whether a video has finished processing, plus its true runtime (seconds). */
+export async function fetchStreamVideoStatus(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<{ found: boolean; ready: boolean; duration: number }> {
+  const res = await fetch(`${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}`, {
+    headers: mgmtHeaders(env),
+  });
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (res.status === 404 || data?.success === false) {
+    return { found: false, ready: false, duration: 0 };
+  }
+  const r = data?.result;
+  const duration = Math.round(r?.duration ?? 0);
+  return { found: true, ready: !!r?.readyToStream && duration > 0, duration };
+}
+
 export interface StreamPlaybackUrls {
   iframe: string;
   hls: string;

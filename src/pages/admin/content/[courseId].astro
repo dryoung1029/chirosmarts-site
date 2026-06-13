@@ -400,12 +400,30 @@ if (lessonIds.length) {
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ uid: mediaId }),
               });
-              const msg = "Video uploaded — once Cloudflare finishes processing, click Save on the lesson to record its length.";
-              window.location.href = `${window.location.pathname}?done=${encodeURIComponent(msg)}#mod-${moduleId}`;
             } catch (e) {
               set("Uploaded, but couldn't attach automatically — " + (e instanceof Error ? e.message : ""));
               btn.disabled = false;
+              return;
             }
+            // Poll until Cloudflare finishes processing; the duration is recorded
+            // automatically the moment the video is ready.
+            const deadline = Date.now() + 12 * 60 * 1000;
+            let flash = "Video uploaded — still processing on Cloudflare. Its length records automatically once ready (or Save the lesson later).";
+            while (Date.now() < deadline) {
+              try {
+                const res = await fetch(`/api/admin/lessons/${lessonId}/record-duration`, { method: "POST" });
+                const data = (await res.json()) as { status?: string; seconds?: number };
+                if (data.status === "ready") {
+                  flash = `Video uploaded and ready — ${Math.round((data.seconds ?? 0) / 60)} min runtime recorded.`;
+                  break;
+                }
+              } catch {
+                /* transient — keep polling */
+              }
+              set("Cloudflare is processing the video… keep this tab open.");
+              await new Promise((r) => setTimeout(r, 5000));
+            }
+            window.location.href = `${window.location.pathname}?done=${encodeURIComponent(flash)}#mod-${moduleId}`;
           },
         });
         upload.start();
