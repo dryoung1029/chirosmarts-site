@@ -110,6 +110,64 @@ export async function fetchStreamDuration(
   return { ok: true, duration };
 }
 
+const STREAM_MGMT = "https://api.cloudflare.com/client/v4";
+const mgmtHeaders = (env: CloudflareEnv) => ({
+  Authorization: `Bearer ${env.CF_STREAM_API_TOKEN}`,
+});
+
+export interface StreamCaption {
+  language: string;
+  label?: string;
+  generated?: boolean;
+  status?: "inprogress" | "ready" | "error";
+}
+
+/** List the caption tracks on a Stream video (management API). */
+export async function listStreamCaptions(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<StreamCaption[]> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions`,
+    { headers: mgmtHeaders(env) },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok || data?.success === false) {
+    throw new Error(`Stream captions list failed: ${JSON.stringify(data?.errors ?? data)}`);
+  }
+  return (data?.result ?? []) as StreamCaption[];
+}
+
+/** Kick off AI caption generation for a language (returns immediately). */
+export async function generateStreamCaption(
+  env: CloudflareEnv,
+  uid: string,
+  language = "en",
+): Promise<void> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions/${language}/generate`,
+    { method: "POST", headers: mgmtHeaders(env) },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (!res.ok || data?.success === false) {
+    throw new Error(`Stream caption generate failed: ${JSON.stringify(data?.errors ?? data)}`);
+  }
+}
+
+/** Download a generated caption as WebVTT text. */
+export async function fetchStreamCaptionVtt(
+  env: CloudflareEnv,
+  uid: string,
+  language = "en",
+): Promise<string> {
+  const res = await fetch(
+    `${STREAM_MGMT}/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}/captions/${language}/vtt`,
+    { headers: mgmtHeaders(env) },
+  );
+  if (!res.ok) throw new Error(`Stream caption VTT download failed (HTTP ${res.status}).`);
+  return res.text();
+}
+
 export interface StreamPlaybackUrls {
   iframe: string;
   hls: string;

@@ -2,7 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getCourseStructure } from "@/lib/courses";
 import { listCourseResources } from "@/lib/course-resources";
 import { isStreamConfigured, signStreamToken, streamPlaybackUrls } from "@/lib/stream";
@@ -35,6 +35,18 @@ if (streamReady) {
       }
     }
   }
+}
+
+// How many transcript cues each lesson already has (drives the captions button label).
+const lessonIds = structure.flatMap(({ lessons }) => lessons.map((l) => l.id));
+const transcriptCounts: Record<string, number> = {};
+if (lessonIds.length) {
+  const rows = await db
+    .select({ lessonId: schema.lessonTranscripts.lessonId })
+    .from(schema.lessonTranscripts)
+    .where(inArray(schema.lessonTranscripts.lessonId, lessonIds))
+    .all();
+  for (const r of rows) transcriptCounts[r.lessonId] = (transcriptCounts[r.lessonId] ?? 0) + 1;
 }
 ---
 
@@ -229,6 +241,16 @@ if (streamReady) {
                     Video preview isn't available here (Stream playback not configured in this environment).
                   </p>
                 ))}
+                {l.streamVideoUid && (
+                  <div style="flex:1 1 100%;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem">
+                    <button type="button" class="gen-captions" data-lesson={l.id} style="font-size:0.85rem">
+                      {transcriptCounts[l.id] ? "↻ Regenerate captions & transcript" : "✨ Generate captions & transcript"}
+                    </button>
+                    <span class="captions-status muted" data-for={l.id} style="font-size:0.8rem">
+                      {transcriptCounts[l.id] ? `Transcript on file (${transcriptCounts[l.id]} cues).` : ""}
+                    </span>
+                  </div>
+                )}
               </form>
             ))
           )}
@@ -269,6 +291,7 @@ if (streamReady) {
   </form>
 
   <script is:inline>
+    // AI-suggest a module description from its transcripts.
     document.addEventListener("click", async (e) => {
       const btn = e.target.closest(".suggest-desc");
       if (!btn) return;
@@ -285,6 +308,39 @@ if (streamReady) {
         if (status) status.textContent = "Suggested — review, edit, then Save module.";
       } catch (err) {
         if (status) status.textContent = err.message || "Failed.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Generate Stream captions + ingest the transcript (poll the idempotent endpoint).
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".gen-captions");
+      if (!btn) return;
+      const lessonId = btn.dataset.lesson;
+      const status = document.querySelector(`.captions-status[data-for="${lessonId}"]`);
+      btn.disabled = true;
+      const set = (msg) => { if (status) status.textContent = msg; };
+      set("Starting…");
+      const deadline = Date.now() + 25 * 60 * 1000; // 25 min ceiling
+      try {
+        while (true) {
+          const res = await fetch(`/api/admin/lessons/${lessonId}/captions`, { method: "POST" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Captioning failed.");
+          if (data.status === "ready") {
+            set(`Done — ${data.cues} cues ingested. Re-embed the tutor in AI tutor → Embed transcripts.`);
+            break;
+          }
+          if (Date.now() > deadline) {
+            set("Still transcribing on Cloudflare — long video. Click again later to finish.");
+            break;
+          }
+          set("Transcribing on Cloudflare… this can take a few minutes. Keep this tab open.");
+          await new Promise((r) => setTimeout(r, 6000));
+        }
+      } catch (err) {
+        set(err.message || "Failed.");
       } finally {
         btn.disabled = false;
       }
