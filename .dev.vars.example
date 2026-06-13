@@ -17,7 +17,12 @@ ADMIN_EMAILS="you@example.com"
 RESEND_API_KEY=""
 # From address for transactional email. For Resend testing without a verified
 # domain, "onboarding@resend.dev" works (delivers to your own account email).
+# IN PRODUCTION set this to an address on a domain VERIFIED in Resend (with
+# SPF+DKIM+DMARC), e.g. "ChiroSmarts <login@mail.chirosmarts.com>" — the
+# resend.dev sandbox is spam-filtered by real inboxes.
 EMAIL_FROM="ChiroSmarts <onboarding@resend.dev>"
+# Optional reply-to (a monitored inbox). Improves trust/deliverability.
+EMAIL_REPLY_TO="support@chirosmarts.com"
 
 # --- Stripe (test mode throughout the build) ---
 STRIPE_SECRET_KEY=""
