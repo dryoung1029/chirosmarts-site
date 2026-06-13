@@ -5,8 +5,10 @@ import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getCourseStructure } from "@/lib/courses";
 import { listCourseResources } from "@/lib/course-resources";
+import { isStreamConfigured, signStreamToken, streamPlaybackUrls } from "@/lib/stream";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 const courseId = Astro.params.courseId!;
 const course = await db
   .select()
@@ -19,6 +21,21 @@ const structure = await getCourseStructure(db, courseId);
 const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
+
+// Signed Stream preview URLs per lesson (admin is authenticated; tokens are short
+// lived). Only built when Stream playback is configured in this environment.
+const streamReady = isStreamConfigured(env);
+const previews: Record<string, { iframe: string; thumbnail: string }> = {};
+if (streamReady) {
+  for (const { lessons } of structure) {
+    for (const l of lessons) {
+      if (l.streamVideoUid) {
+        const token = await signStreamToken(env, l.streamVideoUid);
+        previews[l.id] = streamPlaybackUrls(env, token);
+      }
+    }
+  }
+}
 ---
 
 <Layout title={`Edit ${course.title} · Admin`} showNav={true}>
@@ -150,7 +167,11 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
             </div>
           </div>
           <label>Description</label>
-          <input type="text" name="description" value={module.description ?? ""} />
+          <textarea name="description" rows="2" id={`mod-desc-${module.id}`} style="width:100%;font:inherit;box-sizing:border-box" set:text={module.description ?? ""}></textarea>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.4rem">
+            <button type="button" class="suggest-desc" data-module={module.id} data-target={`mod-desc-${module.id}`} style="font-size:0.85rem">✨ Suggest from transcript</button>
+            <span class="suggest-status muted" data-for={module.id} style="font-size:0.8rem"></span>
+          </div>
           <label class="check" style="margin-top:0.75rem">
             <input type="checkbox" name="isFreePreview" checked={module.isFreePreview} />
             <span>Free preview (no paywall)</span>
@@ -190,6 +211,24 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
                     ? `Video attached · ${fmtMin(l.durationSeconds)} min runtime.`
                     : "No video yet."} Paste a Stream UID to attach — duration is read from Stream automatically (leave Duration blank). Only override it if you know the exact runtime in seconds.
                 </p>
+                {l.streamVideoUid && (previews[l.id] ? (
+                  <details style="flex:1 1 100%;margin:0.35rem 0 0">
+                    <summary style="cursor:pointer;font-size:0.85rem;color:var(--accent)">▶ Preview video</summary>
+                    <div style="position:relative;aspect-ratio:16/9;max-width:480px;margin-top:0.5rem;border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+                      <iframe
+                        src={previews[l.id].iframe}
+                        loading="lazy"
+                        style="position:absolute;inset:0;width:100%;height:100%;border:0"
+                        allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
+                        allowfullscreen
+                      ></iframe>
+                    </div>
+                  </details>
+                ) : (
+                  <p class="muted" style="flex:1 1 100%;margin:0.2rem 0 0;font-size:0.78rem">
+                    Video preview isn't available here (Stream playback not configured in this environment).
+                  </p>
+                ))}
               </form>
             ))
           )}
@@ -228,4 +267,27 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
     <button type="submit" style="margin-top:0.75rem">+ Add module</button>
     <p class="muted" style="margin:0.5rem 0 0;font-size:0.8rem">New modules are added at the end; change the Position fields above to reorder.</p>
   </form>
+
+  <script is:inline>
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".suggest-desc");
+      if (!btn) return;
+      const moduleId = btn.dataset.module;
+      const target = document.getElementById(btn.dataset.target);
+      const status = document.querySelector(`.suggest-status[data-for="${moduleId}"]`);
+      btn.disabled = true;
+      if (status) status.textContent = "Thinking…";
+      try {
+        const res = await fetch(`/api/admin/modules/${moduleId}/suggest-description`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Couldn't generate a description.");
+        if (target) target.value = data.description;
+        if (status) status.textContent = "Suggested — review, edit, then Save module.";
+      } catch (err) {
+        if (status) status.textContent = err.message || "Failed.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
 </Layout>
