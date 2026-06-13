@@ -166,18 +166,30 @@ const fmtMin = (s: number) => (s / 60).toFixed(1);
               <form
                 method="POST"
                 action={`/api/admin/lessons/${l.id}`}
-                style="display:flex;gap:0.5rem;align-items:flex-end;margin:0 0 0.5rem"
+                style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0 0 0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border)"
               >
                 <div style="flex:0 0 4rem">
                   <label style="margin:0">Pos</label>
                   <input type="text" name="position" value={String(l.position)} />
                 </div>
-                <div style="flex:1">
+                <div style="flex:1 1 12rem">
                   <label style="margin:0">Lesson title</label>
                   <input type="text" name="title" value={l.title} required />
                 </div>
-                <span class="muted" style="font-size:0.82rem;white-space:nowrap">{fmtMin(l.durationSeconds)}m</span>
+                <div style="flex:1 1 14rem">
+                  <label style="margin:0">Stream video UID</label>
+                  <input type="text" name="streamVideoUid" value={l.streamVideoUid ?? ""} placeholder="paste from Cloudflare Stream" />
+                </div>
+                <div style="flex:0 0 7rem">
+                  <label style="margin:0">Duration (s)</label>
+                  <input type="text" name="durationSeconds" value="" placeholder={l.durationSeconds ? `${l.durationSeconds} (auto)` : "auto"} />
+                </div>
                 <button type="submit" style="margin:0">Save</button>
+                <p class="muted" style="flex:1 1 100%;margin:0.25rem 0 0;font-size:0.78rem">
+                  {l.streamVideoUid
+                    ? `Video attached · ${fmtMin(l.durationSeconds)} min runtime.`
+                    : "No video yet."} Paste a Stream UID to attach — duration is read from Stream automatically (leave Duration blank). Only override it if you know the exact runtime in seconds.
+                </p>
               </form>
             ))
           )}

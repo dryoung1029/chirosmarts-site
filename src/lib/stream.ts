@@ -73,6 +73,43 @@ export async function signStreamToken(
   return `${signingInput}.${base64url(new Uint8Array(sig))}`;
 }
 
+/**
+ * Whether the Stream MANAGEMENT API (account id + API token) is available. This
+ * is separate from playback signing — it lets the Worker read a video's true
+ * duration when an admin attaches an existing Stream UID to a lesson.
+ */
+export function isStreamManagementConfigured(env: CloudflareEnv): boolean {
+  return !!(env.CF_ACCOUNT_ID && env.CF_STREAM_API_TOKEN);
+}
+
+/**
+ * Read a Stream video's true runtime (seconds) via the management API. Used when
+ * registering an existing video on a lesson — `duration_seconds` is the seat-time
+ * gate's denominator, so it must be Stream's real value, never a guess.
+ */
+export async function fetchStreamDuration(
+  env: CloudflareEnv,
+  uid: string,
+): Promise<{ ok: true; duration: number } | { ok: false; error: string }> {
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/stream/${uid}`,
+    { headers: { Authorization: `Bearer ${env.CF_STREAM_API_TOKEN}` } },
+  );
+  const data = (await res.json().catch(() => ({}))) as any;
+  if (res.status === 404 || data?.success === false) {
+    return { ok: false, error: `No Stream video found for UID "${uid}" (check the UID).` };
+  }
+  const r = data?.result;
+  if (!r?.readyToStream) {
+    return { ok: false, error: `Video "${uid}" is still processing — try again shortly.` };
+  }
+  const duration = Math.round(r.duration ?? 0);
+  if (!duration || duration <= 0) {
+    return { ok: false, error: `Stream reports a 0s duration for "${uid}".` };
+  }
+  return { ok: true, duration };
+}
+
 export interface StreamPlaybackUrls {
   iframe: string;
   hls: string;
