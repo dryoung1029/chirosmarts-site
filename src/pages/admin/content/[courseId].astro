@@ -4,6 +4,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { eq, inArray } from "drizzle-orm";
 import { getCourseStructure } from "@/lib/courses";
+import { getModuleQuiz, getQuizWithQuestions, type QuizWithQuestions } from "@/lib/quiz";
 import { listCourseResources } from "@/lib/course-resources";
 import { isStreamConfigured, signStreamToken, streamPlaybackUrls } from "@/lib/stream";
 
@@ -21,6 +22,18 @@ const structure = await getCourseStructure(db, courseId);
 const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
+const pct = (f: number) => `${Math.round(f * 100)}%`;
+const coursePassPct = pct(course.passThreshold);
+
+// Each module's knowledge-check quiz (with questions) for the quiz editor.
+const moduleQuiz: Record<string, QuizWithQuestions> = {};
+for (const { module } of structure) {
+  const q = await getModuleQuiz(db, module.id);
+  if (q) {
+    const full = await getQuizWithQuestions(db, q.id);
+    if (full) moduleQuiz[module.id] = full;
+  }
+}
 
 // Signed Stream preview URLs per lesson (admin is authenticated; tokens are short
 // lived). Only built when Stream playback is configured in this environment.
@@ -281,6 +294,101 @@ if (lessonIds.length) {
             </div>
             <button type="submit" style="margin:0">+ Add lesson</button>
           </form>
+
+          {/* ---- Module quiz ---- */}
+          <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:0.75rem">
+            {moduleQuiz[module.id] ? (
+              <div>
+                <form method="POST" action={`/api/admin/modules/${module.id}/quiz`} style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0">
+                  <strong style="flex:1 1 100%">Module quiz</strong>
+                  <div style="flex:1 1 16rem">
+                    <label style="margin:0">Quiz title</label>
+                    <input type="text" name="title" value={moduleQuiz[module.id].quiz.title} />
+                  </div>
+                  <div style="flex:0 0 9rem">
+                    <label style="margin:0">Pass score (%)</label>
+                    <input type="text" name="passThreshold"
+                      value={moduleQuiz[module.id].quiz.passThreshold != null ? String(Math.round(moduleQuiz[module.id].quiz.passThreshold! * 100)) : ""}
+                      placeholder={`course default ${coursePassPct}`} />
+                  </div>
+                  <button type="submit" style="margin:0">Save</button>
+                </form>
+
+                <ol style="margin:0.6rem 0 0;padding-left:1.2rem;font-size:0.9rem">
+                  {moduleQuiz[module.id].questions.map((q) => (
+                    <li style="margin-bottom:0.5rem">
+                      <div style="display:flex;gap:0.5rem;align-items:flex-start">
+                        <span style="flex:1">{q.prompt}</span>
+                        <form method="POST" action={`/api/admin/questions/${q.id}/delete`} class="q-del" style="margin:0">
+                          <button type="submit" title="Delete question" style="font-size:0.75rem;padding:0.1rem 0.4rem">✕</button>
+                        </form>
+                      </div>
+                      <ul style="list-style:none;padding:0;margin:0.2rem 0 0">
+                        {q.options.map((o) => (
+                          <li style={o.isCorrect ? "color:var(--ok)" : "color:var(--muted)"}>
+                            {o.isCorrect ? "✓ " : "• "}{o.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+                {moduleQuiz[module.id].questions.length === 0 && (
+                  <p class="muted" style="margin:0.4rem 0;font-size:0.85rem">No questions yet — generate with AI or add one below.</p>
+                )}
+
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:0.5rem">
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/generate`} style="display:flex;gap:0.4rem;align-items:flex-end;margin:0">
+                    <div style="flex:0 0 6rem">
+                      <label style="margin:0">AI questions</label>
+                      <input type="number" name="count" value="5" min="1" max="20" />
+                    </div>
+                    <button type="submit" style="margin:0">✨ Generate</button>
+                  </form>
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/delete`} class="quiz-del" style="margin:0;align-self:flex-end">
+                    <button type="submit" style="font-size:0.8rem">Delete quiz</button>
+                  </form>
+                </div>
+
+                <details style="margin-top:0.6rem">
+                  <summary style="cursor:pointer;font-size:0.85rem;color:var(--accent)">+ Add a question manually</summary>
+                  <form method="POST" action={`/api/admin/quizzes/${moduleQuiz[module.id].quiz.id}/questions`} style="margin-top:0.5rem;font-size:0.9rem">
+                    <label style="margin:0">Question</label>
+                    <input type="text" name="prompt" required style="width:100%;box-sizing:border-box" />
+                    <div style="margin:0.4rem 0">
+                      <label style="margin:0">Options (select the correct one)</label>
+                      {[0, 1, 2, 3].map((i) => (
+                        <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.2rem">
+                          <input type="radio" name="correct" value={String(i)} checked={i === 0} style="width:auto;margin:0" />
+                          <input type="text" name={`opt${i}`} placeholder={`Option ${i + 1}`} style="flex:1" />
+                        </div>
+                      ))}
+                    </div>
+                    <input type="hidden" name="type" value="single_choice" />
+                    <label style="margin:0">Explanation (optional)</label>
+                    <input type="text" name="explanation" style="width:100%;box-sizing:border-box" />
+                    <button type="submit" style="margin-top:0.5rem">Add question</button>
+                  </form>
+                </details>
+              </div>
+            ) : (
+              <form method="POST" action={`/api/admin/modules/${module.id}/quiz`} style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0">
+                <strong style="flex:1 1 100%">Module quiz</strong>
+                <span class="muted" style="flex:1 1 100%;font-size:0.85rem;margin:-0.3rem 0 0.2rem">
+                  Create a knowledge check for this module, then generate questions with AI or add your own.
+                </span>
+                <div style="flex:1 1 16rem">
+                  <label style="margin:0">Quiz title</label>
+                  <input type="text" name="title" placeholder={`${module.title} — knowledge check`} />
+                </div>
+                <div style="flex:0 0 9rem">
+                  <label style="margin:0">Pass score (%)</label>
+                  <input type="text" name="passThreshold" placeholder={`course default ${coursePassPct}`} />
+                </div>
+                <button type="submit" style="margin:0">Create quiz</button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     ))
@@ -360,6 +468,15 @@ if (lessonIds.length) {
         btn.disabled = false;
       }
     });
+  </script>
+
+  <script is:inline>
+    document.querySelectorAll(".q-del").forEach((f) =>
+      f.addEventListener("submit", (e) => { if (!confirm("Delete this question?")) e.preventDefault(); }),
+    );
+    document.querySelectorAll(".quiz-del").forEach((f) =>
+      f.addEventListener("submit", (e) => { if (!confirm("Delete this quiz and all its questions?")) e.preventDefault(); }),
+    );
   </script>
 
   <script>
