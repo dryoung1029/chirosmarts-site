@@ -15,6 +15,15 @@ const emailFrom = env.EMAIL_FROM || "onboarding@resend.dev (default sandbox)";
 const emailReplyTo = env.EMAIL_REPLY_TO || "(none)";
 const emailIsSandbox = /@resend\.dev/i.test(emailFrom) || !env.EMAIL_FROM;
 
+// Stripe config snapshot (mode inferred from the key prefix; key never exposed).
+const stripeHasKey = !!env.STRIPE_SECRET_KEY;
+const stripeMode = env.STRIPE_SECRET_KEY?.startsWith("sk_live_")
+  ? "live"
+  : env.STRIPE_SECRET_KEY?.startsWith("sk_test_")
+    ? "test"
+    : null;
+const stripeHasWebhook = !!env.STRIPE_WEBHOOK_SECRET;
+
 const totalUsers = await db
   .select({ n: sql<number>`count(*)` })
   .from(schema.users)
@@ -156,6 +165,35 @@ const stats = [
       <button type="button" id="email-test-btn">Send test email</button>
     </div>
     <p id="email-test-status" class="muted" style="font-size:0.85rem;margin:0.5rem 0 0;white-space:pre-wrap"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Payments (Stripe)</h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Whether Checkout can take payments. Mode is inferred from the secret key prefix.
+    </p>
+    <ul style="font-size:0.9rem;line-height:1.7;margin:0;padding-left:1.1rem">
+      <li>
+        Secret key (STRIPE_SECRET_KEY):{" "}
+        <strong style={stripeHasKey ? "color:var(--ok)" : "color:var(--warn)"}>
+          {stripeHasKey ? `set — ${stripeMode ?? "unknown"} mode` : "NOT set — purchases are auto-comped (no charge)"}
+        </strong>
+      </li>
+      <li>
+        Webhook secret (STRIPE_WEBHOOK_SECRET):{" "}
+        <strong style={stripeHasWebhook ? "color:var(--ok)" : "color:var(--warn)"}>
+          {stripeHasWebhook ? "set" : "NOT set — payments won't fulfil enrollments"}
+        </strong>
+      </li>
+      {stripeMode === "live" && (
+        <li style="color:var(--warn)">Live mode — real cards will be charged.</li>
+      )}
+      {stripeHasKey && !stripeHasWebhook && (
+        <li style="color:var(--warn)">
+          Key set but no webhook secret — buyers pay but stay un-enrolled. Add the webhook endpoint and STRIPE_WEBHOOK_SECRET.
+        </li>
+      )}
+    </ul>
   </div>
 
   <script is:inline>
