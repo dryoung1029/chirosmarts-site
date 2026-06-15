@@ -92,7 +92,7 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
   <p class="muted" style="margin-top:0">
     {isFinal
       ? `Final exam — you need ${(threshold * 100).toFixed(0)}% to pass.`
-      : "Knowledge check — answer to continue. There's no passing score required here."}
+      : `Knowledge check — score ${(threshold * 100).toFixed(0)}% to pass. Passing it is required for your certificate; you can retake it anytime.`}
   </p>
 
   {
@@ -114,13 +114,15 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
 
   {
     justAttempt && (
-      <div class={`notice ${justAttempt.passed || !isFinal ? "ok" : "err"}`}>
+      <div class={`notice ${justAttempt.passed ? "ok" : "err"}`}>
         You scored <strong>{(justAttempt.score * 100).toFixed(0)}%</strong>
         {isFinal
           ? justAttempt.passed
-            ? " — passed! You've completed the ChiroSmarts training (this is not certification — see the note above). Your completion certificate will be available in a later build (M4)."
+            ? " — passed! You've completed the ChiroSmarts training (this is not certification — see the note above)."
             : " — not passing yet. Review and try again."
-          : " — knowledge check recorded. You can continue."}
+          : justAttempt.passed
+            ? " — passed! You can continue."
+            : " — not passing yet. You can continue the course, but you'll need to pass this to earn your certificate. Review and try again."}
       </div>
     )
   }

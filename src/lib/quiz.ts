@@ -150,6 +150,28 @@ export async function hasPassed(
   return attempts.some((a) => a.passed);
 }
 
+/**
+ * Quizzes in a course the user has NOT yet passed. Used to gate certificate
+ * issuance — if a course has quizzes, they must all be passed before a
+ * certificate is granted.
+ */
+export async function unpassedQuizzes(
+  db: Db,
+  userId: string,
+  courseId: string,
+): Promise<{ id: string; title: string }[]> {
+  const quizzes = await db
+    .select({ id: schema.quizzes.id, title: schema.quizzes.title })
+    .from(schema.quizzes)
+    .where(eq(schema.quizzes.courseId, courseId))
+    .all();
+  const out: { id: string; title: string }[] = [];
+  for (const q of quizzes) {
+    if (!(await hasPassed(db, userId, q.id))) out.push(q);
+  }
+  return out;
+}
+
 export interface SubmitResult {
   attemptId: string;
   attemptNumber: number;

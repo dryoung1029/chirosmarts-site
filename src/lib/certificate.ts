@@ -25,6 +25,7 @@ import {
 } from "pdf-lib";
 import QRCode from "qrcode";
 import { schema, type Db } from "@/db/client";
+import { unpassedQuizzes } from "@/lib/quiz";
 import { newId, readableCode } from "@/lib/crypto";
 import { getSiteUrl } from "@/lib/env";
 import { formatPacific, nowIso } from "@/lib/time";
@@ -140,6 +141,7 @@ export async function reissueCertificate(
   const issued = await issueCertificate(env, db, {
     userId: old.userId,
     courseId: old.courseId,
+    bypassQuizRequirement: true, // reissuing an already-earned certificate
   });
   if (!issued?.created) return issued;
 
@@ -203,10 +205,17 @@ async function nextCertNumber(db: Db, year: number): Promise<string> {
 export async function issueCertificate(
   env: CloudflareEnv,
   db: Db,
-  args: { userId: string; courseId: string; issuedAt?: string },
+  args: { userId: string; courseId: string; issuedAt?: string; bypassQuizRequirement?: boolean },
 ): Promise<IssueResult | null> {
   const existing = await getActiveCertificate(db, args.userId, args.courseId);
   if (existing) return { certificate: existing, created: false };
+
+  // If the course has quizzes, they must all be passed before we certify —
+  // unless an admin explicitly overrides (e.g. credit for off-platform work).
+  if (!args.bypassQuizRequirement) {
+    const unpassed = await unpassedQuizzes(db, args.userId, args.courseId);
+    if (unpassed.length > 0) return null;
+  }
 
   const user = await db
     .select()
@@ -281,7 +290,7 @@ export async function issueCertificate(
 export async function issueAndEmailCertificate(
   env: CloudflareEnv,
   db: Db,
-  args: { userId: string; courseId: string; email: string; issuedAt?: string },
+  args: { userId: string; courseId: string; email: string; issuedAt?: string; bypassQuizRequirement?: boolean },
 ): Promise<IssueResult | null> {
   const issued = await issueCertificate(env, db, args);
   if (issued?.created && issued.certificate.r2Key) {
