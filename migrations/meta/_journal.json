@@ -71,6 +71,13 @@
       "when": 1781366380576,
       "tag": "0009_minor_whistler",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1781507076764,
+      "tag": "0010_panoramic_freak",
+      "breakpoints": true
     }
   ]
 }

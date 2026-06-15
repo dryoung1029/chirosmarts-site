@@ -24,6 +24,8 @@ export interface QuestionWithOptions {
   prompt: string;
   type: QuestionType;
   explanation: string | null;
+  sourceLessonId: string | null;
+  sourceStartSeconds: number | null;
   options: {
     id: string;
     position: number;
@@ -75,6 +77,8 @@ export async function getQuizWithQuestions(
       prompt: q.prompt,
       type: q.type as QuestionType,
       explanation: q.explanation,
+      sourceLessonId: q.sourceLessonId,
+      sourceStartSeconds: q.sourceStartSeconds,
       options: options.map((o) => ({
         id: o.id,
         position: o.position,

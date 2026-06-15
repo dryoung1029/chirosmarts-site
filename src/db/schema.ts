@@ -305,6 +305,10 @@ export const questions = sqliteTable(
       enum: ["single_choice", "multi_choice", "true_false"],
     }).notNull(),
     explanation: text("explanation"),
+    // Optional deep-link to where the answer is taught: a lesson + start second.
+    // Surfaced as a "jump to the answer" link when a student misses the question.
+    sourceLessonId: text("source_lesson_id").references(() => lessons.id),
+    sourceStartSeconds: integer("source_start_seconds"),
   },
   (t) => [index("questions_quiz_idx").on(t.quizId, t.position)],
 );
