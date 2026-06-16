@@ -3,13 +3,54 @@ import Layout from "@/layouts/Layout.astro";
 import { getDb } from "@/db/client";
 import { getCourseBySlug } from "@/lib/courses";
 import { hasActiveEnrollment } from "@/lib/entitlement";
+import { isStripeConfigured, retrieveCheckoutSession } from "@/lib/stripe";
+import { expandFulfillment, activateEnrollment } from "@/lib/enrollment";
 
+const env = Astro.locals.runtime.env;
 const user = Astro.locals.user!;
-const db = getDb(Astro.locals.runtime.env);
+const db = getDb(env);
 const slug = Astro.url.searchParams.get("course");
-const course = slug ? await getCourseBySlug(db, slug) : null;
+const sessionId = Astro.url.searchParams.get("session_id");
 
-// The webhook activates the enrollment; it may lag a beat behind this redirect.
+// Primary fulfilment path: when Stripe redirects back with the Checkout session
+// id, verify the session is paid and belongs to this user, then activate the
+// enrollment(s) directly — no webhook required. We retrieve the session with the
+// same secret key that created it, so this is always in the correct Stripe
+// account/mode. The webhook remains as backup (closed tabs) and for refunds.
+// activateEnrollment is idempotent, so double-fulfilment (here + webhook) is safe.
+if (sessionId && isStripeConfigured(env)) {
+  try {
+    const session = await retrieveCheckoutSession(env, sessionId);
+    const meta = session.metadata ?? {};
+    const paid =
+      session.payment_status === "paid" || session.status === "complete";
+    const ownsSession =
+      meta.userId === user.id || session.client_reference_id === user.id;
+    if (paid && ownsSession && meta.kind === "course") {
+      const courseIds = (meta.courseIds ?? meta.courseId ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const paymentIntentId =
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : (session.payment_intent?.id ?? undefined);
+      for (const courseId of courseIds) {
+        for (const targetId of await expandFulfillment(db, courseId)) {
+          await activateEnrollment(db, user.id, targetId, {
+            paymentStatus: "paid",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+          });
+        }
+      }
+    }
+  } catch {
+    // Fall through: the page still renders, and the webhook can finish the job.
+  }
+}
+
+const course = slug ? await getCourseBySlug(db, slug) : null;
 const active = course ? await hasActiveEnrollment(db, user.id, course.id) : false;
 ---
 

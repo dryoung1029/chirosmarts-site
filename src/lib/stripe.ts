@@ -87,6 +87,19 @@ export async function createSeatsCheckout(
   return session.url!;
 }
 
+/**
+ * Retrieve a completed Checkout session (used by the success page to fulfil the
+ * enrollment directly, independent of the webhook). Runs with the same secret
+ * key that created the session, so it is always in the correct Stripe account.
+ */
+export async function retrieveCheckoutSession(
+  env: CloudflareEnv,
+  sessionId: string,
+): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripe(env);
+  return stripe.checkout.sessions.retrieve(sessionId);
+}
+
 /** Verify + parse a webhook event (async SubtleCrypto path for Workers). */
 export async function constructWebhookEvent(
   env: CloudflareEnv,

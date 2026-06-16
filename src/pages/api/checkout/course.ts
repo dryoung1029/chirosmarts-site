@@ -92,7 +92,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       userId: user.id,
       courseIds: buyable.map((c) => c.id).join(","),
     },
-    successUrl: `${site}/checkout/success?course=${first.slug}`,
+    successUrl: `${site}/checkout/success?course=${first.slug}&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${site}/courses/${first.slug}?canceled=1`,
   });
   return redirect(url, 303);
