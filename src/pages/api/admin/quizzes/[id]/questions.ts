@@ -6,6 +6,20 @@ import type { APIRoute } from "astro";
 import { appendQuestions, quizLocation } from "@/lib/admin/quiz-authoring";
 import type { QuestionType } from "@/lib/quiz-scoring";
 
+/** Parse "mm:ss", "h:mm:ss", or plain seconds into integer seconds (or null). */
+function parseTime(raw: string): number | null {
+  const s = raw.trim();
+  if (!s) return null;
+  if (s.includes(":")) {
+    const parts = s.split(":").map((p) => Number(p));
+    if (parts.some((n) => !Number.isFinite(n))) return null;
+    const secs = parts.reduce((acc, n) => acc * 60 + n, 0);
+    return Number.isFinite(secs) && secs >= 0 ? Math.floor(secs) : null;
+  }
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
+
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const env = locals.runtime.env;
   const quizId = params.id!;
@@ -40,8 +54,19 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   if (options.filter((o) => o.text).length < 2) return back("Add at least two answer options.");
   if (!options.some((o) => o.isCorrect)) return back("Mark which option is correct.");
 
+  // Optional deep-link: where the answer is taught (lesson + mm:ss or seconds).
+  const sourceLessonId = String(form.get("sourceLessonId") ?? "").trim() || null;
+  const sourceStartSeconds = sourceLessonId ? parseTime(String(form.get("sourceTime") ?? "")) : null;
+
   const added = await appendQuestions(env, quizId, [
-    { prompt, type: type === "true_false" ? "true_false" : "single_choice", explanation, options },
+    {
+      prompt,
+      type: type === "true_false" ? "true_false" : "single_choice",
+      explanation,
+      sourceLessonId,
+      sourceStartSeconds,
+      options,
+    },
   ]);
   return back(added ? "Question added." : "Couldn't add the question — check the options.");
 };

@@ -30,6 +30,8 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
         prompt: g.prompt,
         type: "single_choice" as const,
         explanation: g.explanation,
+        sourceLessonId: g.sourceLessonId,
+        sourceStartSeconds: g.sourceStartSeconds,
         options: g.options.map((text, i) => ({ text, isCorrect: i === g.correctIndex })),
       })),
     );

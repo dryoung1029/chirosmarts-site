@@ -11,6 +11,8 @@ export interface NewQuestion {
   prompt: string;
   type: QuestionType;
   explanation?: string;
+  sourceLessonId?: string | null;
+  sourceStartSeconds?: number | null;
   options: { text: string; isCorrect: boolean }[];
 }
 
@@ -41,6 +43,8 @@ export async function appendQuestions(
       prompt: it.prompt.trim(),
       type: it.type,
       explanation: it.explanation?.trim() || null,
+      sourceLessonId: it.sourceLessonId ?? null,
+      sourceStartSeconds: it.sourceStartSeconds ?? null,
     });
     await db.insert(schema.answerOptions).values(
       clean.map((o, i) => ({

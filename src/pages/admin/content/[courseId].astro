@@ -22,8 +22,11 @@ const structure = await getCourseStructure(db, courseId);
 const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
+const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const pct = (f: number) => `${Math.round(f * 100)}%`;
 const coursePassPct = pct(course.passThreshold);
+const lessonTitleById: Record<string, string> = {};
+for (const { lessons } of structure) for (const l of lessons) lessonTitleById[l.id] = l.title;
 
 // Each module's knowledge-check quiz (with questions) for the quiz editor.
 const moduleQuiz: Record<string, QuizWithQuestions> = {};
@@ -330,6 +333,11 @@ if (lessonIds.length) {
                           </li>
                         ))}
                       </ul>
+                      {q.sourceLessonId && q.sourceStartSeconds != null && (
+                        <p class="muted" style="margin:0.15rem 0 0;font-size:0.8rem">
+                          ▶ Answer link: {lessonTitleById[q.sourceLessonId] ?? "lesson"} @ {fmtClock(q.sourceStartSeconds)}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ol>
@@ -367,6 +375,19 @@ if (lessonIds.length) {
                     <input type="hidden" name="type" value="single_choice" />
                     <label style="margin:0">Explanation (optional)</label>
                     <input type="text" name="explanation" style="width:100%;box-sizing:border-box" />
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.3rem">
+                      <div style="flex:1 1 12rem">
+                        <label style="margin:0">Answer is in lesson (optional)</label>
+                        <select name="sourceLessonId" style="width:100%">
+                          <option value="">— none —</option>
+                          {lessons.map((l) => <option value={l.id}>{l.title}</option>)}
+                        </select>
+                      </div>
+                      <div style="flex:0 0 8rem">
+                        <label style="margin:0">At time (mm:ss)</label>
+                        <input type="text" name="sourceTime" placeholder="e.g. 3:45" />
+                      </div>
+                    </div>
                     <button type="submit" style="margin-top:0.5rem">Add question</button>
                   </form>
                 </details>

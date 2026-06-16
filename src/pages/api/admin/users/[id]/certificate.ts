@@ -9,6 +9,7 @@ import type { APIRoute } from "astro";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { issueAndEmailCertificate } from "@/lib/certificate";
+import { unpassedQuizzes } from "@/lib/quiz";
 
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const env = locals.runtime.env;
@@ -32,10 +33,21 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     return back("Can't issue — the student has no legal name yet (they must complete intake).");
   }
 
+  // Quizzes must be passed first, unless the admin explicitly overrides.
+  const override = form.get("override") === "on";
+  if (!override) {
+    const unpassed = await unpassedQuizzes(db, userId, courseId);
+    if (unpassed.length > 0) {
+      const names = unpassed.map((q) => q.title).join(", ");
+      return back(`Can't issue — these quizzes aren't passed yet: ${names}. Tick "issue anyway" to override.`);
+    }
+  }
+
   const result = await issueAndEmailCertificate(env, db, {
     userId,
     courseId,
     email: user.email,
+    bypassQuizRequirement: override,
   });
 
   if (!result) return back("Couldn't issue the certificate (missing course or legal name).");

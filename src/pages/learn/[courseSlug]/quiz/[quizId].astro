@@ -2,7 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getCourseBySlug } from "@/lib/courses";
 import { getQuizWithQuestions, getAttempts } from "@/lib/quiz";
 import { canAccessModule, hasActiveEnrollment } from "@/lib/entitlement";
@@ -68,6 +68,22 @@ if (justAttempt) {
 const correctById = new Map(
   feedback?.perQuestion.map((p) => [p.questionId, p.correct]) ?? [],
 );
+
+// Resolve each question's source lesson to its module so we can build a
+// "jump to the answer" deep link (the player honors ?t=<seconds>).
+const sourceLessonIds = [
+  ...new Set(questions.map((q) => q.sourceLessonId).filter((x): x is string => !!x)),
+];
+const lessonModule = new Map<string, string>();
+if (sourceLessonIds.length) {
+  const rows = await db
+    .select({ id: schema.lessons.id, moduleId: schema.lessons.moduleId })
+    .from(schema.lessons)
+    .where(inArray(schema.lessons.id, sourceLessonIds))
+    .all();
+  for (const r of rows) lessonModule.set(r.id, r.moduleId);
+}
+const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 ---
 
 <Layout title={quiz.title} showNav={true}>
@@ -76,7 +92,7 @@ const correctById = new Map(
   <p class="muted" style="margin-top:0">
     {isFinal
       ? `Final exam — you need ${(threshold * 100).toFixed(0)}% to pass.`
-      : "Knowledge check — answer to continue. There's no passing score required here."}
+      : `Knowledge check — score ${(threshold * 100).toFixed(0)}% to pass. Passing it is required for your certificate; you can retake it anytime.`}
   </p>
 
   {
@@ -98,13 +114,15 @@ const correctById = new Map(
 
   {
     justAttempt && (
-      <div class={`notice ${justAttempt.passed || !isFinal ? "ok" : "err"}`}>
+      <div class={`notice ${justAttempt.passed ? "ok" : "err"}`}>
         You scored <strong>{(justAttempt.score * 100).toFixed(0)}%</strong>
         {isFinal
           ? justAttempt.passed
-            ? " — passed! You've completed the ChiroSmarts training (this is not certification — see the note above). Your completion certificate will be available in a later build (M4)."
+            ? " — passed! You've completed the ChiroSmarts training (this is not certification — see the note above)."
             : " — not passing yet. Review and try again."
-          : " — knowledge check recorded. You can continue."}
+          : justAttempt.passed
+            ? " — passed! You can continue."
+            : " — not passing yet. You can continue the course, but you'll need to pass this to earn your certificate. Review and try again."}
       </div>
     )
   }
@@ -151,6 +169,21 @@ const correctById = new Map(
                 {q.explanation}
               </p>
             )}
+            {feedback &&
+              !correctById.get(q.id) &&
+              q.sourceLessonId &&
+              q.sourceStartSeconds != null &&
+              lessonModule.get(q.sourceLessonId) && (
+                <p style="margin:0.5rem 0 0">
+                  <a
+                    href={`/learn/${courseSlug}/${lessonModule.get(q.sourceLessonId)}/${q.sourceLessonId}?t=${q.sourceStartSeconds}`}
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    ▶ Watch the answer in the video ({fmtClock(q.sourceStartSeconds)})
+                  </a>
+                </p>
+              )}
           </div>
         ))}
         <button type="submit">
