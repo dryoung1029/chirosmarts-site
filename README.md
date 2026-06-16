@@ -8,6 +8,7 @@ training. Astro 5 (SSR) on Cloudflare (D1 / R2 / Stream), Stripe, Resend.
 
 Current milestone: **M1 — Auth + intake + roadmap**.
 
+
 ---
 
 ## Prerequisites
