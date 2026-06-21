@@ -84,7 +84,7 @@ export async function activateEnrollment(
   userId: string,
   courseId: string,
   opts: {
-    paymentStatus: "paid" | "comp" | "free";
+    paymentStatus: "paid" | "comp" | "free" | "clinic_seat";
     stripeCheckoutSessionId?: string;
     stripePaymentIntentId?: string;
     amountCents?: number;

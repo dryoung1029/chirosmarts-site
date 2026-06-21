@@ -123,11 +123,78 @@ export const clinics = sqliteTable(
       .notNull()
       .references(() => users.id),
     name: text("name").notNull(),
+    // DEPRECATED (Phase 4): the single bulk seat count is superseded by per-course
+    // `clinicSeatPools`. Kept (not dropped) because dropping a column forces a
+    // table rebuild, which fails on D1 (PRAGMA foreign_keys=OFF is a no-op inside
+    // a migration txn and `clinicMembers` FKs to `clinics`). Backfilled into a
+    // pool row for the CA-initial course, then ignored by all reads.
     seatsPurchased: integer("seats_purchased").notNull().default(0),
     createdAt: text("created_at").notNull().default(nowUtc),
     updatedAt: text("updated_at").notNull().default(nowUtc),
   },
   (t) => [index("clinics_owner_idx").on(t.ownerUserId)],
+);
+
+// ---------------------------------------------------------------------------
+// Phase 4 — per-course clinic seat pools
+// ---------------------------------------------------------------------------
+// One seat pool per (clinic, course). `seatsPurchased` is the ONLY stored count;
+// consumed seats are RECOMPUTED from `seatAssignments` (compliance ethos), never
+// stored as a counter.
+export const clinicSeatPools = sqliteTable(
+  "clinic_seat_pools",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id")
+      .notNull()
+      .references(() => clinics.id),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id),
+    seatsPurchased: integer("seats_purchased").notNull().default(0),
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("clinic_seat_pools_clinic_course_idx").on(t.clinicId, t.courseId),
+  ],
+);
+
+// One assignment per (person, course). `clinicMembers` stays the person↔clinic
+// identity (unchanged); this maps a member to a course seat. Re-granting a course
+// each year adds a new row here, not a new roster row. Assigning an
+// already-active member creates an `active` row directly (no invite token);
+// otherwise an `invited` row holds the seat until the CA claims it.
+// Consumed seats = assignments in (invited|active); expired/revoked free the seat.
+export const seatAssignments = sqliteTable(
+  "seat_assignments",
+  {
+    id: text("id").primaryKey(),
+    clinicId: text("clinic_id") // denormalized so a pool's consumed seats recompute cheaply
+      .notNull()
+      .references(() => clinics.id),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => clinicMembers.id),
+    status: text("status", {
+      enum: ["invited", "active", "expired", "revoked"],
+    })
+      .notNull()
+      .default("invited"),
+    enrollmentId: text("enrollment_id").references(() => enrollments.id), // set when access is granted
+    inviteTokenHash: text("invite_token_hash"), // null for direct (already-active member) assignments
+    inviteExpiresAt: text("invite_expires_at"),
+    assignedAt: text("assigned_at").notNull().default(nowUtc),
+    claimedAt: text("claimed_at"),
+  },
+  (t) => [
+    uniqueIndex("seat_assignments_member_course_idx").on(t.memberId, t.courseId),
+    index("seat_assignments_pool_idx").on(t.clinicId, t.courseId),
+    uniqueIndex("seat_assignments_token_idx").on(t.inviteTokenHash),
+  ],
 );
 
 // Membership rows tie a person to a clinic. The owner gets a `role=owner` row;
@@ -461,7 +528,10 @@ export const enrollments = sqliteTable(
       .notNull()
       .default("pending"),
     paymentStatus: text("payment_status", {
-      enum: ["unpaid", "paid", "free", "comp"],
+      // `clinic_seat` (Phase 4): access granted by a clinic owner's seat pool,
+      // not a student-level payment. Type-only enum change — SQLite has no CHECK
+      // here, so it needs no DB migration.
+      enum: ["unpaid", "paid", "free", "comp", "clinic_seat"],
     })
       .notNull()
       .default("unpaid"),
