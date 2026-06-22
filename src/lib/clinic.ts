@@ -1,23 +1,21 @@
 /**
- * Clinic management (clinic-owner path).
+ * Clinic identity (clinic-owner path).
  *
- * Model: a clinic owner buys a POOL of training seats and invites their CAs by
- * email. Each CA self-claims their own account — the invite link proves email
- * ownership the same way a magic link does, so claiming an invite both
- * authenticates the CA and joins them to the clinic.
+ * Model: a clinic owner runs a clinic and onboards their CAs. Each CA self-claims
+ * their own account — a seat-assignment invite link proves email ownership the
+ * same way a magic link does, so claiming both authenticates the CA and links
+ * their membership.
  *
- * Seat accounting is RECOMPUTED, never stored as a counter: seats consumed =
- * CA members still in (invited|active). `clinics.seatsPurchased` is the only
- * stored figure (set by the seat-purchase flow — comped in test mode now,
- * Stripe in M3).
+ * This module owns the clinic + member IDENTITY (one `clinic_members` row per
+ * person per clinic). Seat accounting — per-course pools and per-(person,course)
+ * assignments — lives in `seat-pools.ts` (Phase 4). `clinics.seatsPurchased` is
+ * deprecated (kept for D1-safety, backfilled into a pool, then unused).
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
-import { newId, randomToken, sha256Hex } from "@/lib/crypto";
-import { isoInSeconds, nowIso, isPast } from "@/lib/time";
-
-const INVITE_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 days
+import { newId } from "@/lib/crypto";
+import { nowIso } from "@/lib/time";
 
 export type Clinic = typeof schema.clinics.$inferSelect;
 export type ClinicMember = typeof schema.clinicMembers.$inferSelect;
@@ -78,185 +76,68 @@ export async function getRoster(
   return rows.filter((m) => m.role === "ca");
 }
 
-export interface RosterEntry {
-  member: ClinicMember;
-  legalName: string | null;
-  intakeCompletedAt: string | null;
-}
-
-/** Roster joined with each claimed CA's user record, for the owner dashboard. */
-export async function getRosterDetailed(
+/**
+ * The live CA-member identity for an email in a clinic, or null. Prefers an
+ * already-`active` (claimed) row, then a still-`invited` one, then the most
+ * recent. Used to decide whether a seat assignment can go straight to `active`
+ * (the CA is already in the clinic) or needs an invite.
+ */
+export async function findCaMemberByEmail(
   db: Db,
   clinicId: string,
-): Promise<RosterEntry[]> {
-  const roster = await getRoster(db, clinicId);
-  const entries: RosterEntry[] = [];
-  for (const member of roster) {
-    let legalName: string | null = null;
-    let intakeCompletedAt: string | null = null;
-    if (member.userId) {
-      const u = await db
-        .select({
-          legalName: schema.users.legalName,
-          intakeCompletedAt: schema.users.intakeCompletedAt,
-        })
-        .from(schema.users)
-        .where(eq(schema.users.id, member.userId))
-        .get();
-      legalName = u?.legalName || null;
-      intakeCompletedAt = u?.intakeCompletedAt ?? null;
-    }
-    entries.push({ member, legalName, intakeCompletedAt });
-  }
-  return entries;
+  rawEmail: string,
+): Promise<ClinicMember | null> {
+  const email = rawEmail.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(schema.clinicMembers)
+    .where(
+      and(
+        eq(schema.clinicMembers.clinicId, clinicId),
+        eq(schema.clinicMembers.email, email),
+        eq(schema.clinicMembers.role, "ca"),
+      ),
+    )
+    .orderBy(desc(schema.clinicMembers.invitedAt))
+    .all();
+  if (rows.length === 0) return null;
+  return (
+    rows.find((m) => m.status === "active") ??
+    rows.find((m) => m.status === "invited") ??
+    rows[0]
+  );
 }
-
-export interface SeatSummary {
-  purchased: number;
-  consumed: number; // invited + active CAs
-  available: number;
-}
-
-/** Recompute seat usage from membership rows. Never stored as a counter. */
-export async function getSeatSummary(
-  db: Db,
-  clinic: Clinic,
-): Promise<SeatSummary> {
-  const roster = await getRoster(db, clinic.id);
-  const consumed = roster.filter(
-    (m) => m.status === "invited" || m.status === "active",
-  ).length;
-  return {
-    purchased: clinic.seatsPurchased,
-    consumed,
-    available: Math.max(0, clinic.seatsPurchased - consumed),
-  };
-}
-
-export type InviteResult =
-  | { ok: true; member: ClinicMember; token: string }
-  | { ok: false; reason: string };
 
 /**
- * Invite a CA by email. Reserves a seat (the new `invited` row consumes one).
- * Returns the raw token so the caller can build/send the claim URL. Re-inviting
- * an email that already has a live (invited|active) row is a no-op error.
+ * Return the CA-member identity for an email, creating an `invited` identity row
+ * if none exists. One row per person per clinic — re-granting courses reuses it.
  */
-export async function inviteCa(
+export async function ensureCaMember(
   db: Db,
-  clinic: Clinic,
+  clinicId: string,
   rawEmail: string,
-): Promise<InviteResult> {
+): Promise<ClinicMember> {
   const email = rawEmail.trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    return { ok: false, reason: "Please enter a valid email address." };
-  }
+  const existing = await findCaMemberByEmail(db, clinicId, email);
+  if (existing && existing.status !== "removed") return existing;
 
-  const roster = await getRoster(db, clinic.id);
-  const live = roster.find(
-    (m) =>
-      m.email === email && (m.status === "invited" || m.status === "active"),
-  );
-  if (live) {
-    return {
-      ok: false,
-      reason:
-        live.status === "active"
-          ? "That CA has already joined your clinic."
-          : "That CA already has a pending invite.",
-    };
-  }
-
-  const seats = await getSeatSummary(db, clinic);
-  if (seats.available < 1) {
-    return {
-      ok: false,
-      reason: "No seats available. Purchase more seats to invite another CA.",
-    };
-  }
-
-  const token = randomToken();
-  const inviteTokenHash = await sha256Hex(token);
   const id = newId("clm");
   await db.insert(schema.clinicMembers).values({
     id,
-    clinicId: clinic.id,
+    clinicId,
     email,
     role: "ca",
     status: "invited",
-    inviteTokenHash,
-    inviteExpiresAt: isoInSeconds(INVITE_TTL_SECONDS),
   });
-
-  const member = await db
+  return (await db
     .select()
     .from(schema.clinicMembers)
     .where(eq(schema.clinicMembers.id, id))
-    .get();
-  return { ok: true, member: member!, token };
+    .get())!;
 }
 
-/** Revoke a pending invite (frees its seat). Only invited rows can be revoked. */
-export async function revokeInvite(
-  db: Db,
-  clinicId: string,
-  memberId: string,
-): Promise<boolean> {
-  const member = await db
-    .select()
-    .from(schema.clinicMembers)
-    .where(eq(schema.clinicMembers.id, memberId))
-    .get();
-  if (!member || member.clinicId !== clinicId || member.status !== "invited") {
-    return false;
-  }
-  await db
-    .update(schema.clinicMembers)
-    .set({ status: "removed", inviteTokenHash: null })
-    .where(eq(schema.clinicMembers.id, memberId));
-  return true;
-}
-
-export type AcceptResult =
-  | { ok: true; clinicId: string; email: string; memberId: string }
-  | { ok: false; reason: string };
-
-/**
- * Validate an invite token. Marks the invite accepted and returns the email to
- * authenticate. Single-use + expiry enforced here. The caller is responsible for
- * creating/looking up the user, linking `userId`, and creating the session.
- */
-export async function acceptInvite(
-  db: Db,
-  token: string,
-): Promise<AcceptResult> {
-  if (!token) return { ok: false, reason: "missing token" };
-  const hash = await sha256Hex(token);
-
-  const member = await db
-    .select()
-    .from(schema.clinicMembers)
-    .where(eq(schema.clinicMembers.inviteTokenHash, hash))
-    .get();
-
-  if (!member) return { ok: false, reason: "This invite link is not valid." };
-  if (member.status !== "invited") {
-    return { ok: false, reason: "This invite has already been used." };
-  }
-  if (member.inviteExpiresAt && isPast(member.inviteExpiresAt)) {
-    return { ok: false, reason: "This invite link has expired." };
-  }
-
-  return {
-    ok: true,
-    clinicId: member.clinicId,
-    email: member.email,
-    memberId: member.id,
-  };
-}
-
-/** Link a claimed invite to the now-authenticated user and mark it active. */
-export async function linkInviteToUser(
+/** Link a claimed member identity to the now-authenticated user; mark active. */
+export async function linkMemberToUser(
   db: Db,
   memberId: string,
   userId: string,
@@ -269,25 +150,5 @@ export async function linkInviteToUser(
       claimedAt: nowIso(),
       inviteTokenHash: null,
     })
-    .where(
-      and(
-        eq(schema.clinicMembers.id, memberId),
-        eq(schema.clinicMembers.status, "invited"),
-      ),
-    );
-}
-
-/** Grant seats to a clinic (test-mode comp; Stripe-backed in M3). */
-export async function grantSeats(
-  db: Db,
-  clinic: Clinic,
-  count: number,
-): Promise<void> {
-  await db
-    .update(schema.clinics)
-    .set({
-      seatsPurchased: clinic.seatsPurchased + count,
-      updatedAt: nowIso(),
-    })
-    .where(eq(schema.clinics.id, clinic.id));
+    .where(eq(schema.clinicMembers.id, memberId));
 }

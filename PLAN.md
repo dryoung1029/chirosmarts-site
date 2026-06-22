@@ -9,7 +9,7 @@
 
 | Item | State |
 |---|---|
-| Current milestone | **Marketing + funnel + light design-token theme + semantic tutor + illustration integration — all shipped.** M0–M6, multi-course Phases 1–3, pricing, legal (draft), funnel (renewal checker, lead capture double-opt-in, Brevo groundwork), and the 15-illustration pass (see "Illustration integration (shipped)" below) done. Phase 4 seat pools pending DDL review (`docs/phase4-seat-pools-ddl.md`). |
+| Current milestone | **Marketing + funnel + light design-token theme + semantic tutor + illustration integration — all shipped.** M0–M6, multi-course Phases 1–3, pricing, legal (draft), funnel (renewal checker, lead capture double-opt-in, Brevo groundwork), and the 15-illustration pass (see "Illustration integration (shipped)" below) done. **Phase 4 per-course clinic seat pools now built** (migration 0011; owner runs `db:migrate:remote`). |
 | M0 | ✅ merged to `main` |
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
@@ -95,8 +95,40 @@ only — previews accrue NO seat time / heartbeats.** Cap is client-side (a dete
 viewer could fetch more via the token; the rest of the course stays paywalled). Owner
 action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
 
-### Phase 4 — per-course clinic seat pools (APPROVED design, DDL pending review)
-Decisions locked for the build (NOT yet implemented — DDL produced separately for review):
+### Phase 4 — per-course clinic seat pools (SHIPPED 2026-06)
+Built on branch `claude/charming-faraday-ixrhmb` from the approved design + DDL
+(`docs/phase4-seat-pools-ddl.md`). Migration **0011** (generated DDL + hand-written
+backfill) applies clean on local D1; **owner action: run `npm run db:migrate:remote`.**
+
+- **Schema**: `clinic_seat_pools(clinicId, courseId, seatsPurchased)` (the only stored
+  count) + `seat_assignments` (one row per person+course; `invited｜active｜expired｜revoked`).
+  `enrollments.paymentStatus` gains `clinic_seat` (type-only, no migration). `clinics.seatsPurchased`
+  kept (deprecated) and backfilled into a CA-initial pool — never dropped (D1 rebuild limitation).
+- **Libs**: `src/lib/clinic.ts` is now clinic+member **identity** only (`findCaMemberByEmail`,
+  `ensureCaMember`, `linkMemberToUser`). New `src/lib/seat-pools.ts` owns pools + assignments:
+  pure `consumedSeats`/`summarizePool` (consumed = invited+active, available clamped ≥0,
+  **recomputed never stored**), `grantPoolSeats`, `assignSeat`, `acceptSeatToken`,
+  `claimSeatsForMember`, `revokeAssignment`, lazy `expireStaleAssignments` (30-day invite TTL).
+  **9 unit tests** in `seat-pools.test.ts` (52 total pass).
+- **Assign flow**: already-active member → **immediate** `active` assignment + `clinic_seat`
+  enrollment (no invite/email); new/unclaimed CA → emailed one-time claim link (`/clinic/join`),
+  and claiming activates **every** pending assignment for that member. Unique `(member,course)`
+  index ⇒ re-grant after expiry/revoke **reactivates the row in place** (`upsertAssignment`).
+- **Endpoints**: `POST /api/clinic/seats` `{courseId,count}` (price from that course's DB row;
+  comped in test mode, Stripe-metadata `courseId` for the paid webhook), new `POST /api/clinic/assign`
+  `{courseId,email}`, `POST /api/clinic/revoke` `{assignmentId}`. Old `/api/clinic/invite` removed.
+- **Webhook**: `kind=seats` grants to the right pool; an unmatched `charge.refunded` (i.e. a
+  seat-pool purchase) logs `clinic_seat_refund_manual_review` — **no pool shrink, no enrollment/cert
+  revoke** (manual handling, per the record).
+- **Dashboard**: per-course pool panels (bought / in-use / available, buy-seats course picker —
+  standalone published courses only, bundles excluded — assign form, per-pool roster, revoke).
+- **Audit events**: `clinic_pool_seats_granted`, `clinic_seat_assigned`, `clinic_seat_claimed`,
+  `clinic_seat_assignment_revoked`, `clinic_seat_refund_manual_review`.
+- **Verified**: 52/52 unit tests, `astro check` 0 errors, build clean, migration applies on local
+  D1, and SQL-level invariants checked (consumed recompute, NULL-token coexistence, unique-index
+  re-grant rejection). **Not yet exercised through the browser / against remote D1.**
+
+#### Original locked decisions (for reference):
 - **Normalized `seat_assignments(memberId, courseId, status, enrollmentId, …)`**; `clinic_members` stays one row per person and keeps the invite/claim machinery. Assigning an **already-active** member requires **no invite**. (Rationale: annual renewal re-grants courses yearly; per-person-per-course-per-year roster rows would explode.)
 - Per-course `clinic_seat_pools(clinicId, courseId, seats_purchased)`; consumed seats **recomputed** from assignments. Backfill the existing single `clinics.seats_purchased` into a pool row for `crs_or_ca_initial`.
 - New enrollment `payment_status='clinic_seat'` (distinct value, not `comp`).

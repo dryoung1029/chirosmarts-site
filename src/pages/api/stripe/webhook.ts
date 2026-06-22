@@ -18,7 +18,7 @@ import {
   expandFulfillment,
   revokeEnrollmentByPaymentIntent,
 } from "@/lib/enrollment";
-import { grantSeats } from "@/lib/clinic";
+import { grantPoolSeats } from "@/lib/seat-pools";
 import { logEvent } from "@/lib/events";
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -68,7 +68,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
           });
         }
       }
-    } else if (meta.kind === "seats" && meta.clinicId && meta.count) {
+    } else if (
+      meta.kind === "seats" &&
+      meta.clinicId &&
+      meta.courseId &&
+      meta.count
+    ) {
       const clinic = await db
         .select()
         .from(schema.clinics)
@@ -76,10 +81,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
         .get();
       if (clinic) {
         const count = Number(meta.count);
-        await grantSeats(db, clinic, count);
+        await grantPoolSeats(db, clinic.id, meta.courseId, count);
         await logEvent(db, {
           userId: clinic.ownerUserId,
-          type: "clinic_seats_granted",
+          type: "clinic_pool_seats_granted",
+          courseId: meta.courseId,
           payload: { clinicId: clinic.id, count, method: "stripe" },
         });
       }
@@ -87,7 +93,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
   } else if (event.type === "charge.refunded") {
     const charge = event.data.object as { payment_intent?: string | null };
     if (charge.payment_intent) {
-      await revokeEnrollmentByPaymentIntent(db, charge.payment_intent);
+      // Student-level course refund → revoke that enrollment (PLAN #9).
+      const revoked = await revokeEnrollmentByPaymentIntent(
+        db,
+        charge.payment_intent,
+      );
+      // A refund that matches no enrollment is most likely a clinic SEAT-POOL
+      // purchase. Per the Phase 4 record, seat-pool refunds are handled MANUALLY:
+      // no automatic pool shrinking and no enrollment/cert revocation — just log
+      // for an admin to reconcile.
+      if (!revoked) {
+        await logEvent(db, {
+          type: "clinic_seat_refund_manual_review",
+          payload: { paymentIntentId: charge.payment_intent },
+        });
+      }
     }
   }
 
