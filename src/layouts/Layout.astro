@@ -10,7 +10,12 @@ import Logo from "@/components/Logo.astro";
 import { isAdmin } from "@/lib/admin";
 import { LEGAL } from "@/config/legal";
 const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
+const isClinicOwner = user?.role === "clinic_admin";
 const legalEntity = LEGAL.entityName;
+// Highlight the active top-level section.
+const path = Astro.url.pathname;
+const isActive = (prefix: string) =>
+  prefix === "/dashboard" ? path === "/dashboard" : path.startsWith(prefix);
 ---
 
 <!doctype html>
@@ -34,6 +39,10 @@ const legalEntity = LEGAL.entityName;
       }
       .nav strong { font-size: 1.1rem; }
       .nav form { margin: 0; }
+      .nav-links { display: flex; align-items: center; gap: 1.25rem; }
+      .nav-links a { font-size: 0.95rem; text-decoration: none; color: var(--muted); }
+      .nav-links a:hover { color: var(--text); }
+      .nav-links a.active { color: var(--text); font-weight: 600; }
       .wrap { max-width: 44rem; margin: 0 auto; padding: 2rem 1.5rem; }
       .panel {
         background: var(--surface);
@@ -63,10 +72,16 @@ const legalEntity = LEGAL.entityName;
         <nav class="nav">
           <a href="/dashboard" style="text-decoration:none;color:inherit"><Logo height={42} /></a>
           {user && (
-            <div style="display:flex;align-items:center;gap:1rem">
-              {userIsAdmin && (
-                <a href="/admin" style="font-size:0.9rem">Admin</a>
-              )}
+            <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+              <div class="nav-links">
+                <a href="/dashboard" class={isActive("/dashboard") ? "active" : ""}>Dashboard</a>
+                {isClinicOwner && (
+                  <a href="/clinic" class={isActive("/clinic") ? "active" : ""}>Clinic</a>
+                )}
+                {userIsAdmin && (
+                  <a href="/admin" class={isActive("/admin") ? "active" : ""}>Admin</a>
+                )}
+              </div>
               <form method="POST" action="/api/auth/logout" style="display:flex;align-items:center;gap:1rem">
                 <span class="muted">{user.email}</span>
                 <button class="link" type="submit">Sign out</button>

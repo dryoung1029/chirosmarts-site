@@ -1,0 +1,224 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { getClinicForOwner } from "@/lib/clinic";
+import { listPoolsDetailed, type PoolView } from "@/lib/seat-pools";
+
+const user = Astro.locals.user!;
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+// Clinic management is owner-only. Anyone else lands back on their dashboard.
+const clinic =
+  user.role === "clinic_admin" ? await getClinicForOwner(db, user.id) : null;
+if (!clinic) return Astro.redirect("/dashboard", 302);
+
+const params = Astro.url.searchParams;
+const q = {
+  error: params.get("error"),
+  assigned: params.get("assigned"),
+  dev: params.get("dev"),
+  seats: params.get("seats"),
+};
+
+const pools: PoolView[] = await listPoolsDetailed(db, clinic.id);
+
+// Courses a clinic can buy seats for: published, standalone (non-bundle) courses.
+// Bundles enroll their CHILDREN, so a per-bundle seat pool wouldn't grant access.
+const bundleIds = (
+  await db
+    .select({ id: schema.bundleItems.bundleCourseId })
+    .from(schema.bundleItems)
+    .all()
+).map((b) => b.id);
+const published = await db
+  .select({
+    id: schema.courses.id,
+    title: schema.courses.title,
+    priceCents: schema.courses.priceCents,
+  })
+  .from(schema.courses)
+  .where(eq(schema.courses.status, "published"))
+  .all();
+const purchasableCourses = published.filter((c) => !bundleIds.includes(c.id));
+
+const dollars = (cents: number) =>
+  `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+const assignmentStatusLabel: Record<string, string> = {
+  invited: "Invited",
+  active: "Joined",
+  expired: "Expired",
+  revoked: "Revoked",
+};
+
+// Headline totals across every pool (so the owner sees their footprint at a glance).
+const totals = pools.reduce(
+  (acc, p) => ({
+    purchased: acc.purchased + p.summary.purchased,
+    consumed: acc.consumed + p.summary.consumed,
+    available: acc.available + p.summary.available,
+  }),
+  { purchased: 0, consumed: 0, available: 0 },
+);
+---
+
+<Layout title="Manage your clinic" showNav={true}>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div>
+      <h1 style="margin-bottom:0.25rem">{clinic.name}</h1>
+      <p style="margin:0">
+        Buy training seats per course, then assign them to your CAs. You have
+        <strong style="color:var(--text)">{totals.available}</strong> seat{totals.available === 1 ? "" : "s"} available
+        across {pools.length} course{pools.length === 1 ? "" : "s"}.
+      </p>
+    </div>
+    <Illustration name="clinic-dashboard" maxWidth={160} />
+  </div>
+
+  {q.error && <div class="notice err">{q.error}</div>}
+  {q.assigned === "invited" && (
+    <div class="notice ok">Invite sent. The CA will get an email to claim their seat.</div>
+  )}
+  {q.assigned === "active" && (
+    <div class="notice ok">Seat granted — that CA now has access to the course.</div>
+  )}
+  {q.seats && (
+    <div class="notice ok">
+      Added {q.seats} seat{q.seats === "1" ? "" : "s"} to the pool (test mode — no charge).
+    </div>
+  )}
+  {q.dev && (
+    <div class="notice warn">
+      Dev mode (no email key set). Claim link: <a href={q.dev}>{q.dev}</a>
+    </div>
+  )}
+
+  {/* Buy seats for a course — opens (or adds to) that course's pool. */}
+  <div class="panel">
+    <h2>Buy training seats</h2>
+    <form method="POST" action="/api/clinic/seats">
+      <div class="row" style="flex-wrap:wrap">
+        <select name="courseId" aria-label="Course" style="flex:2;min-width:200px">
+          {purchasableCourses.length === 0 ? (
+            <option value="">No purchasable courses</option>
+          ) : (
+            purchasableCourses.map((c) => (
+              <option value={c.id}>
+                {c.title} — {dollars(c.priceCents)}/seat
+              </option>
+            ))
+          )}
+        </select>
+        <input
+          type="text"
+          name="count"
+          inputmode="numeric"
+          placeholder="Qty"
+          aria-label="Number of seats"
+          style="flex:0 0 5rem"
+        />
+        <button type="submit" style="margin-top:0;white-space:nowrap">Add seats</button>
+      </div>
+      <p class="muted" style="margin:0.5rem 0 0">
+        Each seat lets you grant one CA access to that course. Test mode: seats are
+        comped instantly (Stripe checkout when payment keys are set).
+      </p>
+    </form>
+  </div>
+
+  {/* One panel per course pool. */}
+  {pools.length === 0 ? (
+    <div class="panel">
+      <h2>No course seats yet</h2>
+      <p style="margin:0">
+        Buy seats for a course above, then come back here to assign them to your
+        Chiropractic Assistants.
+      </p>
+    </div>
+  ) : (
+    pools.map((p) => {
+      const visible = p.assignments.filter(
+        (a) =>
+          a.assignment.status === "invited" || a.assignment.status === "active",
+      );
+      return (
+        <div class="panel">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+            <h2 style="margin:0">{p.courseTitle}</h2>
+            <span class="muted">
+              <strong style="color:var(--text)">{p.summary.available}</strong> available
+              of {p.summary.purchased} ({p.summary.consumed} in use)
+            </span>
+          </div>
+
+          <form method="POST" action="/api/clinic/assign" style="margin-top:0.75rem">
+            <input type="hidden" name="courseId" value={p.courseId} />
+            <label>Assign a seat to a CA</label>
+            <div class="row">
+              <input
+                type="email"
+                name="email"
+                placeholder="ca@example.com"
+                disabled={p.summary.available < 1}
+                style="flex:1"
+              />
+              <button
+                type="submit"
+                disabled={p.summary.available < 1}
+                style="margin-top:0;white-space:nowrap"
+              >
+                Assign seat
+              </button>
+            </div>
+            {p.summary.available < 1 && (
+              <p class="muted" style="margin:0.4rem 0 0">
+                No seats available — buy more above to assign another CA.
+              </p>
+            )}
+          </form>
+
+          {visible.length === 0 ? (
+            <p class="muted" style="margin:0.75rem 0 0">
+              No CAs assigned to this course yet.
+            </p>
+          ) : (
+            <ol style="list-style:none;padding:0;margin:0.75rem 0 0">
+              {visible.map((r) => (
+                <li style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-top:1px solid var(--border)">
+                  <span style="flex:1">
+                    <span style="color:var(--text)">{r.legalName || r.email}</span>
+                    {r.legalName && <span class="muted"> · {r.email}</span>}
+                    <br />
+                    <span class="muted">
+                      {r.assignment.status === "active"
+                        ? r.intakeCompletedAt
+                          ? "Onboarded — in training"
+                          : "Joined — finishing intake"
+                        : "Invited — not claimed yet"}
+                    </span>
+                  </span>
+                  <span
+                    style={`font-size:0.8rem;color:${r.assignment.status === "active" ? "var(--ok)" : "var(--warn)"}`}
+                  >
+                    {assignmentStatusLabel[r.assignment.status]}
+                  </span>
+                  {r.assignment.status === "invited" && (
+                    <form method="POST" action="/api/clinic/revoke" style="margin:0">
+                      <input type="hidden" name="assignmentId" value={r.assignment.id} />
+                      <button class="link" type="submit" style="color:var(--muted)">
+                        Revoke
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      );
+    })
+  )}
+</Layout>
