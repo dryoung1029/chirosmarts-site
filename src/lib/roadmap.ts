@@ -134,6 +134,14 @@ export async function getUserRoadmap(db: Db, userId: string) {
           .where(eq(schema.courses.id, tstep.courseId))
           .get();
         if (course) href = `/learn/${course.slug}`;
+      } else if (
+        // Clinic-management steps (buy seats / invite / track) all live on the
+        // dedicated /clinic page. Point any non-locked step there beyond setup.
+        template?.slug === "oregon-clinic-owner" &&
+        step.status !== "locked" &&
+        step.position > 1
+      ) {
+        href = "/clinic";
       }
       steps.push({ ...step, href });
     }
