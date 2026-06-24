@@ -29,12 +29,31 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 
 #### Copy status — owner copy is now IN (`src/config/marketing.ts`, `COURSE_MARKETING`, guides, course descriptions). Two registries remain:
 
-**`[VERIFY]` launch blockers** — owner-flagged factual/regulatory claims, kept verbatim & visible; the site must NOT truly launch with any of these unresolved (each renders as a visible flag):
-- Instructor bio: years in practice (`[VERIFY]`).
-- Homepage FAQ: duties-before-certification framing; OBCE fee link/list; legacy-records promise.
-- Course (`oregon-ca-initial`) requirements table: confirm every "Oregon requires" row vs current OAR (the page's biggest claim surface); course FAQ "accepted by the Oregon board" approval phrasing.
-- Renewal page + Guide 2: lapse-consequence phrasing, the 6-hour topic breakdown rows, reinstatement process/fee, board submission fee/method, birth-month deadline rule.
-- Guide 1: the requirements list vs OAR, hands-on required topics, application steps/fee/fingerprint vendor, exam format/score/fee/retakes, accepted BLS providers, state fee amounts, BLS price range.
+**`[VERIFY]` launch blockers — ✅ ALL RESOLVED (2026-06-24).** Owner certified
+these against **oregon.gov/obce as the canonical source** (and his own bio
+facts); every live `[VERIFY]` flag is removed. Record of what was decided:
+- Instructor bio: practicing in Corvallis **since 2008**; NBCE title corrected to
+  **"at-large director"** (bio, credentials, "Who's behind this" FAQ, both guide
+  frontmatters).
+- Homepage FAQ: duties-before-certification framing confirmed; cost answer now
+  cites **$175** initial OBCE application (incl. $45 Fieldprint background) +
+  oregon.gov/obce; legacy-records Q makes **no record-keeping promise** — points
+  to the **/verify** certificate-verification page instead.
+- Course (`oregon-ca-initial`): all six requirements-table rows confirmed vs OBCE
+  (flag removed); "accepted by the board" FAQ reworded to **"Dr. Young is an
+  authorized trainer for the OBCE CA initial training."**
+- Renewal page + Guide 2: birth-month deadline confirmed; **6 CE hrs/yr**;
+  **vitals = 2 hrs EVERY year** (corrected from first-renewal-only, per OBCE);
+  cultural competency 1 hr/yr; grace ($25/30 days) + $75 late + 12-month
+  reinstatement-then-reapply; renewal fee **$117 + $2 OHA survey**.
+- Guide 1: requirements list, hands-on topics (hydro/electro/physiotherapy),
+  online application + **Fieldprint** vendor, **open-book NBCE** exam, $175/$45
+  fees. BLS softened to OBCE's wording (**BLS/AED/CPR from a recognized provider
+  within the first year** — OBCE lists no providers/format).
+- `src/config/oregon-renewal.ts`: `firstRenewalHours`/`subsequentRenewalHours`
+  now **6** (was null); `requirementsNote` filled (cultural competency + vitals).
+- Soft non-OBCE estimate left as-is (not a regulatory claim): Guide 1 BLS price
+  **"$50–90"**.
 
 **Still pending owner inputs** (render as `[OWNER COPY]` chips or are omitted):
 - **Stats** — kept EMPTY (owner's numeric stats were `[VERIFY]`; "only real numbers can ship"). Fill `OWNER.stats` with confirmed figures to show the bar.
