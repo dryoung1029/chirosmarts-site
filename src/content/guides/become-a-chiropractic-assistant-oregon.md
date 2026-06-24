@@ -49,7 +49,7 @@ The certification exam is an open-book exam administered through the National Bo
 
 ## Step 6: Get BLS/CPR certified within your first year
 
-Within your first certified year, you need Basic Life Support certification — the in-person kind with a manikin, from a recognized provider, not an online-only card. **[VERIFY accepted providers]** Book it early; it's the requirement people forget until the deadline.
+Within your first certified year, you need BLS/AED/CPR certification from a recognized provider. Book it early; it's the requirement people forget until the deadline.
 
 ## What it costs
 
@@ -65,7 +65,7 @@ The training itself: as little as a week — two or three evenings for the 8 onl
 
 ## After you're certified: the part nobody tells you
 
-Your certification renews **every year on the last day of your birth month**, with 6 hours of continuing education each year — including specific required topics (cultural competency every year; vitals training at your first renewal). Most lapses aren't laziness — they're CAs who simply never knew their deadline. Put it somewhere that reminds you. (If you train with us, your dashboard tracks it and emails you at 60, 30, and 14 days automatically, every year.)
+Your certification renews **every year on the last day of your birth month**, with 6 hours of continuing education each year — including specific required topics (1 hour of cultural competency and 2 hours of vitals training every year). Most lapses aren't laziness — they're CAs who simply never knew their deadline. Put it somewhere that reminds you. (If you train with us, your dashboard tracks it and emails you at 60, 30, and 14 days automatically, every year.)
 
 ## Start tonight, free
 

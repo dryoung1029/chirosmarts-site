@@ -20,7 +20,7 @@ Oregon CA certifications expire annually on the **last day of your birth month**
 Each renewal year requires **6 hours of continuing education**, and they're not a free-for-all:
 
 - **1 hour of cultural competency** — required every year.
-- **2 hours of vitals training** — required at your *first* renewal. **[VERIFY: OBCE's summary lists 2 vitals hours within the annual 6 — confirm whether vitals is first-renewal-only or every year.]**
+- **2 hours of vitals training** — required every year.
 - The remaining hours: qualifying CE relevant to your role.
 
 The required topics are where renewals go wrong — a CA takes six general hours, then learns at submission that the cultural competency hour is missing. Check the topic requirements *before* choosing courses, or take a bundle assembled to satisfy them. (Our Annual Renewal Bundle is exactly that: 6 hours including the required vitals and cultural competency, $89, finished in about two evenings.)
