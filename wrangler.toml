@@ -16,7 +16,7 @@ pages_build_output_dir = "./dist"
 [vars]
 SITE_URL = "https://chirosmarts-site.pages.dev"
 # Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
-ADMIN_EMAILS = "dryoung1029@gmail.com"
+ADMIN_EMAILS = "contact@chirosmarts.com"
 
 # --- D1 (database) ---
 [[d1_databases]]
