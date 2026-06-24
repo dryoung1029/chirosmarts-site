@@ -2,6 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import Illustration from "@/components/marketing/Illustration.astro";
 import RoadmapList from "@/components/RoadmapList.astro";
+import HelpTip from "@/components/HelpTip.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getClinicForOwner, getRoster } from "@/lib/clinic";
@@ -114,7 +115,7 @@ const totals = pools.reduce(
 
   {/* Buy seats for a course — opens (or adds to) that course's pool. */}
   <div class="panel">
-    <h2>Buy training seats</h2>
+    <h2>Buy training seats<HelpTip label="What is a training seat?" article="buying-and-assigning-seats">A seat lets you grant one CA access to one course. Seats live in a pool per course — buy what you need, then assign them.</HelpTip></h2>
     <form method="POST" action="/api/clinic/seats">
       <div class="row" style="flex-wrap:wrap">
         <select name="courseId" aria-label="Course" style="flex:2;min-width:200px">
@@ -240,7 +241,7 @@ const totals = pools.reduce(
 
   {/* Transfer the manager role (turnover). */}
   <div class="panel" style="border-color:var(--border)">
-    <h2>Transfer clinic manager</h2>
+    <h2>Transfer clinic manager<HelpTip label="What does transferring do?" article="transferring-your-clinic">Hands full clinic control to a new manager immediately. You keep your own training but become a regular account. Seats and CA assignments move with the clinic.</HelpTip></h2>
     <p class="muted" style="margin-top:0">
       Hand this clinic over to someone else — e.g. when you leave or change roles.
       The new manager gets full access to seats and CAs; you become a regular

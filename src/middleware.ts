@@ -42,6 +42,9 @@ function isPublic(pathname: string): boolean {
     pathname === "/sitemap.xml"
   )
     return true;
+  // Help Center (articles + contact form) is open to everyone, incl. prospects.
+  if (pathname === "/help" || pathname.startsWith("/help/")) return true;
+  if (pathname === "/api/help/contact") return true;
   // Funnel: lead capture, double-opt-in confirm, and gated asset download.
   if (pathname === "/api/leads/capture") return true;
   if (pathname === "/leads/confirm") return true;
