@@ -51,7 +51,7 @@ export const OWNER = {
     },
     {
       q: "I was certified years ago through ChiroSmarts. Do you still have my records?",
-      a: "Reach out — we can help you locate your training history. [VERIFY what you can actually promise for legacy records before publishing this answer]",
+      a: "Every ChiroSmarts certificate carries a verification code that stays valid. You, an employer, or the board can confirm a past certification anytime on our public certificate verification page — just visit /verify and enter the code.",
     },
     {
       q: "Who's behind this?",
