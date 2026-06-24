@@ -2,7 +2,7 @@
 title: How to Become a Chiropractic Assistant in Oregon (Complete Guide)
 description: The complete path to becoming a certified chiropractic assistant in Oregon — the role, exactly what the state requires, every step in order, what it costs, and how long it really takes.
 author: Jason Young, DC
-authorCredentials: Oregon chiropractor · former director, National Board of Chiropractic Examiners
+authorCredentials: Oregon chiropractor · former at-large director, National Board of Chiropractic Examiners
 lastUpdated: "[ADD DATE]"
 relatedCourse: oregon-ca-initial
 ---
@@ -15,7 +15,7 @@ A chiropractic assistant is far more than a front-desk role. Depending on the cl
 
 ## The requirements at a glance
 
-To become a certified Oregon CA, you will: **[VERIFY this list against current OAR before publishing]**
+To become a certified Oregon CA, you will:
 
 1. Complete **12 hours of training** — 8 hours of didactic (classroom-style) instruction plus 4 hands-on hours with a supervising chiropractor.
 2. **Apply to the OBCE**, including fingerprinting for a background check.
@@ -37,15 +37,15 @@ Two practical tips. First, your training hours are a compliance record — make 
 
 ## Step 3: Complete the 4 hands-on hours with your supervising chiropractor
 
-These hours happen at your clinic, with your doctor, covering hands-on skills like hydrotherapy, electrotherapy, and physiotherapy setup. **[VERIFY current required topics]** They must be documented in a signed training log. The most common failure point here is disorganization — nobody is sure what the session must cover, and the log gets filled out from memory weeks later. Fix that by walking in with a checklist and the log ready to sign. (ChiroSmarts sends your doctor a prep packet and gives you the signable log automatically when you add them during signup.)
+These hours happen at your clinic, with your doctor, covering the hands-on skills Oregon requires: hydrotherapy, electrotherapy, and physiotherapy. They must be documented in a signed training log. The most common failure point here is disorganization — nobody is sure what the session must cover, and the log gets filled out from memory weeks later. Fix that by walking in with a checklist and the log ready to sign. (ChiroSmarts sends your doctor a prep packet and gives you the signable log automatically when you add them during signup.)
 
 ## Step 4: Apply to the OBCE and complete fingerprinting
 
-With training documented, you apply to the board: the application, your training documentation, and a fingerprint-based background check. **[VERIFY current application steps, fee, and fingerprinting vendor]** Processing takes time, so submit promptly — this step is usually the longest part of the calendar, and none of it is in your control. While you wait: study.
+With training documented, you apply to the board through the OBCE's online portal: the application, your training documentation, a passport-type photo, and a fingerprint-based background check (Oregon uses Fieldprint for fingerprinting). Processing takes time, so submit promptly — this step is usually the longest part of the calendar, and none of it is in your control. While you wait: study.
 
 ## Step 5: Pass the state certification exam
 
-The certification exam is administered through the National Board of Chiropractic Examiners and is separate from any exam inside your training course. **[VERIFY format, pass score, fee, retake policy]** It covers the content of your training. Prepare by reviewing your course materials and practicing with questions in the same style — cramming the night before is the avoidable mistake.
+The certification exam is an open-book exam administered through the National Board of Chiropractic Examiners, and is separate from any exam inside your training course. It covers the content of your training. Prepare by reviewing your course materials and practicing with questions in the same style — cramming the night before is the avoidable mistake.
 
 ## Step 6: Get BLS/CPR certified within your first year
 
@@ -54,8 +54,8 @@ Within your first certified year, you need Basic Life Support certification — 
 ## What it costs
 
 - Training: $149 with ChiroSmarts (first module free); other providers range significantly higher.
-- State application, fingerprinting, and exam fees: paid to the board and its vendors — **[VERIFY and list current amounts]**
-- BLS/CPR: typically $50–90 depending on provider. **[VERIFY range]**
+- State certification application: $175 total to the OBCE, which includes the $45 Fieldprint background report; the open-book certification exam is administered by the NBCE.
+- BLS/CPR: typically $50–90 depending on provider.
 
 Many clinics reimburse or pay these directly — ask. (Clinics: you can buy training seats for staff directly.)
 

@@ -31,7 +31,7 @@ export const OWNER = {
   homepageFaq: [
     {
       q: "Do I need this training before I can work in a chiropractic office?",
-      a: "You can be hired first — most CAs are. But Oregon requires certification before you perform clinical duties like therapies, so most clinics want you certified quickly. Our students typically finish the online training within a week of starting. [VERIFY framing against current OBCE rule on duties prior to certification]",
+      a: "You can be hired first — most CAs are. But Oregon requires certification before you perform clinical duties like therapies, so most clinics want you certified quickly. Our students typically finish the online training within a week of starting.",
     },
     {
       q: "Is this the official Oregon certification?",
@@ -43,7 +43,7 @@ export const OWNER = {
     },
     {
       q: "How much does it cost?",
-      a: "Initial certification training is $149, and Module 1 is free before you pay anything. Renewal courses run $29–89. State application and exam fees are paid separately to the board. [VERIFY: link or list current OBCE fees]",
+      a: "Initial certification training is $149, and Module 1 is free before you pay anything. Renewal courses run $29–89. Your state certification fee is paid separately to the Oregon Board of Chiropractic Examiners — currently $175 for initial certification (which includes your background check). See the OBCE Chiropractic Assistant page (oregon.gov/obce) for current fees and to apply.",
     },
     {
       q: "What if it's not for me?",
@@ -112,12 +112,10 @@ export const COURSE_MARKETING: Record<
           "Your renewal date tracked automatically by birth month, with reminder emails and a one-click renewal bundle",
       },
     ],
-    requirementsVerify:
-      "[VERIFY] Confirm each “Oregon requires” row against current OAR language before launch — this table is the page's biggest claim surface.",
     faqs: [
       {
         q: "Is this course accepted by the Oregon board?",
-        a: "This course is built to Oregon's didactic-hour requirement and has been used by Oregon CAs for over a decade. [VERIFY exact acceptable approval phrasing — this is the one answer to be most careful with.]",
+        a: "Yes. This course is provided by Dr. Jason Young, an authorized trainer for the OBCE chiropractic-assistant initial training, and it meets Oregon's 8-hour didactic requirement. It has been used by Oregon CAs for over a decade.",
       },
       {
         q: "Can I really try it free?",
