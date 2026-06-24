@@ -5,15 +5,16 @@ import RoadmapList from "@/components/RoadmapList.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
-import { getCaMembershipForUser, type CaMembership } from "@/lib/clinic";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
 
-// This is the STUDENT dashboard. Clinic-management content (the "Train Your CAs"
-// roadmap + seat tools) lives on its own page (/clinic), so we drop the clinic
-// roadmap here and show students only their own training paths.
+// This is the STUDENT dashboard — TRAINING ONLY. Every clinic-side thing (the
+// "Train Your CAs" roadmap, seat tools, and the "which clinic am I a CA at"
+// context) lives on its own screen (/clinic). Nothing clinic-related renders
+// here, so a person who is both a student and a clinic owner sees two clean,
+// separate screens instead of one mixed one.
 const isClinicOwner = user.role === "clinic_admin";
 const roadmap = (await getUserRoadmap(db, user.id)).filter(
   ({ template }) => template?.slug !== "oregon-clinic-owner",
@@ -34,11 +35,6 @@ const myCourses = await db
 const activeCourses = myCourses.filter(
   (c) => c.status === "active" || c.status === "completed",
 );
-
-// Staff CAs (not owners) see which clinic they belong to.
-const caMembership: CaMembership | null = isClinicOwner
-  ? null
-  : await getCaMembershipForUser(db, user.id);
 
 const justTransferred = Astro.url.searchParams.get("transferred") === "1";
 const readOnlyBlocked =
@@ -101,36 +97,6 @@ const months = [
       )
     }
   </div>
-
-  {
-    isClinicOwner && (
-      <a
-        href="/clinic"
-        class="panel"
-        style="display:flex;align-items:center;justify-content:space-between;gap:1rem;text-decoration:none;border-color:var(--brand)"
-      >
-        <span class="muted" style="margin:0">
-          Looking for clinic management? Buy seats and track your CAs on your
-          <strong style="color:var(--text)"> clinic dashboard</strong>.
-        </span>
-        <span style="white-space:nowrap;color:var(--brand);font-weight:600">Clinic →</span>
-      </a>
-    )
-  }
-
-  {
-    caMembership && (
-      <div class="panel">
-        <h2 style="margin:0">Your clinic</h2>
-        <p style="margin:0.4rem 0 0">
-          You're a CA at <strong style="color:var(--text)">{caMembership.clinic.name}</strong>.
-          {activeCourses.length > 0
-            ? " Your training is below — keep working through your roadmap."
-            : " When your clinic assigns you a course seat, it'll appear above."}
-        </p>
-      </div>
-    )
-  }
 
   {
     roadmap.length === 0 && !isClinicOwner && (
