@@ -33,6 +33,40 @@ export async function getClinicForOwner(
   return row ?? null;
 }
 
+/** A claimed CA's clinic membership (their staff link), or null. */
+export interface CaMembership {
+  clinic: Clinic;
+  member: ClinicMember;
+}
+
+/**
+ * The clinic a user belongs to as a CA (an active, claimed staff membership), or
+ * null. Used to show clinic context on a staff member's own dashboard.
+ */
+export async function getCaMembershipForUser(
+  db: Db,
+  userId: string,
+): Promise<CaMembership | null> {
+  const member = await db
+    .select()
+    .from(schema.clinicMembers)
+    .where(
+      and(
+        eq(schema.clinicMembers.userId, userId),
+        eq(schema.clinicMembers.role, "ca"),
+        eq(schema.clinicMembers.status, "active"),
+      ),
+    )
+    .get();
+  if (!member) return null;
+  const clinic = await db
+    .select()
+    .from(schema.clinics)
+    .where(eq(schema.clinics.id, member.clinicId))
+    .get();
+  return clinic ? { clinic, member } : null;
+}
+
 /**
  * Create a clinic for an owner if they don't already have one. Idempotent per
  * owner. Also records the owner's own `owner` membership row.

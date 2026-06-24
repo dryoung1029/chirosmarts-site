@@ -4,7 +4,11 @@ import Illustration from "@/components/marketing/Illustration.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
-import { getClinicForOwner } from "@/lib/clinic";
+import {
+  getClinicForOwner,
+  getCaMembershipForUser,
+  type CaMembership,
+} from "@/lib/clinic";
 import { listPoolsDetailed } from "@/lib/seat-pools";
 
 const user = Astro.locals.user!;
@@ -45,6 +49,11 @@ if (user.role === "clinic_admin") {
     );
   }
 }
+
+// Staff CAs (not owners) see which clinic they belong to.
+const caMembership: CaMembership | null = clinic
+  ? null
+  : await getCaMembershipForUser(db, user.id);
 
 const months = [
   "", "January", "February", "March", "April", "May", "June",
@@ -129,6 +138,20 @@ const statusColor: Record<string, string> = {
   }
 
   {
+    caMembership && (
+      <div class="panel">
+        <h2 style="margin:0">Your clinic</h2>
+        <p style="margin:0.4rem 0 0">
+          You're a CA at <strong style="color:var(--text)">{caMembership.clinic.name}</strong>.
+          {activeCourses.length > 0
+            ? " Your training is below — keep working through your roadmap."
+            : " When your clinic assigns you a course seat, it'll appear above."}
+        </p>
+      </div>
+    )
+  }
+
+  {
     roadmap.length === 0 && !clinic && (
       <div class="panel">
         <h2>No roadmap yet</h2>
@@ -174,8 +197,4 @@ const statusColor: Record<string, string> = {
     ))
   }
 
-  <p class="muted">
-    More is coming: your course player and progress tracking arrive in the next
-    build (M2).
-  </p>
 </Layout>
