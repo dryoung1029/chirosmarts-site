@@ -55,6 +55,10 @@ const caMembership: CaMembership | null = clinic
   ? null
   : await getCaMembershipForUser(db, user.id);
 
+const justTransferred = Astro.url.searchParams.get("transferred") === "1";
+const readOnlyBlocked =
+  Astro.url.searchParams.get("impersonation_readonly") === "1";
+
 const months = [
   "", "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -77,6 +81,17 @@ const statusColor: Record<string, string> = {
 ---
 
 <Layout title="Your roadmap" showNav={true}>
+  {justTransferred && (
+    <div class="panel" style="border-color:var(--ok);color:var(--ok)">
+      Clinic transferred. You're no longer the manager of that clinic.
+    </div>
+  )}
+  {readOnlyBlocked && (
+    <div class="panel" style="border-color:var(--warn);color:var(--warn)">
+      That action is disabled while viewing as another user (read-only preview).
+    </div>
+  )}
+
   <h1>Welcome back, {user.displayName || user.legalName || "there"}</h1>
   <p>
     {user.birthMonth

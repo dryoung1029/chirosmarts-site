@@ -12,6 +12,8 @@ import { LEGAL } from "@/config/legal";
 const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
 const isClinicOwner = user?.role === "clinic_admin";
 const legalEntity = LEGAL.entityName;
+const impersonating = Astro.locals.impersonating;
+const realUser = Astro.locals.realUser;
 // Highlight the active top-level section.
 const path = Astro.url.pathname;
 const isActive = (prefix: string) =>
@@ -67,6 +69,29 @@ const isActive = (prefix: string) =>
     </style>
   </head>
   <body>
+    {
+      impersonating && (
+        <div style="background:var(--warn);color:#fff;padding:0.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-size:0.9rem">
+          <span>
+            👁 Viewing as{" "}
+            <strong>{user?.displayName || user?.legalName || user?.email}</strong>{" "}
+            (read-only preview)
+            {realUser && (
+              <span style="opacity:0.85"> · signed in as {realUser.email}</span>
+            )}
+          </span>
+          <form method="POST" action="/api/impersonate/stop" style="margin:0">
+            <button
+              class="link"
+              type="submit"
+              style="margin:0;color:#fff;text-decoration:underline;font-weight:600"
+            >
+              Exit preview
+            </button>
+          </form>
+        </div>
+      )
+    }
     {
       showNav && (
         <nav class="nav">
