@@ -17,6 +17,11 @@ pages_build_output_dir = "./dist"
 SITE_URL = "https://chirosmarts-site.pages.dev"
 # Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
 ADMIN_EMAILS = "contact@chirosmarts.com"
+# Transactional "From" for ALL Resend mail (magic links, receipts, certs).
+# REQUIRES chirosmarts.com to be a VERIFIED domain in Resend before deploying —
+# sending from an unverified domain makes Resend reject every message.
+EMAIL_FROM = "ChiroSmarts <noreply@chirosmarts.com>"
+EMAIL_REPLY_TO = "contact@chirosmarts.com"
 
 # --- D1 (database) ---
 [[d1_databases]]
