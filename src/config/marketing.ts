@@ -24,8 +24,8 @@ export const OWNER = {
   instructor: {
     name: "Jason Young, DC",
     credentials:
-      "Chiropractic physician · Former director, National Board of Chiropractic Examiners",
-    bio: "Dr. Young has practiced in Corvallis, Oregon for [VERIFY] years and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as a director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
+      "Chiropractic physician · Former at-large director, National Board of Chiropractic Examiners",
+    bio: "Dr. Young has practiced in Corvallis, Oregon since 2008 and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as an at-large director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
     photo: null as string | null,
   },
   homepageFaq: [
@@ -55,7 +55,7 @@ export const OWNER = {
     },
     {
       q: "Who's behind this?",
-      a: "Dr. Jason Young — an Oregon chiropractor in active practice who has trained Oregon CAs for over a decade and previously served as a director of the National Board of Chiropractic Examiners. You're learning the requirements from someone who has worked on both sides of them.",
+      a: "Dr. Jason Young — an Oregon chiropractor in active practice who has trained Oregon CAs for over a decade and previously served as an at-large director of the National Board of Chiropractic Examiners. You're learning the requirements from someone who has worked on both sides of them.",
     },
   ] as { q: string; a: string }[],
   clinics: {
