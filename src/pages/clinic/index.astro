@@ -1,9 +1,11 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Illustration from "@/components/marketing/Illustration.astro";
+import RoadmapList from "@/components/RoadmapList.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getClinicForOwner, getRoster } from "@/lib/clinic";
+import { getUserRoadmap } from "@/lib/roadmap";
 import { listPoolsDetailed, type PoolView } from "@/lib/seat-pools";
 
 const user = Astro.locals.user!;
@@ -14,6 +16,13 @@ const db = getDb(env);
 const clinic =
   user.role === "clinic_admin" ? await getClinicForOwner(db, user.id) : null;
 if (!clinic) return Astro.redirect("/dashboard", 302);
+
+// The clinic-management roadmap ("Train Your CAs") lives here, not on the
+// student dashboard — it's the owner's at-a-glance progress through setup →
+// buy seats → invite → track.
+const clinicRoadmap = (await getUserRoadmap(db, user.id)).filter(
+  ({ template }) => template?.slug === "oregon-clinic-owner",
+);
 
 // CAs who have joined (claimed an account) — eligible to be promoted to manager.
 const claimedCas = (await getRoster(db, clinic.id)).filter(
@@ -82,6 +91,8 @@ const totals = pools.reduce(
     </div>
     <Illustration name="clinic-dashboard" maxWidth={160} />
   </div>
+
+  <RoadmapList roadmap={clinicRoadmap} />
 
   {q.error && <div class="notice err">{q.error}</div>}
   {q.assigned === "invited" && (
