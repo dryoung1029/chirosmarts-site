@@ -3,7 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import Illustration from "@/components/marketing/Illustration.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
-import { getClinicForOwner } from "@/lib/clinic";
+import { getClinicForOwner, getRoster } from "@/lib/clinic";
 import { listPoolsDetailed, type PoolView } from "@/lib/seat-pools";
 
 const user = Astro.locals.user!;
@@ -14,6 +14,11 @@ const db = getDb(env);
 const clinic =
   user.role === "clinic_admin" ? await getClinicForOwner(db, user.id) : null;
 if (!clinic) return Astro.redirect("/dashboard", 302);
+
+// CAs who have joined (claimed an account) — eligible to be promoted to manager.
+const claimedCas = (await getRoster(db, clinic.id)).filter(
+  (m) => m.status === "active" && m.userId,
+);
 
 const params = Astro.url.searchParams;
 const q = {
@@ -221,4 +226,45 @@ const totals = pools.reduce(
       );
     })
   )}
+
+  {/* Transfer the manager role (turnover). */}
+  <div class="panel" style="border-color:var(--border)">
+    <h2>Transfer clinic manager</h2>
+    <p class="muted" style="margin-top:0">
+      Hand this clinic over to someone else — e.g. when you leave or change roles.
+      The new manager gets full access to seats and CAs; you become a regular
+      account. This takes effect immediately.
+    </p>
+    <form
+      method="POST"
+      action="/api/clinic/transfer"
+      onsubmit="return confirm('Transfer this clinic to the selected person? You will no longer manage it.')"
+    >
+      {claimedCas.length > 0 && (
+        <>
+          <label for="memberId">Promote one of your CAs</label>
+          <select id="memberId" name="memberId" style="width:100%">
+            <option value="">— select a CA —</option>
+            {claimedCas.map((m) => (
+              <option value={m.id}>{m.email}</option>
+            ))}
+          </select>
+          <p class="muted" style="margin:0.75rem 0 0.25rem">— or —</p>
+        </>
+      )}
+      <label for="newOwnerEmail">Hand off to a new email</label>
+      <input
+        id="newOwnerEmail"
+        type="email"
+        name="email"
+        placeholder="new-manager@example.com"
+        style="width:100%"
+      />
+      <p class="muted" style="margin:0.4rem 0 0">
+        If they don't have an account yet, we'll create one and email them a
+        sign-in link. Leave the dropdown empty when handing off by email.
+      </p>
+      <button type="submit" style="margin-top:1rem">Transfer clinic</button>
+    </form>
+  </div>
 </Layout>
