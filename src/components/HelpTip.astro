@@ -1,0 +1,75 @@
+---
+/**
+ * Contextual "?" help. Renders a small inline button that opens a short
+ * explanation in a light-dismiss popover (native HTML Popover API — zero JS).
+ * Optionally deep-links to a full Help Center article.
+ *
+ *   <HelpTip label="What is seat time?" article="how-seat-time-works">
+ *     Credit is based on the unique content you watch, not time on the page.
+ *   </HelpTip>
+ */
+interface Props {
+  /** Accessible label for the trigger (what the tip explains). */
+  label?: string;
+  /** Optional Help Center article slug to link to ("Learn more →"). */
+  article?: string;
+}
+const { label = "More info", article } = Astro.props;
+const id = `help-tip-${crypto.randomUUID()}`;
+---
+
+<span class="help-tip-wrap">
+  <button
+    type="button"
+    class="help-tip-btn"
+    popovertarget={id}
+    aria-label={label}
+    title={label}>?</button>
+  <span id={id} popover="auto" class="help-tip-pop" role="note">
+    <span class="help-tip-body"><slot /></span>
+    {article && (
+      <a class="help-tip-link" href={`/help/${article}`}>Learn more →</a>
+    )}
+  </span>
+</span>
+
+<style>
+  .help-tip-wrap { display: inline; }
+  .help-tip-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0 0 0 0.25rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .help-tip-btn:hover { color: var(--text); border-color: var(--muted); }
+  .help-tip-pop {
+    max-width: 22rem;
+    margin: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .help-tip-body { color: var(--muted); }
+  .help-tip-link {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+</style>

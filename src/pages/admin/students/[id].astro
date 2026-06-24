@@ -68,6 +68,13 @@ const flash = Astro.url.searchParams.get("done");
     intake {student.intakeCompletedAt ? formatPacific(student.intakeCompletedAt, { dateStyle: "medium" }) : "not completed"}
   </p>
 
+  <form method="POST" action="/api/impersonate" style="margin:0 0 0.5rem">
+    <input type="hidden" name="userId" value={userId} />
+    <button class="btn-secondary" type="submit" style="margin:0">
+      👁 View as this user (read-only)
+    </button>
+  </form>
+
   {flash && (
     <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>
   )}

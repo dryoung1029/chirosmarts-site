@@ -48,5 +48,9 @@ declare namespace App {
     // Populated by src/middleware.ts on every request.
     user: import("@/lib/auth/session").SessionUser | null;
     sessionId: string | null;
+    // Admin impersonation: when an admin is "viewing as" another user, `user` is
+    // the impersonated target, `realUser` is the admin, and `impersonating` true.
+    realUser: import("@/lib/auth/session").SessionUser | null;
+    impersonating: boolean;
   }
 }

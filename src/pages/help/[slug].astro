@@ -1,0 +1,74 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getCollection, getEntry, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const articles = await getCollection("help");
+  return articles.map((a) => ({ params: { slug: a.id } }));
+}
+
+const { slug } = Astro.params;
+const entry = await getEntry("help", slug!);
+if (!entry) return Astro.redirect("/help", 302);
+
+// Admin-only articles are not reachable by non-admins.
+const isAdmin = Astro.locals.user?.role === "site_admin";
+if (entry.data.audience === "admin" && !isAdmin) return Astro.redirect("/help", 302);
+
+const { Content } = await render(entry);
+
+// Resolve related articles (drop any that don't exist or are admin-gated).
+const related = [];
+for (const rel of entry.data.related ?? []) {
+  const r = await getEntry("help", rel);
+  if (r && (r.data.audience !== "admin" || isAdmin)) related.push(r);
+}
+---
+
+<Layout title={`${entry.data.title} · Help`} showNav={true}>
+  <p style="margin:0 0 0.75rem">
+    <a href="/help" style="font-size:0.9rem">← Help Center</a>
+  </p>
+
+  <article class="panel" style="line-height:1.7">
+    <h1 style="margin-bottom:0.5rem">{entry.data.title}</h1>
+    <p class="muted" style="margin:0 0 1.25rem">{entry.data.summary}</p>
+    <div class="help-body">
+      <Content />
+    </div>
+  </article>
+
+  {
+    related.length > 0 && (
+      <div class="panel">
+        <h2>Related</h2>
+        <ul style="list-style:none;padding:0;margin:0">
+          {related.map((r) => (
+            <li style="padding:0.6rem 0;border-top:1px solid var(--border)">
+              <a href={`/help/${r.id}`} style="font-weight:600;text-decoration:none">{r.data.title}</a>
+              <p class="muted" style="margin:0.2rem 0 0">{r.data.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  <div class="panel" style="border-color:var(--brand)">
+    <p style="margin:0 0 0.75rem">Didn't answer your question?</p>
+    <a class="btn" href="/help/contact" style="margin:0">Contact support →</a>
+  </div>
+
+  <style>
+    .help-body :global(h2) { font-size: 1.15rem; margin: 1.6rem 0 0.5rem; }
+    .help-body :global(h3) { font-size: 1rem; margin: 1.2rem 0 0.4rem; }
+    .help-body :global(p) { color: var(--muted); }
+    .help-body :global(ul), .help-body :global(ol) { color: var(--muted); padding-left: 1.25rem; }
+    .help-body :global(li) { margin: 0.3rem 0; }
+    .help-body :global(blockquote) {
+      margin: 1rem 0; padding: 0.5rem 0 0.5rem 1rem;
+      border-left: 3px solid var(--border); color: var(--muted);
+    }
+    .help-body :global(a) { color: var(--brand); }
+  </style>
+</Layout>

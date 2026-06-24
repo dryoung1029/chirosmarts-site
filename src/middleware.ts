@@ -10,6 +10,11 @@
 import { defineMiddleware } from "astro:middleware";
 import { getDb } from "@/db/client";
 import { getSessionUser } from "@/lib/auth/session";
+import {
+  getImpersonationTargetId,
+  getUserById,
+  clearImpersonation,
+} from "@/lib/auth/impersonation";
 import { isAdmin } from "@/lib/admin";
 
 // Routes reachable without a session.
@@ -37,6 +42,9 @@ function isPublic(pathname: string): boolean {
     pathname === "/sitemap.xml"
   )
     return true;
+  // Help Center (articles + contact form) is open to everyone, incl. prospects.
+  if (pathname === "/help" || pathname.startsWith("/help/")) return true;
+  if (pathname === "/api/help/contact") return true;
   // Funnel: lead capture, double-opt-in confirm, and gated asset download.
   if (pathname === "/api/leads/capture") return true;
   if (pathname === "/leads/confirm") return true;
@@ -54,6 +62,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { locals, cookies, url, redirect } = context;
   locals.user = null;
   locals.sessionId = null;
+  locals.realUser = null;
+  locals.impersonating = false;
 
   const env = locals.runtime?.env;
   if (env?.DB) {
@@ -61,11 +71,41 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const resolved = await getSessionUser(db, cookies);
     if (resolved) {
       locals.user = resolved.user;
+      locals.realUser = resolved.user;
       locals.sessionId = resolved.sessionId;
+
+      // Admin "view as": honour the impersonation cookie only when the REAL
+      // session user is an admin. `user` becomes the target; `realUser` stays
+      // the admin. A non-admin's forged cookie is ignored (and cleared).
+      const targetId = getImpersonationTargetId(cookies);
+      if (targetId && targetId !== resolved.user.id) {
+        if (isAdmin(env, resolved.user)) {
+          const target = await getUserById(db, targetId);
+          if (target) {
+            locals.user = target;
+            locals.impersonating = true;
+          } else {
+            clearImpersonation(cookies);
+          }
+        } else {
+          clearImpersonation(cookies);
+        }
+      }
     }
   }
 
   const path = url.pathname;
+
+  // Impersonation is READ-ONLY: block state-changing requests while active so no
+  // action is taken as the impersonated user. Exit (stop) is the only exception.
+  if (
+    locals.impersonating &&
+    context.request.method !== "GET" &&
+    context.request.method !== "HEAD" &&
+    path !== "/api/impersonate/stop"
+  ) {
+    return redirect("/dashboard?impersonation_readonly=1", 303);
+  }
 
   // Not signed in + private route → login.
   if (!locals.user && !isPublic(path)) {

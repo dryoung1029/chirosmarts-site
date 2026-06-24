@@ -16,6 +16,8 @@ import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import { newId } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
+import { logEvent } from "@/lib/events";
+import { findOrCreateUserByEmail } from "@/lib/auth/users";
 
 export type Clinic = typeof schema.clinics.$inferSelect;
 export type ClinicMember = typeof schema.clinicMembers.$inferSelect;
@@ -31,6 +33,40 @@ export async function getClinicForOwner(
     .where(eq(schema.clinics.ownerUserId, ownerUserId))
     .get();
   return row ?? null;
+}
+
+/** A claimed CA's clinic membership (their staff link), or null. */
+export interface CaMembership {
+  clinic: Clinic;
+  member: ClinicMember;
+}
+
+/**
+ * The clinic a user belongs to as a CA (an active, claimed staff membership), or
+ * null. Used to show clinic context on a staff member's own dashboard.
+ */
+export async function getCaMembershipForUser(
+  db: Db,
+  userId: string,
+): Promise<CaMembership | null> {
+  const member = await db
+    .select()
+    .from(schema.clinicMembers)
+    .where(
+      and(
+        eq(schema.clinicMembers.userId, userId),
+        eq(schema.clinicMembers.role, "ca"),
+        eq(schema.clinicMembers.status, "active"),
+      ),
+    )
+    .get();
+  if (!member) return null;
+  const clinic = await db
+    .select()
+    .from(schema.clinics)
+    .where(eq(schema.clinics.id, member.clinicId))
+    .get();
+  return clinic ? { clinic, member } : null;
 }
 
 /**
@@ -151,4 +187,138 @@ export async function linkMemberToUser(
       inviteTokenHash: null,
     })
     .where(eq(schema.clinicMembers.id, memberId));
+}
+
+export type TransferResult =
+  | { ok: true; newOwnerId: string; newOwnerEmail: string; created: boolean }
+  | { ok: false; reason: string };
+
+/**
+ * Hand the clinic to a new manager (turnover). The target is either an existing
+ * claimed CA (`memberId`) or anyone by email (`email`) — a shell account is
+ * created if they're new. Reassigns ownership + the single `owner` membership
+ * row, promotes the new manager to `clinic_admin`, and demotes the outgoing
+ * owner to `student`. site_admin roles are never changed. Does NOT touch the new
+ * manager's existing CA row or seat assignments (so their training stays intact).
+ */
+export async function transferClinicOwnership(
+  db: Db,
+  clinic: Clinic,
+  target: { memberId?: string | null; email?: string | null },
+): Promise<TransferResult> {
+  let newOwnerId: string | null = null;
+  let newOwnerEmail = "";
+  let created = false;
+
+  if (target.memberId) {
+    const m = await db
+      .select()
+      .from(schema.clinicMembers)
+      .where(
+        and(
+          eq(schema.clinicMembers.id, target.memberId),
+          eq(schema.clinicMembers.clinicId, clinic.id),
+        ),
+      )
+      .get();
+    if (!m || m.role !== "ca" || m.status !== "active" || !m.userId) {
+      return {
+        ok: false,
+        reason: "Pick a CA who has already joined (claimed their account).",
+      };
+    }
+    newOwnerId = m.userId;
+    newOwnerEmail = m.email;
+  } else if (target.email && target.email.trim()) {
+    const normalized = target.email.trim().toLowerCase();
+    const existing = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, normalized))
+      .get();
+    const u = existing ?? (await findOrCreateUserByEmail(db, normalized));
+    created = !existing;
+    newOwnerId = u.id;
+    newOwnerEmail = u.email;
+  } else {
+    return { ok: false, reason: "Choose a current CA or enter an email." };
+  }
+
+  if (newOwnerId === clinic.ownerUserId) {
+    return { ok: false, reason: "That person already manages this clinic." };
+  }
+
+  const now = nowIso();
+  const oldOwnerId = clinic.ownerUserId;
+
+  const [oldOwner, newOwner] = await Promise.all([
+    db.select().from(schema.users).where(eq(schema.users.id, oldOwnerId)).get(),
+    db.select().from(schema.users).where(eq(schema.users.id, newOwnerId)).get(),
+  ]);
+
+  // 1. Clinic ownership.
+  await db
+    .update(schema.clinics)
+    .set({ ownerUserId: newOwnerId, updatedAt: now })
+    .where(eq(schema.clinics.id, clinic.id));
+
+  // 2. Roles — promote the new manager, demote the old. Never touch site_admins.
+  if (newOwner && newOwner.role !== "site_admin") {
+    await db
+      .update(schema.users)
+      .set({ role: "clinic_admin", updatedAt: now })
+      .where(eq(schema.users.id, newOwnerId));
+  }
+  if (oldOwner && oldOwner.role === "clinic_admin") {
+    await db
+      .update(schema.users)
+      .set({ role: "student", updatedAt: now })
+      .where(eq(schema.users.id, oldOwnerId));
+  }
+
+  // 3. Reassign the single `owner` membership row to the new manager.
+  const ownerRow = await db
+    .select()
+    .from(schema.clinicMembers)
+    .where(
+      and(
+        eq(schema.clinicMembers.clinicId, clinic.id),
+        eq(schema.clinicMembers.role, "owner"),
+      ),
+    )
+    .get();
+  if (ownerRow) {
+    await db
+      .update(schema.clinicMembers)
+      .set({
+        userId: newOwnerId,
+        email: newOwnerEmail,
+        status: "active",
+        claimedAt: now,
+        inviteTokenHash: null,
+      })
+      .where(eq(schema.clinicMembers.id, ownerRow.id));
+  } else {
+    await db.insert(schema.clinicMembers).values({
+      id: newId("clm"),
+      clinicId: clinic.id,
+      userId: newOwnerId,
+      email: newOwnerEmail,
+      role: "owner",
+      status: "active",
+      claimedAt: now,
+    });
+  }
+
+  await logEvent(db, {
+    userId: oldOwnerId,
+    type: "clinic_owner_transferred",
+    payload: {
+      clinicId: clinic.id,
+      newOwnerUserId: newOwnerId,
+      viaEmail: !!target.email,
+    },
+  });
+
+  return { ok: true, newOwnerId, newOwnerEmail, created };
 }

@@ -1,0 +1,62 @@
+---
+/**
+ * Renders one panel per roadmap path (a heading + a linear, gated step list).
+ * Shared by the student dashboard (/dashboard) and the clinic dashboard
+ * (/clinic) so both stay visually identical. Pass an already-filtered set of
+ * paths — this component does not decide which roadmaps belong on which page.
+ */
+import type { getUserRoadmap } from "@/lib/roadmap";
+
+interface Props {
+  roadmap: Awaited<ReturnType<typeof getUserRoadmap>>;
+}
+const { roadmap } = Astro.props;
+
+const statusLabel: Record<string, string> = {
+  complete: "Done",
+  available: "Up next",
+  in_progress: "In progress",
+  locked: "Locked",
+  waived: "Waived",
+};
+const statusColor: Record<string, string> = {
+  complete: "var(--ok)",
+  available: "var(--accent)",
+  in_progress: "var(--warn)",
+  locked: "var(--muted)",
+  waived: "var(--muted)",
+};
+---
+
+{
+  roadmap.map(({ template, steps }) => (
+    <div class="panel">
+      <h2>{template?.name ?? "Roadmap"}</h2>
+      {template?.description && <p style="margin-top:0">{template.description}</p>}
+      <ol style="list-style:none;padding:0;margin:0.5rem 0 0">
+        {steps.map((s) => (
+          <li style="display:flex;align-items:center;gap:0.75rem;padding:0.7rem 0;border-top:1px solid var(--border)">
+            <span
+              aria-hidden="true"
+              style={`flex:0 0 auto;width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;font-size:0.8rem;border:2px solid ${statusColor[s.status]};color:${statusColor[s.status]}`}
+            >
+              {s.status === "complete" ? "✓" : s.position}
+            </span>
+            <span style="flex:1">
+              {s.href ? <a href={s.href}>{s.title}</a> : s.title}
+            </span>
+            <span style={`font-size:0.8rem;color:${statusColor[s.status]}`}>
+              {s.href && s.status !== "complete" ? (
+                <a href={s.href} style={`color:${statusColor[s.status]}`}>
+                  {statusLabel[s.status] ?? s.status} →
+                </a>
+              ) : (
+                statusLabel[s.status] ?? s.status
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  ))
+}

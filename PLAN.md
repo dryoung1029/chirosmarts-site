@@ -16,6 +16,26 @@
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
 
+### Help system (shipped 2026-06)
+- **In-app Help Center** at `/help` (role-aware), distinct from `guides` (public
+  SEO) and the AI course tutor (lesson content only). New `help` content
+  collection (`src/content/help/*.md`, schema: title/summary/audience/category/
+  order/related). 12 starter articles drafted (getting-started, student training,
+  clinic management) with **`[VERIFY]`** flags on pricing/policy/required-minutes.
+  `/help/index.astro` groups by category and surfaces the signed-in user's role
+  topics first; `/help/[slug].astro` renders article + related + contact CTA.
+- **Contact support** form `/help/contact` → `POST /api/help/contact`: zod-validated,
+  honeypot anti-spam, signed-in email can't be spoofed (session email used),
+  delivers via Resend to `EMAIL_REPLY_TO` (fallback: first ADMIN_EMAILS), reply-to
+  = sender; logs a `support_request` event. Surfaces a fallback inbox if Resend
+  fails. **Depends on Resend domain verification to actually deliver.**
+- **Contextual `?` help** = `src/components/HelpTip.astro` (native Popover API,
+  zero JS, optional deep-link to an article). Wired on `/clinic` (Buy seats,
+  Transfer). More placements (course player seat-time/exam-gate) TODO.
+- Wiring: `/help` added to middleware public paths; "Help" link in app nav + footer.
+- **Not built (deferred):** AI help assistant over help docs (owner deprioritized
+  for now); help-article search; admin-audience articles.
+
 ### Design tokens (shipped)
 - **One source of truth:** `src/styles/tokens.css` defines the brand palette (--brand teal, --action orange, --ink/--muted, --canvas/--surface, success/warning/danger + tints, gold, derived --border/--focus/--shadow) and is imported by both layouts — components reference tokens only, **no raw hexes** (emails keep inline hex; CSS vars don't work in mail clients). Back-compat aliases (`--bg/--panel/--text/--accent/--ok/--warn`) re-map the existing app to the light theme.
 - **Usage rules** baked into base styles: --action for primary CTAs only; secondary = --brand outline; links = --brand underlined; success/warning/danger map to cert states (current/approaching/lapsed), never decorative; amber-tint text uses --warning-ink (#633806); focus rings --brand 2px. Hero demo, logo, and certificate (PDF + preview) retokenized to ink+teal+gold. **WCAG verified** — body ≥4.5:1, state/large ≥3:1 on every pairing.
