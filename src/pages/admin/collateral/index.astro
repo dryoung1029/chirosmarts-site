@@ -102,7 +102,12 @@ const TYPE_LABEL: Record<string, string> = {
             <ul style="list-style:none;margin:0.75rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.4rem">
               {items.map((it) => (
                 <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.92rem">
-                  <span style="color:var(--text)">{it.title}</span>
+                  <a
+                    href={`/admin/collateral/${it.id}`}
+                    style="color:var(--accent);text-decoration:none;font-weight:500"
+                  >
+                    {it.title}
+                  </a>
                   <span class="muted">· {TYPE_LABEL[it.type] ?? it.type}</span>
                   <span
                     style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
