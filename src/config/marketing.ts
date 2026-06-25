@@ -24,7 +24,7 @@ export const OWNER = {
   instructor: {
     name: "Jason Young, DC",
     credentials:
-      "Chiropractic physician · Former at-large director, National Board of Chiropractic Examiners",
+      "Chiropractic physician · Former president, Oregon Board of Chiropractic Examiners",
     bio: "Dr. Young has practiced in Corvallis, Oregon since 2008 and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as an at-large director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
     photo: null as string | null,
   },
