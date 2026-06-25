@@ -8,10 +8,16 @@
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
+import { asc } from "drizzle-orm";
 
 const db = getDb(Astro.locals.runtime.env);
 const courses = await db.select().from(schema.courses).all();
 const collateral = await db.select().from(schema.courseCollateral).all();
+const modules = await db
+  .select()
+  .from(schema.modules)
+  .orderBy(asc(schema.modules.position))
+  .all();
 
 const byCourse = new Map<string, typeof collateral>();
 for (const c of collateral) {
@@ -19,6 +25,14 @@ for (const c of collateral) {
   list.push(c);
   byCourse.set(c.courseId, list);
 }
+const modsByCourse = new Map<string, typeof modules>();
+for (const m of modules) {
+  const list = modsByCourse.get(m.courseId) ?? [];
+  list.push(m);
+  modsByCourse.set(m.courseId, list);
+}
+
+const msg = Astro.url.searchParams.get("msg");
 
 const TYPE_LABEL: Record<string, string> = {
   study_guide: "Study guide",
@@ -35,10 +49,19 @@ const TYPE_LABEL: Record<string, string> = {
   <h1>Collateral Studio</h1>
   <p class="muted" style="margin-top:0;max-width:48rem">
     Generate study guides, checklists, and cheat-sheets from a course's
-    transcripts — in Dr. Young's voice — then edit and publish them as PDFs for
-    students. <strong>Generation and the editor arrive in the next build step;</strong>
-    this view lists what exists per course.
+    transcripts — in Dr. Young's voice — then edit them and (next step) publish
+    as PDFs for students. Generation can take up to a minute for a whole course;
+    pick a single module for faster, tighter results.
   </p>
+
+  {msg && (
+    <p
+      class="panel"
+      style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none"
+    >
+      {msg}
+    </p>
+  )}
 
   {
     courses.map((c) => {
@@ -52,14 +75,27 @@ const TYPE_LABEL: Record<string, string> = {
                 /{c.slug} · {items.length} collateral item{items.length === 1 ? "" : "s"}
               </div>
             </div>
-            <button
-              type="button"
-              disabled
-              title="Available in the next build step (P1b)"
-              style="padding:0.4rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:not-allowed"
+            <form
+              method="POST"
+              action="/api/admin/collateral/generate"
+              style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center"
             >
-              + New collateral
-            </button>
+              <input type="hidden" name="courseId" value={c.id} />
+              <select name="type" style="padding:0.35rem">
+                <option value="study_guide">Study guide</option>
+                <option value="checklist">Checklist</option>
+                <option value="cheat_sheet">Cheat-sheet</option>
+              </select>
+              <select name="scope_ref" style="padding:0.35rem;max-width:14rem">
+                <option value="course">Whole course</option>
+                {(modsByCourse.get(c.id) ?? []).map((m) => (
+                  <option value={`module:${m.id}`}>Module: {m.title}</option>
+                ))}
+              </select>
+              <button type="submit" class="btn-primary" style="padding:0.4rem 0.9rem">
+                Generate
+              </button>
+            </form>
           </div>
 
           {items.length > 0 && (

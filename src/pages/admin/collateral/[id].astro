@@ -1,0 +1,118 @@
+---
+/**
+ * Collateral Studio — draft editor (P1b).
+ * Edit the AI-drafted Markdown, save, or regenerate. Publish (→ PDF/R2/
+ * course_resources) arrives in P1c. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { TYPE_LABEL } from "@/lib/collateral";
+
+const db = getDb(Astro.locals.runtime.env);
+const id = Astro.params.id!;
+const row = await db
+  .select()
+  .from(schema.courseCollateral)
+  .where(eq(schema.courseCollateral.id, id))
+  .get();
+
+if (!row) return Astro.redirect("/admin/collateral", 303);
+
+const course = await db
+  .select({ title: schema.courses.title })
+  .from(schema.courses)
+  .where(eq(schema.courses.id, row.courseId))
+  .get();
+
+const msg = Astro.url.searchParams.get("msg");
+const meta = row.sourceMeta ? JSON.parse(row.sourceMeta) : {};
+---
+
+<Layout title="Edit collateral · Admin" showNav={true}>
+  <AdminNav active="collateral" />
+
+  <p style="margin:0 0 0.5rem"><a href="/admin/collateral">← All collateral</a></p>
+
+  {msg && (
+    <p
+      class="panel"
+      style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none"
+    >
+      {msg}
+    </p>
+  )}
+
+  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap">
+    <h1 style="margin:0">{row.title}</h1>
+    <span
+      style={`padding:0.15rem 0.6rem;border-radius:6px;font-size:0.8rem;${
+        row.status === "published"
+          ? "background:var(--brand-tint);color:var(--brand)"
+          : "background:var(--panel-2);color:var(--muted)"
+      }`}
+    >
+      {row.status}
+    </span>
+  </div>
+  <p class="muted" style="margin:0.25rem 0 1.25rem;font-size:0.9rem">
+    {course?.title} · {TYPE_LABEL[row.type as keyof typeof TYPE_LABEL] ?? row.type}
+    {" · "}{meta.scopeLabel ?? row.scope}
+    {row.model && <> · drafted by {row.model}</>}
+  </p>
+
+  <form method="POST" action={`/api/admin/collateral/${row.id}`}>
+    <label style="display:block;font-weight:600;margin-bottom:0.25rem">Title</label>
+    <input
+      type="text"
+      name="title"
+      value={row.title}
+      required
+      style="width:100%;padding:0.5rem;margin-bottom:1rem"
+    />
+
+    <label style="display:block;font-weight:600;margin-bottom:0.25rem">
+      Content (Markdown)
+    </label>
+    <textarea
+      name="bodyMarkdown"
+      spellcheck="true"
+      style="width:100%;height:30rem;padding:0.75rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre"
+      >{row.bodyMarkdown}</textarea
+    >
+
+    <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        Save draft
+      </button>
+    </div>
+  </form>
+
+  <hr style="margin:1.75rem 0;border:none;border-top:1px solid var(--border)" />
+
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+    <form method="POST" action={`/api/admin/collateral/${row.id}/regenerate`}>
+      <button
+        type="submit"
+        style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel)"
+      >
+        ↻ Regenerate from transcripts
+      </button>
+    </form>
+    <span class="muted" style="font-size:0.85rem">
+      Replaces the content above with a fresh draft (your edits will be lost).
+    </span>
+  </div>
+
+  <div style="margin-top:1.25rem">
+    <button
+      type="button"
+      disabled
+      title="Publishing to a student-facing PDF arrives in the next build step (P1c)"
+      style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:not-allowed"
+    >
+      Publish as PDF (coming next)
+    </button>
+  </div>
+</Layout>
