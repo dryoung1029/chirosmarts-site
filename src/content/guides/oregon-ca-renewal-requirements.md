@@ -3,7 +3,7 @@ title: Oregon CA Renewal Requirements — Deadlines, Hours, and How to Stay Curr
 description: When your Oregon Chiropractic Assistant certification renews, the continuing-education hours required (and the topics inside them), and how to stay current.
 author: Jason Young, DC
 authorCredentials: Oregon chiropractor · former at-large director, National Board of Chiropractic Examiners
-lastUpdated: "[ADD DATE]"
+lastUpdated: "2026-06-25"
 relatedCourse: annual-renewal-bundle
 ---
 

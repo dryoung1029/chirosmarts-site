@@ -3,7 +3,7 @@ title: How to Become a Chiropractic Assistant in Oregon (Complete Guide)
 description: The complete path to becoming a certified chiropractic assistant in Oregon — the role, exactly what the state requires, every step in order, what it costs, and how long it really takes.
 author: Jason Young, DC
 authorCredentials: Oregon chiropractor · former at-large director, National Board of Chiropractic Examiners
-lastUpdated: "[ADD DATE]"
+lastUpdated: "2026-06-25"
 relatedCourse: oregon-ca-initial
 ---
 

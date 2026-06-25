@@ -14,9 +14,10 @@ continuing education (CE)**.
 
 ## When it's due
 
-Your renewal is keyed to your **birth month**. The platform shows your renewal
-timing on your dashboard so you're never guessing. [VERIFY: confirm the exact
-renewal deadline rule and how many CE hours are required each year.]
+Your renewal is due on the **last day of your birth month**, and each year
+requires **6 hours of continuing education** (including 1 hour of cultural
+competency and 2 hours of vitals training). The platform shows your renewal
+timing on your dashboard so you're never guessing.
 
 ## How to renew
 

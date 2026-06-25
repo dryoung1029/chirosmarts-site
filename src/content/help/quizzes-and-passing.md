@@ -12,8 +12,8 @@ related:
 ## Passing score
 
 Quizzes and the final exam have a passing threshold — **80% by default**, though
-a course may set its own. [VERIFY: confirm per-course pass thresholds.] You'll see
-your score immediately after submitting.
+a course may set its own; the course page and the quiz show the threshold that
+applies. You'll see your score immediately after submitting.
 
 ## Retakes
 

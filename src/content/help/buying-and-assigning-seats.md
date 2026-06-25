@@ -16,8 +16,8 @@ A **seat** lets you grant one CA access to one course. Seats are organized into 
 
 1. Open your **Clinic** page.
 2. Under **Buy training seats**, pick the course and the number of seats.
-3. Confirm. [VERIFY: confirm pricing and whether checkout is live or test-mode
-   comped.]
+3. Confirm. You'll see the current price for that course and seat count before
+   you pay.
 
 Each course you buy seats for gets its own pool, showing how many seats are
 **available**, **in use**, and **purchased**.

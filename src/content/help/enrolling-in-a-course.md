@@ -18,7 +18,7 @@ page lists what it covers, how many **credit hours** it grants, and the price.
 
 - **On your own:** open the course you want and follow the checkout steps.
   Module 1 of the initial certification course is **free to preview** — you can
-  start before you pay. [VERIFY: confirm which modules are free preview.]
+  start before you pay; the paywall begins at Module 2.
 - **Through your clinic:** if your clinic manager assigns you a seat, the course
   appears on your dashboard automatically — there's nothing to buy. You'll get an
   email invite to claim your seat; clicking it signs you in and enrolls you.

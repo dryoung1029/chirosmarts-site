@@ -16,8 +16,8 @@ conditions must **both** be met:
    needs at least 90% of its content covered. One unwatched lesson keeps the exam
    locked.
 2. **Reach the course's required minutes.** Some courses set a minimum total of
-   content-minutes you must accrue. [VERIFY: state the exact required minutes per
-   course, or that there is no extra floor.]
+   content-minutes you must accrue; your dashboard shows that target and your
+   progress toward it (many courses have no extra floor beyond the 90% rule).
 
 ## How to tell what's left
 
