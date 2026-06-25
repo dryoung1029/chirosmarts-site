@@ -147,6 +147,22 @@ the differentiator; the tool leans on it deliberately.
 - **Phase 2 (later):** glossary/practice-Qs types, richer layout via Cloudflare
   Browser Rendering (new binding/cost — needs approval), lesson-level scope.
 
+## 8a. P1b owner feedback (2026-06-25) → next-phase work
+
+Owner tried the generate→edit loop in prod. Verdict: "good start," but the
+editor is rudimentary. Carry into P1c / Phase 2 polish:
+
+- ✅ **Fixed immediately:** saved drafts were unreachable (no link back into the
+  editor) — list titles now link to `/admin/collateral/[id]`.
+- **Live Markdown preview** in the editor (side-by-side), so the owner sees the
+  formatted result, not raw Markdown.
+- **Draft management:** delete a draft; clearer list (created date, scope, model);
+  maybe duplicate/rename.
+- **PDF publish (P1c)** is the headline next step — branded PDF → R2 →
+  `course_resources` → student download; "Publish" button is currently stubbed.
+- Owner is **holding further voice/quality comments until the PDF phase** — judge
+  the real artifact, not the textarea.
+
 ## 9. Dependencies
 
 - **No new runtime dependencies for Phase 1** (`pdf-lib`, Anthropic SDK, `sharp`
