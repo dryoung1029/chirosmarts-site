@@ -90,9 +90,32 @@ const publishedLabel = row.publishedAt
       >{row.bodyMarkdown}</textarea
     >
 
+    <label
+      style="display:block;font-weight:600;margin:1.25rem 0 0.25rem"
+    >
+      Ask for an edit (optional)
+    </label>
+    <input
+      type="text"
+      name="instruction"
+      placeholder="e.g. Make the checklist shorter, or add a section on cuff sizing"
+      style="width:100%;padding:0.5rem"
+    />
+    <p class="muted" style="margin:0.3rem 0 0;font-size:0.85rem">
+      "Apply edit" revises the draft above using your instruction, in your voice.
+      "Save draft" just saves your manual edits.
+    </p>
+
     <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
       <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
         Save draft
+      </button>
+      <button
+        type="submit"
+        formaction={`/api/admin/collateral/${row.id}/revise`}
+        style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600"
+      >
+        ✦ Apply edit
       </button>
     </div>
   </form>
@@ -103,7 +126,7 @@ const publishedLabel = row.publishedAt
     <form method="POST" action={`/api/admin/collateral/${row.id}/regenerate`}>
       <button
         type="submit"
-        style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel)"
+        style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)"
       >
         ↻ Regenerate from transcripts
       </button>

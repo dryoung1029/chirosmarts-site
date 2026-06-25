@@ -283,3 +283,36 @@ ${sourceBlock}`;
   );
   return { title, markdown, model: COMPOSE_MODEL };
 }
+
+const REVISE_SYSTEM = `You are revising existing course collateral on the editor's instruction. Keep the author's voice and the document's structure; change only what the instruction asks, and leave everything else intact. Return the COMPLETE revised document as GitHub-Flavored Markdown — no commentary, no code fences around it.
+
+VOICE PROFILE
+${voiceProfile}
+
+RULES
+- Keep the H1 title line (update it only if the instruction asks).
+- Stay grounded: do not invent facts, figures, fees, or regulatory claims. If the instruction asks for something the existing material doesn't support, do your best with what's there and don't fabricate.
+- Preserve Markdown formatting (headings, lists, checkbox items, tables, bold).`;
+
+export interface ReviseResult {
+  title: string;
+  markdown: string;
+  model: string;
+}
+
+/** Apply a natural-language edit instruction to an existing collateral draft. */
+export async function reviseCollateral(
+  env: CloudflareEnv,
+  currentMarkdown: string,
+  instruction: string,
+  fallbackTitle: string,
+): Promise<ReviseResult> {
+  if (!isConfigured(env)) throw new NotConfiguredError();
+  const user = `INSTRUCTION:\n${instruction}\n\nCURRENT COLLATERAL:\n${currentMarkdown}`;
+  const markdown = await complete(env, COMPOSE_MODEL, REVISE_SYSTEM, user, 8000);
+  return {
+    title: extractTitle(markdown, fallbackTitle),
+    markdown,
+    model: COMPOSE_MODEL,
+  };
+}
