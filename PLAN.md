@@ -138,7 +138,10 @@ action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
 Admin tool to generate/edit/publish PDF collateral (Phase 1: **study guide,
 checklist, cheat-sheet**) from a course's `lesson_transcripts`, via Claude
 Sonnet → Markdown editor → `pdf-lib` PDF → R2 → `course_resources` student
-download. Owner-in-the-loop (nothing publishes unapproved). Diagrams = code-built
+download. **Voice fidelity is a requirement** — a distilled voice profile from
+the owner's transcripts + his `yourbodyofhealth.com/articles` (style only, not
+content) is injected into every prompt; extractive-leaning toward his own
+phrasing. Owner-in-the-loop (nothing publishes unapproved). Diagrams = code-built
 SVG (no Mermaid — needs a browser, unavailable on Workers). **AI image-gen
 deferred** (anatomy/text accuracy = brand/liability risk). No new Phase-1 deps.
 Full spec + data model (`course_collateral`) + build order in

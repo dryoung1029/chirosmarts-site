@@ -82,6 +82,34 @@ Migration is **additive** (new table only) — safe on D1 (no table rebuild).
 - Grounded in transcripts only (same discipline as the tutor) — no invented
   regulatory facts; flag anything it can't support.
 
+## 4a. Voice fidelity (owner requirement)
+
+The collateral must sound like **Dr. Young**, not generic e-learning. His voice is
+the differentiator; the tool leans on it deliberately.
+
+- **Voice profile** — a distilled style guide (`src/config/voice-profile.md`,
+  injected into every generation prompt) built from two owner-authorized sources:
+  1. **Transcripts** — his actual spoken explanations (primary; also the content).
+  2. **`yourbodyofhealth.com/articles/*`** — his written articles (voice only).
+- **Observed voice** (from sampled articles, to encode in the profile):
+  evidence-based and plain-spoken; **direct second-person address** ("your
+  visceral fat is elevated…"); concrete specifics and numbers over vague claims;
+  occasional historical/origin framing; short declarative sentences mixed with
+  one longer explanatory line; no hype, no filler.
+- **Extractive-leaning** — prefer the owner's own phrasing from transcripts over
+  paraphrasing into textbook tone. The model rewrites for structure, not for a
+  different personality.
+- **Hard guardrail — voice, not content lifting.** Collateral *content* comes from
+  the **course transcripts**. The clinic articles inform **style only**; never
+  copy clinic-article sentences verbatim into course handouts (his content, but
+  wrong context + duplicate-content hygiene).
+- **Ingestion mechanism** — clinic articles are fetched with a browser
+  User-Agent via `curl`/server fetch (WebFetch is 403'd by the site's bot
+  protection). Done once to build the profile, refreshed on demand; store the
+  distilled profile, not full article dumps.
+- **Owner edits are the final word on voice** — the editor step (your hand on the
+  draft) is the ultimate voice check; the profile just gets the first draft close.
+
 ## 5. PDF rendering (`src/lib/pdf/collateral.ts`, Option A)
 
 - Parse Markdown → render with `pdf-lib`: h1–h3, paragraphs, bullet/numbered/
