@@ -134,6 +134,17 @@ only — previews accrue NO seat time / heartbeats.** Cap is client-side (a dete
 viewer could fetch more via the token; the rest of the course stays paywalled). Owner
 action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
 
+### Collateral Studio — PROPOSED (2026-06-25), not built
+Admin tool to generate/edit/publish PDF collateral (Phase 1: **study guide,
+checklist, cheat-sheet**) from a course's `lesson_transcripts`, via Claude
+Sonnet → Markdown editor → `pdf-lib` PDF → R2 → `course_resources` student
+download. Owner-in-the-loop (nothing publishes unapproved). Diagrams = code-built
+SVG (no Mermaid — needs a browser, unavailable on Workers). **AI image-gen
+deferred** (anatomy/text accuracy = brand/liability risk). No new Phase-1 deps.
+Full spec + data model (`course_collateral`) + build order in
+**`docs/collateral-studio-design.md`**. Awaiting owner go-ahead to build P1a
+(schema + additive migration + admin scaffold).
+
 ### Phase 4 — per-course clinic seat pools (SHIPPED 2026-06)
 Built on branch `claude/charming-faraday-ixrhmb` from the approved design + DDL
 (`docs/phase4-seat-pools-ddl.md`). Migration **0011** (generated DDL + hand-written
