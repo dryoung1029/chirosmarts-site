@@ -51,8 +51,8 @@ function isPublic(pathname: string): boolean {
   if (pathname === "/api/leads/asset") return true;
   // Public free-preview token (hard-gated on lessons.is_preview in the handler).
   if (pathname === "/api/stream/preview-token") return true;
-  // public verification route (M4) and static assets
-  if (pathname.startsWith("/verify/")) return true;
+  // public verification route (M4) — entry form AND code deep-links — + static assets
+  if (pathname === "/verify" || pathname.startsWith("/verify/")) return true;
   if (pathname.startsWith("/_")) return true; // _astro, _image, _server-islands
   if (pathname.startsWith("/favicon")) return true;
   return false;
