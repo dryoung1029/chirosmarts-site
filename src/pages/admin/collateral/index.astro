@@ -1,0 +1,90 @@
+---
+/**
+ * Collateral Studio — admin list (P1a scaffold).
+ * Lists generated/published collateral grouped by course. Generation + editor +
+ * publish land in P1b/P1c (docs/collateral-studio-design.md). Route is admin-
+ * guarded by middleware (site_admin).
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+
+const db = getDb(Astro.locals.runtime.env);
+const courses = await db.select().from(schema.courses).all();
+const collateral = await db.select().from(schema.courseCollateral).all();
+
+const byCourse = new Map<string, typeof collateral>();
+for (const c of collateral) {
+  const list = byCourse.get(c.courseId) ?? [];
+  list.push(c);
+  byCourse.set(c.courseId, list);
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  study_guide: "Study guide",
+  checklist: "Checklist",
+  cheat_sheet: "Cheat-sheet",
+  glossary: "Glossary",
+  practice_questions: "Practice questions",
+  handout: "Handout",
+};
+---
+
+<Layout title="Collateral · Admin" showNav={true}>
+  <AdminNav active="collateral" />
+  <h1>Collateral Studio</h1>
+  <p class="muted" style="margin-top:0;max-width:48rem">
+    Generate study guides, checklists, and cheat-sheets from a course's
+    transcripts — in Dr. Young's voice — then edit and publish them as PDFs for
+    students. <strong>Generation and the editor arrive in the next build step;</strong>
+    this view lists what exists per course.
+  </p>
+
+  {
+    courses.map((c) => {
+      const items = byCourse.get(c.id) ?? [];
+      return (
+        <div class="panel" style="margin-bottom:1rem">
+          <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <div style="flex:1;min-width:14rem">
+              <div style="font-weight:600;color:var(--text)">{c.title}</div>
+              <div class="muted" style="font-size:0.88rem">
+                /{c.slug} · {items.length} collateral item{items.length === 1 ? "" : "s"}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled
+              title="Available in the next build step (P1b)"
+              style="padding:0.4rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:not-allowed"
+            >
+              + New collateral
+            </button>
+          </div>
+
+          {items.length > 0 && (
+            <ul style="list-style:none;margin:0.75rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.4rem">
+              {items.map((it) => (
+                <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.92rem">
+                  <span style="color:var(--text)">{it.title}</span>
+                  <span class="muted">· {TYPE_LABEL[it.type] ?? it.type}</span>
+                  <span
+                    style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
+                      it.status === "published"
+                        ? "background:var(--brand-tint);color:var(--brand)"
+                        : "background:var(--panel-2);color:var(--muted)"
+                    }`}
+                  >
+                    {it.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    })
+  }
+
+  {courses.length === 0 && <p class="muted">No courses yet.</p>}
+</Layout>
