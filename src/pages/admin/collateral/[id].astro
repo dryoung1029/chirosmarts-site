@@ -21,10 +21,11 @@ const row = await db
 if (!row) return Astro.redirect("/admin/collateral", 303);
 
 const course = await db
-  .select({ title: schema.courses.title })
+  .select({ title: schema.courses.title, slug: schema.courses.slug })
   .from(schema.courses)
   .where(eq(schema.courses.id, row.courseId))
   .get();
+const courseSlug = course?.slug ?? "";
 
 const msg = Astro.url.searchParams.get("msg");
 const meta = row.sourceMeta ? JSON.parse(row.sourceMeta) : {};
@@ -157,8 +158,15 @@ const publishedLabel = row.publishedAt
 
   {row.status === "published" && (
     <p class="muted" style="margin-top:0.75rem;font-size:0.9rem">
-      ✓ Published (v{row.version}{publishedLabel ? ` · ${publishedLabel}` : ""}) —
-      enrolled students can download it from the course page.
+      ✓ Published (v{row.version}{publishedLabel ? ` · ${publishedLabel}` : ""}).
+      {" "}
+      <a href={`/api/admin/collateral/${row.id}/published`} target="_blank" rel="noopener">
+        Download the published PDF ↗
+      </a>
+      <br />
+      Students see it in the <strong>Downloads</strong> panel on the course player
+      page (<code>/learn/{courseSlug}</code>) — visible to <strong>enrolled</strong>
+      students only, so you won't see it there unless you're enrolled in this course.
     </p>
   )}
 
