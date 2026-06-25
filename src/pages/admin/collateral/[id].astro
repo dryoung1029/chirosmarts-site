@@ -28,6 +28,14 @@ const course = await db
 
 const msg = Astro.url.searchParams.get("msg");
 const meta = row.sourceMeta ? JSON.parse(row.sourceMeta) : {};
+const publishedLabel = row.publishedAt
+  ? new Date(row.publishedAt).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "America/Los_Angeles",
+    })
+  : null;
 ---
 
 <Layout title="Edit collateral · Admin" showNav={true}>
@@ -105,14 +113,58 @@ const meta = row.sourceMeta ? JSON.parse(row.sourceMeta) : {};
     </span>
   </div>
 
-  <div style="margin-top:1.25rem">
-    <button
-      type="button"
-      disabled
-      title="Publishing to a student-facing PDF arrives in the next build step (P1c)"
-      style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:not-allowed"
+  <div style="margin-top:1.5rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+    <a
+      href={`/api/admin/collateral/${row.id}/preview`}
+      target="_blank"
+      rel="noopener"
+      style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)"
     >
-      Publish as PDF (coming next)
-    </button>
+      Preview PDF ↗
+    </a>
+    <form method="POST" action={`/api/admin/collateral/${row.id}/publish`}>
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        {row.status === "published" ? "Re-publish to students" : "Publish to students"}
+      </button>
+    </form>
+    <span class="muted" style="font-size:0.85rem">
+      Preview & publish use the <strong>saved</strong> draft — save your edits first.
+    </span>
   </div>
+
+  {row.status === "published" && (
+    <p class="muted" style="margin-top:0.75rem;font-size:0.9rem">
+      ✓ Published (v{row.version}{publishedLabel ? ` · ${publishedLabel}` : ""}) —
+      enrolled students can download it from the course page.
+    </p>
+  )}
+
+  <hr style="margin:1.75rem 0;border:none;border-top:1px solid var(--border)" />
+  <form
+    id="delete-collateral"
+    method="POST"
+    action={`/api/admin/collateral/${row.id}/delete`}
+  >
+    <button
+      type="submit"
+      style="padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--danger,#b3261e);background:transparent;color:var(--danger,#b3261e)"
+    >
+      Delete collateral
+    </button>
+    <span class="muted" style="font-size:0.85rem;margin-left:0.5rem">
+      {row.status === "published"
+        ? "Removes the draft and the published student download."
+        : "Removes this draft."}
+    </span>
+  </form>
+
+  <script>
+    document
+      .getElementById("delete-collateral")
+      ?.addEventListener("submit", (e) => {
+        if (!confirm("Delete this collateral? This can't be undone.")) {
+          e.preventDefault();
+        }
+      });
+  </script>
 </Layout>
