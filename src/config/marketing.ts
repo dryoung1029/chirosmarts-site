@@ -68,7 +68,10 @@ export const OWNER = {
       "See it in 90 seconds. Dr. Young walks through buying seats, inviting a new CA, and the compliance view your front office will actually use.",
     demoVideoStreamUid: null as string | null,
   },
-  about: null as string | null,
+  about:
+    "I'm Dr. Jason Young, and I've practiced chiropractic in Corvallis, Oregon since 2008. ChiroSmarts grew out of a problem I kept running into in my own clinic: getting a new chiropractic assistant properly trained and certified in Oregon was harder, and murkier, than it needed to be.\n\nI was the first chiropractor in Oregon to offer online chiropractic assistant training. At the time the state's rules didn't account for online instruction, so I went to the Oregon Board of Chiropractic Examiners (OBCE) and made the case for allowing it. Later I served on that board from 2013 to 2019 — including two terms as its president — and helped shape the rules that govern CA practice in Oregon today. I've also served as an at-large director of the National Board of Chiropractic Examiners.\n\nThat's the perspective behind this platform: I've trained Oregon CAs for over a decade, and I've sat on the regulatory side of the table. ChiroSmarts is the resource I wanted for my own staff — training that's clear about exactly what Oregon requires, with the hours, exam, certificate, and yearly renewals all tracked to audit standard, so nothing is left to guess." as
+      | string
+      | null,
 } as const;
 
 export const COURSE_MARKETING: Record<
