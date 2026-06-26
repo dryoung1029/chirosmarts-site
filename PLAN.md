@@ -14,7 +14,7 @@
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
-| Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+| Git model | **`main` is the Cloudflare production branch and auto-deploys on push** (Pages is Git-connected). Work happens on feature branches (`claude/charming-faraday-ixrhmb`, milestone branches) and is merged/fast-forwarded into `main` to ship. (`main` was historically stale while prod tracking drifted to `blissful-archimedes`; realigned 2026-06.) |
 
 ### Help system (shipped 2026-06)
 - **In-app Help Center** at `/help` (role-aware), distinct from `guides` (public

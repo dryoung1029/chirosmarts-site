@@ -6,8 +6,17 @@ lives in **PLAN.md** — update it every session.
 
 ## Session handoff — current state & next task (2026-06, read first)
 
-**Shipped & live** (prod: `https://chirosmarts-site.pages.dev`, branch
-`claude/blissful-archimedes-60fn4w`): M0–M6 complete, plus **multi-course Phases
+**DEPLOY / PRODUCTION BRANCH (read first):** Cloudflare Pages is **Git-connected**
+and its **production branch is `main`** — pushing to `main` **auto-builds and
+deploys** to `https://chirosmarts-site.pages.dev` (no manual `wrangler pages
+deploy` needed). `main` was historically stuck at an old commit while work lived
+on `claude/blissful-archimedes-60fn4w` / `claude/charming-faraday-ixrhmb`, which
+is why deploys silently lagged; **as of 2026-06 `main` is the source of truth —
+merge/fast-forward your work into `main` to ship.** (Older notes referencing
+`blissful-archimedes` as prod are superseded.)
+
+**Shipped & live** (prod: `https://chirosmarts-site.pages.dev`, production branch
+**`main`**): M0–M6 complete, plus **multi-course Phases
 1–3** (catalog, course landing, `course_resources`, `requiredSeatMinutes` exam
 gate, bundle fulfilment), **pricing model** (DB-only prices, `bundle_items`),
 **legal pages** (`/terms`,`/privacy` from `src/content/legal/*.md` — real draft
@@ -48,9 +57,10 @@ var / secret / binding changes only on the NEXT deploy**. Migrations: edit
 `schema.ts` → `npm run db:generate` → `db:migrate:local`/`:remote`; **D1 can't
 rebuild a table inside a migration** (FK pragma is a no-op in the txn) — keep
 migrations additive (see migration 0006 note). Re-embed the tutor after new
-transcripts via **Admin → AI tutor → Embed transcripts**. Git: the owner pushed
-from a stale clone and force-rewound this branch once (recovered via merge
-`5495f97`); pull before pushing, never force-push, prefer a fresh clone.
+transcripts via **Admin → AI tutor → Embed transcripts**. Git: **`main` is the
+Cloudflare production branch (auto-deploys on push)** — merge finished work into
+`main` to ship. The owner also pushes from their own clone; pull before pushing,
+never force-push, prefer a fresh clone.
 
 ## What this is
 
