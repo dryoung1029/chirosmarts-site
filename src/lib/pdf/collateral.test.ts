@@ -24,6 +24,10 @@ A quick reference for the vitals module. Use it to **review the essentials** bef
 | Pulse | 60 – 100 bpm | Count a full 60 seconds |
 | Respiration | 12 – 20 / min | Count without telling the patient |
 
+## Red flags — stop and escalate
+
+> **Escalate immediately** if systolic is over 180 or under 90, or if the patient reports chest pain. Do not proceed with therapy; notify the supervising chiropractor.
+
 ## Pre-visit checklist
 
 - [ ] Clean and calibrate the equipment

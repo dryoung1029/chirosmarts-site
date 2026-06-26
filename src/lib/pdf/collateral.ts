@@ -15,6 +15,7 @@ import { LOGO_DARK_PNG_BASE64 } from "@/lib/logo-data";
 const INK = rgb(0.075, 0.153, 0.169); // #13272B
 const ACCENT = rgb(0.043, 0.42, 0.388); // #0B6B63 brand teal
 const MUTED = rgb(0.318, 0.392, 0.416); // #51646A
+const GOLD = rgb(0.722, 0.525, 0.043); // #B8860B callout accent
 const RULE = rgb(0.85, 0.88, 0.87);
 const TABLE_HEAD = rgb(0.93, 0.96, 0.95);
 
@@ -175,6 +176,24 @@ export async function renderCollateralPdf(
       color: RULE,
     });
     y -= 10;
+  }
+
+  function blockquote(qlines: string[]) {
+    y -= 2;
+    ensure(16);
+    const topY = y + 10;
+    for (const ln of qlines) drawParagraph(parseInline(ln), 10, INK, 16, 4, 16);
+    const botY = y + 6;
+    if (topY > botY) {
+      page.drawRectangle({
+        x: MARGIN + 3,
+        y: botY,
+        width: 3,
+        height: topY - botY,
+        color: GOLD,
+      });
+    }
+    y -= 4;
   }
 
   function checkbox(label: Run[]) {
@@ -360,6 +379,16 @@ export async function renderCollateralPdf(
             .map((c) => c.trim()),
         );
       if (rows.length) table(rows);
+      continue;
+    }
+    // blockquote / callout (consecutive '>' lines) — used for red-flag boxes
+    if (/^>\s?/.test(t)) {
+      const block: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+        block.push(lines[i].trim().replace(/^>\s?/, ""));
+        i++;
+      }
+      blockquote(block);
       continue;
     }
     // checkbox

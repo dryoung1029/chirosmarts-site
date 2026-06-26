@@ -19,6 +19,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import voiceProfile from "@/config/voice-profile.md?raw";
+import handoutCraft from "@/config/handout-craft.md?raw";
 
 const COMPOSE_MODEL = "claude-sonnet-4-6";
 const DISTIL_MODEL = "claude-haiku-4-5";
@@ -151,41 +152,53 @@ export async function assembleSource(
 
 // ---- prompt building ------------------------------------------------------
 
-const SYSTEM_RULES = `You are creating downloadable study collateral for a continuing-education course. Write in the author's voice described below.
+const SYSTEM_RULES = `You are an instructional designer creating downloadable study collateral for a continuing-education course, written in the author's voice. Build a purpose-built learning artifact — not a reformatted transcript — using the craft brief below.
+
+HANDOUT CRAFT BRIEF
+${handoutCraft}
 
 VOICE PROFILE
 ${voiceProfile}
 
-ABSOLUTE RULES
-- Ground EVERYTHING in the provided course material. Do not add facts, figures, statistics, fees, or regulatory claims that are not present in the source. If the source doesn't cover something, leave it out.
-- This is training collateral for chiropractic assistants — never give patient-directed clinical/medical advice.
-- Output GitHub-Flavored Markdown only. No preamble, no "here is your…", no code fences around the whole thing.
-- Start with a single H1 title line.`;
+ABSOLUTE RULES (override the craft brief on any conflict)
+- GROUNDING: Every fact, figure, statistic, fee, clinical value, and regulatory claim must come from the provided course material. Never fabricate them. If the source doesn't cover something, leave it out rather than invent it.
+- The ONLY thing you may add that isn't in the transcript is a clearly-hypothetical illustrative example ("Consider a patient who…") to make a concept concrete — and even then, invent no specific clinical values, doses, or facts, and never a false first-person anecdote.
+- AUDIENCE: this is training collateral for chiropractic assistants (CAs). Frame objectives around what a CA must be able to DO. Never give patient-directed clinical/medical advice.
+- Output GitHub-Flavored Markdown only. No preamble, no "here is your…", no code fences around the whole document.
+- Start with a single H1 title line.
+- Before finishing, silently run the craft brief's quality self-check and fix any gaps.`;
 
 function typeInstructions(type: CollateralType, courseTitle: string): string {
   switch (type) {
     case "study_guide":
-      return `Create a STUDY GUIDE for "${courseTitle}".
-Structure:
+      return `Create a STUDY GUIDE for "${courseTitle}" — for post-session review and CEU study. Organize by CONCEPT (not transcript order). Target ~3–6 pages. Use this structure (omit a section only if the source truly has nothing for it):
 # <concise title>
-A 1–2 sentence orientation (what this guide covers and how to use it).
+A 1–2 sentence orientation: what this covers and how to use it.
 ## Learning objectives
-- bullet list of what the learner should be able to do
-## Section summaries
-For each major topic in the source, a "### <topic>" heading with a tight summary in the author's voice.
+- SWBAT behaviors: "You'll be able to …" — observable actions a CA can perform, not "understand X".
 ## Key terms
-A short definition list of important terms (term — plain-language definition).
+Definitions FIRST (pre-training principle): term — plain-language definition.
+## Core concepts
+A "### <concept>" per major topic: a tight summary in the author's voice, each paired with a brief clinical application example (use a clearly-hypothetical "Consider…" example only if the transcript lacks one).
+## Decision points & red flags
+When to do X vs Y, contraindications, and red flags the source raises (a small table if it helps). Omit if none.
+## Common errors & practice gaps
+What CAs commonly get wrong, drawn from the instructor's "most people miss…" cues. This is high-value — include it whenever the source supports it.
+## Evidence & standards
+Any studies, guidelines, or regulatory standards the source cites. Omit if none.
 ## Check your understanding
-6–10 self-check questions (no answer key).`;
+6–10 questions spanning at least three Bloom's levels (recall → understanding → apply/analyze). No answer key.
+## Keep it current
+A one-line spaced-review nudge: revisit at 24 hours, 1 week, and 1 month.`;
     case "checklist":
-      return `Create an actionable CHECKLIST for "${courseTitle}".
-Structure:
+      return `Create an actionable CHECKLIST / JOB AID for "${courseTitle}" — a performance-support tool, 1–2 pages. Every item must earn its place.
 # <concise title>
-One sentence on when/how to use it.
-Then grouped sections ("## <phase or topic>") of GitHub checkbox items ("- [ ] do X"). Each item must be a concrete, doable action drawn from the source — not a vague concept. Order them the way the work actually happens.`;
+One sentence on when and how to use it.
+Then grouped sections ("## <phase or topic>") of GitHub checkbox items ("- [ ] do X"). Each item is a concrete, doable action drawn from the source — ordered the way the work actually happens. Pull any contraindications / red flags into a clearly marked "## Red flags — stop and escalate" section. End with a small "Version & date" line.`;
     case "cheat_sheet":
-      return `Create a one-to-two page CHEAT-SHEET for "${courseTitle}".
-Dense and scannable: short sections with bullets and small Markdown tables where they help (e.g., term/value, step/why). Lead with the must-know essentials. Use **bold** for the things a learner most needs to remember. No long paragraphs.`;
+      return `Create a CLINICAL QUICK-REFERENCE CARD (cheat-sheet) for "${courseTitle}" — point-of-care use, 1–2 pages, scannable. Every piece of information must earn its place; if removing it wouldn't change what the CA does, cut it.
+# <concise title>
+Lead with the must-know essentials. Use short sections, bulleted steps for procedures, and small Markdown tables for key values/thresholds. Put **red flags / contraindications** in their own clearly-marked section. Bold the things a CA most needs to remember. No long paragraphs. End with a small "Version & date" line.`;
   }
 }
 
@@ -226,11 +239,15 @@ async function distilLesson(
   const notes = await complete(
     env,
     DISTIL_MODEL,
-    "Extract the key teaching points from this course-lesson transcript as concise bullet notes. Capture concepts, definitions, steps, numbers, and any do/don't guidance. Be faithful — add nothing not in the transcript. Output bullets only.",
+    `Extract the teaching signals from this course-lesson transcript for later handout assembly. Under each label below, list what's present (omit a label if nothing applies). Be faithful — add nothing not in the transcript. Cut filler, housekeeping, and tangents.
+
+LEARNING OBJECTIVES · KEY TERMS (with definitions) · CORE CONCEPTS (1–2 sentences each) · PROCEDURAL STEPS · CLINICAL EVIDENCE/STANDARDS · CASE EXAMPLES · COMMON ERRORS/PRACTICE GAPS · DECISION CRITERIA (when X vs Y, contraindications, red flags) · NOTABLE QUOTES · RESOURCES · SELF-ASSESSMENT PROMPTS
+
+Mark anything the instructor emphasized ("important", "remember this", repeated) with (!).`,
     `Lesson: ${lesson.title}\n\nTranscript:\n${lesson.transcript.slice(0, MAX_DISTIL_CHARS)}`,
-    1500,
+    1800,
   );
-  return `## ${lesson.title}\n${notes}`;
+  return `## Lesson: ${lesson.title}\n${notes}`;
 }
 
 export interface GenerateResult {
@@ -269,7 +286,9 @@ export async function generateCollateral(
     sourceBlock = notes.join("\n\n");
   }
 
-  const user = `${typeInstructions(type, source.courseTitle)}
+  const user = `First, mentally mine the course material below for the 11 teaching signals (objectives, key terms, core concepts, procedural steps, evidence, case examples, common errors/practice gaps, decision criteria, notable quotes, resources, self-assessment prompts), weighting emphasized/repeated points. Cut filler and tangents. Then build the artifact below from those signals — organized by concept, not transcript order.
+
+${typeInstructions(type, source.courseTitle)}
 
 SCOPE: ${source.scopeLabel}
 
