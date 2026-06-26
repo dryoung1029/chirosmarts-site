@@ -7,6 +7,7 @@ import { getCourseSeatTime } from "@/lib/progress";
 import { getModuleQuiz, getFinalExam, hasPassed } from "@/lib/quiz";
 import { getActiveCertificate, issueAndEmailCertificate } from "@/lib/certificate";
 import { listCourseResources } from "@/lib/course-resources";
+import { isAdmin } from "@/lib/admin";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
@@ -53,8 +54,11 @@ if (!certificate && finalPassed && user.legalName.trim()) {
 const needsLegalName = finalPassed && !certificate && !user.legalName.trim();
 
 // Downloadable course resources (e.g. the Vitals practice-log PDF).
+// Enrolled students and public resources as usual; admins always see them too
+// (so the owner can verify published collateral without enrolling).
+const admin = isAdmin(env, user);
 const resources = (await listCourseResources(db, course.id)).filter(
-  (r) => r.visibility === "public" || enrolled,
+  (r) => r.visibility === "public" || enrolled || admin,
 );
 ---
 
