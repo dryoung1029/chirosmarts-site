@@ -19,8 +19,17 @@ export const POST: APIRoute = async ({ params, locals, redirect }) => {
     .get();
   if (!row) return redirect("/admin/collateral", 303);
 
-  // Tear down the published artifact, if any.
+  // Delete the collateral row FIRST: it holds the FK (resource_id) to
+  // course_resources, so the parent resource can't be removed while it points
+  // at it. Then tear down the published artifact (resource row + R2 object).
+  await db
+    .delete(schema.courseCollateral)
+    .where(eq(schema.courseCollateral.id, id));
+
   if (row.resourceId) {
+    await db
+      .delete(schema.courseResources)
+      .where(eq(schema.courseResources.id, row.resourceId));
     if (row.r2Key) {
       try {
         await env.DOCS.delete(row.r2Key);
@@ -28,14 +37,7 @@ export const POST: APIRoute = async ({ params, locals, redirect }) => {
         /* best-effort */
       }
     }
-    await db
-      .delete(schema.courseResources)
-      .where(eq(schema.courseResources.id, row.resourceId));
   }
-
-  await db
-    .delete(schema.courseCollateral)
-    .where(eq(schema.courseCollateral.id, id));
 
   return redirect("/admin/collateral?msg=Collateral+deleted", 303);
 };
