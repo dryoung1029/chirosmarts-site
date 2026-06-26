@@ -30,6 +30,38 @@ interface Run {
   bold: boolean;
 }
 
+// pdf-lib's standard Helvetica only encodes WinAnsi (CP1252). AI-generated
+// clinical text often includes characters outside it (≥ ≤ → ✓ Greek, emoji),
+// which make drawText throw. Map the common ones to safe equivalents and drop
+// anything else outside CP1252.
+const CHAR_MAP: Record<string, string> = {
+  "≥": ">=", "≤": "<=", "≠": "!=", "≈": "~",
+  "→": "->", "←": "<-", "↔": "<->", "⇒": "=>", "⟶": "->",
+  "✓": "-", "✔": "-", "☑": "-", "✗": "x", "✘": "x",
+  "′": "'", "″": '"',
+};
+// CP1252 "smart" punctuation pdf-lib encodes natively (codepoints > 0xFF).
+const CP1252_EXTRA = "’‘“”–—…•™€‚„†‡‰‹›ƒˆˇ˜";
+
+function winAnsiSafe(input: string): string {
+  // Normalize assorted Unicode spaces to a plain space first.
+  const s = input.replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000]/g, " ");
+  let out = "";
+  for (const ch of s) {
+    if (CHAR_MAP[ch] !== undefined) {
+      out += CHAR_MAP[ch];
+      continue;
+    }
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp <= 0x7e || (cp >= 0xa0 && cp <= 0xff) || CP1252_EXTRA.includes(ch)) {
+      out += ch;
+    } else {
+      out += ""; // drop unsupported glyphs (emoji, math, Greek, etc.)
+    }
+  }
+  return out;
+}
+
 export interface CollateralPdfOpts {
   title: string;
   courseTitle: string;
@@ -47,9 +79,11 @@ function decodeBase64(b64: string): Uint8Array {
 
 /** Split a line of inline Markdown into bold/plain runs (links/code → text). */
 function parseInline(text: string): Run[] {
-  const clean = text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [t](u) → t
-    .replace(/`([^`]+)`/g, "$1"); // `code` → code
+  const clean = winAnsiSafe(
+    text
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [t](u) → t
+      .replace(/`([^`]+)`/g, "$1"), // `code` → code
+  );
   const runs: Run[] = [];
   let bold = false;
   for (const part of clean.split("**")) {
@@ -81,14 +115,14 @@ export async function renderCollateralPdf(
       thickness: 0.5,
       color: RULE,
     });
-    p.drawText(`${opts.courseTitle} · ${opts.typeLabel}`, {
+    p.drawText(winAnsiSafe(`${opts.courseTitle} · ${opts.typeLabel}`), {
       x: MARGIN,
       y: FOOT_Y,
       size: 8,
       font,
       color: MUTED,
     });
-    const right = `ChiroSmarts · ${opts.generatedDate}`;
+    const right = winAnsiSafe(`ChiroSmarts · ${opts.generatedDate}`);
     p.drawText(right, {
       x: PAGE_W - MARGIN - widthOf(right, font, 8),
       y: FOOT_Y,
@@ -288,7 +322,7 @@ export async function renderCollateralPdf(
     size: number,
     maxW: number,
   ): string[] {
-    const words = text.split(/\s+/).filter(Boolean);
+    const words = winAnsiSafe(text).split(/\s+/).filter(Boolean);
     const lines: string[] = [];
     let cur = "";
     for (const w of words) {

@@ -52,4 +52,26 @@ describe("renderCollateralPdf", () => {
     expect(bytes.length).toBeGreaterThan(2000);
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
   });
+
+  it("does not throw on non-WinAnsi characters (≥ ≤ → ✓ Greek, emoji)", async () => {
+    const tricky = `# Vitals ≥ and ≤ Thresholds 🚑
+
+Blood pressure ≤ 120/80 and pulse ≥ 60 → document it. ✓ Greek: α β μ. Arrow →.
+
+| Vital | Rule |
+| --- | --- |
+| BP | ≤ 120/80 ✓ |
+
+- [ ] Confirm BP ≥ 90 systolic 🩺
+
+> **Red flag:** escalate if systolic ≥ 180 → notify the DC immediately.`;
+    const bytes = await renderCollateralPdf({
+      title: "Vitals ≥ Thresholds 🚑",
+      courseTitle: "Oregon CA · Initial",
+      typeLabel: "Cheat-sheet",
+      markdown: tricky,
+      generatedDate: "Jun 25, 2026",
+    });
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+  });
 });
