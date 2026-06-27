@@ -231,6 +231,26 @@ async function complete(
     .trim();
 }
 
+/** Run `fn` over items with at most `limit` in flight; preserves input order. */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
+}
+
 /** Distil one lesson's transcript into compact teaching notes (map step). */
 async function distilLesson(
   env: CloudflareEnv,
@@ -278,11 +298,11 @@ export async function generateCollateral(
       .map((l) => `## Lesson: ${l.title}\n${l.transcript}`)
       .join("\n\n");
   } else {
-    // Map: distil each lesson (sequential to respect Workers concurrency).
-    const notes: string[] = [];
-    for (const lesson of source.lessons) {
-      notes.push(await distilLesson(env, lesson));
-    }
+    // Map: distil lessons with bounded concurrency (much faster wall-clock than
+    // sequential, without bursting Anthropic rate limits or Workers subrequests).
+    const notes = await mapLimit(source.lessons, 6, (lesson) =>
+      distilLesson(env, lesson),
+    );
     sourceBlock = notes.join("\n\n");
   }
 
