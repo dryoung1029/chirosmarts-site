@@ -183,6 +183,12 @@ const TYPE_LABEL: Record<string, string> = {
                 <button type="submit" class="btn-primary" style="padding:0.4rem 1rem">
                   📘 Compile manual ({items.filter((x) => x.inManual).length} included)
                 </button>
+                <a
+                  href={`/api/admin/collateral/manual-markdown?courseId=${c.id}`}
+                  style="margin-left:0.5rem;font-size:0.85rem"
+                >
+                  Download manual .md ↓
+                </a>
                 <span class="muted" style="font-size:0.83rem;margin-left:0.5rem">
                   Combines the "in manual" items, in this order, into one PDF for students.
                 </span>

@@ -478,30 +478,38 @@ export interface ManualPdfOpts {
 }
 
 /**
+ * Build the combined manual Markdown: a Contents list, then each section as a
+ * chapter (its own H1 replaced with the manage-view title). `separator` joins
+ * chapters — `[[newpage]]` for the PDF (page break), `---` for a portable .md.
+ */
+export function buildManualMarkdown(
+  sections: ManualSection[],
+  separator = "[[newpage]]",
+): string {
+  const contents = ["## Contents", ""];
+  sections.forEach((s, i) => contents.push(`${i + 1}. ${s.title}`));
+
+  const parts: string[] = [contents.join("\n")];
+  for (const s of sections) {
+    const body = s.markdown.replace(/^\s*#\s+.*(\n|$)/, "").trimStart();
+    parts.push(separator);
+    parts.push(`# ${s.title}\n\n${body}`);
+  }
+  return parts.join("\n\n");
+}
+
+/**
  * Compile multiple collateral pieces into one branded manual: a title header, a
- * Contents list, then each section as a chapter starting on a new page. Reuses
- * the single-doc renderer (page break token + chapter H1s).
+ * Contents list, then each section as a chapter starting on a new page.
  */
 export async function renderManualPdf(
   opts: ManualPdfOpts,
 ): Promise<Uint8Array> {
-  const contents = ["## Contents", ""];
-  opts.sections.forEach((s, i) => contents.push(`${i + 1}. ${s.title}`));
-
-  const parts: string[] = [contents.join("\n")];
-  for (const s of opts.sections) {
-    // Replace the section's own leading H1 with our (possibly renamed) chapter
-    // title so the manual reflects the titles set in the manage view.
-    const body = s.markdown.replace(/^\s*#\s+.*(\n|$)/, "").trimStart();
-    parts.push("[[newpage]]");
-    parts.push(`# ${s.title}\n\n${body}`);
-  }
-
   return renderCollateralPdf({
     title: opts.manualTitle,
     courseTitle: opts.courseTitle,
     typeLabel: "Training manual",
-    markdown: parts.join("\n\n"),
+    markdown: buildManualMarkdown(opts.sections, "[[newpage]]"),
     generatedDate: opts.generatedDate,
     skipFirstH1: false,
   });

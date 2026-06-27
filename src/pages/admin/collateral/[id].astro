@@ -149,6 +149,12 @@ const publishedLabel = row.publishedAt
     >
       Preview PDF ↗
     </a>
+    <a
+      href={`/api/admin/collateral/${row.id}/markdown`}
+      style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)"
+    >
+      Download .md ↓
+    </a>
     <form method="POST" action={`/api/admin/collateral/${row.id}/publish`} data-busy="Publishing…">
       <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
         {row.status === "published" ? "Re-publish to students" : "Publish to students"}
