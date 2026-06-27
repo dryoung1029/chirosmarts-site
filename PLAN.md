@@ -134,7 +134,7 @@ only — previews accrue NO seat time / heartbeats.** Cap is client-side (a dete
 viewer could fetch more via the token; the rest of the course stays paywalled). Owner
 action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
 
-### Collateral Studio — PROPOSED (2026-06-25), not built
+### Collateral Studio — SHIPPED (2026-06)
 Admin tool to generate/edit/publish PDF collateral (Phase 1: **study guide,
 checklist, cheat-sheet**) from a course's `lesson_transcripts`, via Claude
 Sonnet → Markdown editor → `pdf-lib` PDF → R2 → `course_resources` student
@@ -145,8 +145,30 @@ phrasing. Owner-in-the-loop (nothing publishes unapproved). Diagrams = code-buil
 SVG (no Mermaid — needs a browser, unavailable on Workers). **AI image-gen
 deferred** (anatomy/text accuracy = brand/liability risk). No new Phase-1 deps.
 Full spec + data model (`course_collateral`) + build order in
-**`docs/collateral-studio-design.md`**. Awaiting owner go-ahead to build P1a
-(schema + additive migration + admin scaffold).
+**`docs/collateral-studio-design.md`**.
+
+**Shipped (P1a–P1c + extras):** migrations **0012** (`course_collateral`) and
+**0013** (`sort_order`, `in_manual`). Generate per scope (course/module);
+Markdown editor with **Save / ✦ Apply edit (AI revise) / Regenerate**; **Preview
+PDF**, **Publish** → R2 + `course_resources` (admins see it on the course page
+w/o enrolling); **Download .md** (single + combined manual). **Reorder / rename /
+in-manual** manage view; **📘 Compile manual** → one branded PDF (title + Contents
++ chapters). **"Generate all modules"** is client-orchestrated (one short request
+per module, parallel, live progress) to dodge the whole-course request timeout —
+**don't use whole-course Generate, it times out**. Best-practices brief
+(`src/config/handout-craft.md`) + voice profile injected into prompts. PDF
+hardened for non-WinAnsi chars (sanitizer). `BusyOverlay` spinner (dismissible).
+
+**NEXT-STEP — Print-on-demand (DEFERRED, secondary):** sell a bound physical copy
+of the manual to old-school DCs. Recommended: **Lulu Print API**
+(`developer.lulu.com`) — on-demand book printing + **dropship**, you set retail
+and keep the margin, no inventory (alts: Gelato, Peecho/Cloudprinter; **not** KDP
+— no API). Shape: "Buy a printed copy" → **Stripe** charges your price → create a
+Lulu print job from the manual PDF → Lulu prints + ships. **Caveat:** needs a
+**print-spec PDF variant** (page size, margins/bleed, separate cover) — current
+PDF is letter w/ clean margins, close but not print-ready. Est. ~1 day (Lulu job
++ Stripe + print PDF + cover). Keep on the back burner until the core collateral
+flow feels right.
 
 ### Phase 4 — per-course clinic seat pools (SHIPPED 2026-06)
 Built on branch `claude/charming-faraday-ixrhmb` from the approved design + DDL
