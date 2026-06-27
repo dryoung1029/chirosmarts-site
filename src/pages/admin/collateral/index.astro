@@ -25,6 +25,10 @@ for (const c of collateral) {
   list.push(c);
   byCourse.set(c.courseId, list);
 }
+for (const list of byCourse.values())
+  list.sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt),
+  );
 const modsByCourse = new Map<string, typeof modules>();
 for (const m of modules) {
   const list = modsByCourse.get(m.courseId) ?? [];
@@ -99,28 +103,64 @@ const TYPE_LABEL: Record<string, string> = {
           </div>
 
           {items.length > 0 && (
-            <ul style="list-style:none;margin:0.75rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.4rem">
-              {items.map((it) => (
-                <li style="display:flex;align-items:center;gap:0.6rem;font-size:0.92rem">
-                  <a
-                    href={`/admin/collateral/${it.id}`}
-                    style="color:var(--accent);text-decoration:none;font-weight:500"
-                  >
-                    {it.title}
-                  </a>
-                  <span class="muted">· {TYPE_LABEL[it.type] ?? it.type}</span>
-                  <span
-                    style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
-                      it.status === "published"
-                        ? "background:var(--brand-tint);color:var(--brand)"
-                        : "background:var(--panel-2);color:var(--muted)"
-                    }`}
-                  >
-                    {it.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul style="list-style:none;margin:0.85rem 0 0;padding:0;display:flex;flex-direction:column">
+                {items.map((it, idx) => (
+                  <li style="display:flex;align-items:center;gap:0.5rem;font-size:0.9rem;border-top:1px solid var(--border);padding:0.45rem 0">
+                    <span style="display:flex;flex-direction:column;line-height:0.7">
+                      <form method="POST" action={`/api/admin/collateral/${it.id}/move`}>
+                        <input type="hidden" name="dir" value="up" />
+                        <button type="submit" disabled={idx === 0} title="Move up" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:0.7rem;padding:0">
+                          ▲
+                        </button>
+                      </form>
+                      <form method="POST" action={`/api/admin/collateral/${it.id}/move`}>
+                        <input type="hidden" name="dir" value="down" />
+                        <button type="submit" disabled={idx === items.length - 1} title="Move down" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:0.7rem;padding:0">
+                          ▼
+                        </button>
+                      </form>
+                    </span>
+
+                    <form method="POST" action={`/api/admin/collateral/${it.id}/rename`} style="display:flex;gap:0.3rem;flex:1;min-width:12rem;align-items:center">
+                      <input name="title" value={it.title} style="flex:1;padding:0.3rem;font-size:0.9rem" />
+                      <button type="submit" title="Save name" style="padding:0.3rem 0.6rem;border:1px solid var(--border);background:var(--panel);border-radius:6px;color:var(--text);font-size:0.82rem">
+                        Rename
+                      </button>
+                    </form>
+
+                    <span class="muted" style="white-space:nowrap">{TYPE_LABEL[it.type] ?? it.type}</span>
+                    <span
+                      style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
+                        it.status === "published"
+                          ? "background:var(--brand-tint);color:var(--brand)"
+                          : "background:var(--panel-2);color:var(--muted)"
+                      }`}
+                    >
+                      {it.status}
+                    </span>
+
+                    <form method="POST" action={`/api/admin/collateral/${it.id}/toggle-manual`}>
+                      <button type="submit" title="Include in the compiled manual" style={`padding:0.15rem 0.55rem;border-radius:6px;font-size:0.78rem;border:1px solid ${it.inManual ? "var(--accent)" : "var(--border)"};background:${it.inManual ? "var(--brand-tint)" : "var(--panel)"};color:${it.inManual ? "var(--brand)" : "var(--muted)"};cursor:pointer`}>
+                        {it.inManual ? "✓ in manual" : "add to manual"}
+                      </button>
+                    </form>
+
+                    <a href={`/admin/collateral/${it.id}`} style="white-space:nowrap">Edit →</a>
+                  </li>
+                ))}
+              </ul>
+
+              <form method="POST" action="/api/admin/collateral/compile-manual" style="margin-top:0.85rem">
+                <input type="hidden" name="courseId" value={c.id} />
+                <button type="submit" class="btn-primary" style="padding:0.4rem 1rem">
+                  📘 Compile manual ({items.filter((x) => x.inManual).length} included)
+                </button>
+                <span class="muted" style="font-size:0.83rem;margin-left:0.5rem">
+                  Combines the "in manual" items, in this order, into one PDF for students.
+                </span>
+              </form>
+            </>
           )}
         </div>
       );

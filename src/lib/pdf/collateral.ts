@@ -68,6 +68,10 @@ export interface CollateralPdfOpts {
   typeLabel: string;
   markdown: string;
   generatedDate: string;
+  // Single docs hide the body's leading H1 (shown in the header). Manuals set
+  // this false so each chapter's H1 renders. A line of exactly `[[newpage]]`
+  // forces a page break (used between manual chapters).
+  skipFirstH1?: boolean;
 }
 
 function decodeBase64(b64: string): Uint8Array {
@@ -355,7 +359,7 @@ export async function renderCollateralPdf(
   // ---- body ----
   const lines = opts.markdown.replace(/\r\n/g, "\n").split("\n");
   let i = 0;
-  let firstH1 = true;
+  let firstH1 = opts.skipFirstH1 !== false;
   while (i < lines.length) {
     const raw = lines[i];
     const line = raw.trimEnd();
@@ -363,6 +367,11 @@ export async function renderCollateralPdf(
 
     if (t === "") {
       y -= 4;
+      i++;
+      continue;
+    }
+    if (t === "[[newpage]]") {
+      newPage();
       i++;
       continue;
     }
@@ -455,4 +464,45 @@ export async function renderCollateralPdf(
   footer(page);
   pageNumbers();
   return doc.save();
+}
+
+export interface ManualSection {
+  title: string;
+  markdown: string;
+}
+export interface ManualPdfOpts {
+  manualTitle: string;
+  courseTitle: string;
+  generatedDate: string;
+  sections: ManualSection[];
+}
+
+/**
+ * Compile multiple collateral pieces into one branded manual: a title header, a
+ * Contents list, then each section as a chapter starting on a new page. Reuses
+ * the single-doc renderer (page break token + chapter H1s).
+ */
+export async function renderManualPdf(
+  opts: ManualPdfOpts,
+): Promise<Uint8Array> {
+  const contents = ["## Contents", ""];
+  opts.sections.forEach((s, i) => contents.push(`${i + 1}. ${s.title}`));
+
+  const parts: string[] = [contents.join("\n")];
+  for (const s of opts.sections) {
+    // Replace the section's own leading H1 with our (possibly renamed) chapter
+    // title so the manual reflects the titles set in the manage view.
+    const body = s.markdown.replace(/^\s*#\s+.*(\n|$)/, "").trimStart();
+    parts.push("[[newpage]]");
+    parts.push(`# ${s.title}\n\n${body}`);
+  }
+
+  return renderCollateralPdf({
+    title: opts.manualTitle,
+    courseTitle: opts.courseTitle,
+    typeLabel: "Training manual",
+    markdown: parts.join("\n\n"),
+    generatedDate: opts.generatedDate,
+    skipFirstH1: false,
+  });
 }

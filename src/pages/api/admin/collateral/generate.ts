@@ -5,6 +5,7 @@
  * Access enforced in middleware (site_admin).
  */
 import type { APIRoute } from "astro";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import { newId } from "@/lib/crypto";
 import {
@@ -45,6 +46,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const source = await assembleSource(db, courseId, scope, scopeRefId);
     const result = await generateCollateral(env, source, type);
 
+    // Append at the end of the course's existing collateral.
+    const siblings = await db
+      .select({ s: schema.courseCollateral.sortOrder })
+      .from(schema.courseCollateral)
+      .where(eq(schema.courseCollateral.courseId, courseId))
+      .all();
+    const sortOrder = siblings.reduce((m, r) => Math.max(m, r.s), -1) + 1;
+
     const id = newId("coll");
     await db.insert(schema.courseCollateral).values({
       id,
@@ -55,6 +64,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       title: result.title,
       status: "draft",
       bodyMarkdown: result.markdown,
+      sortOrder,
       model: result.model,
       sourceMeta: JSON.stringify({
         lessonIds: source.lessons.map((l) => l.id),

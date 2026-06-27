@@ -686,6 +686,8 @@ export const courseCollateral = sqliteTable(
     r2Key: text("r2_key"), // published PDF object key; null until published
     resourceId: text("resource_id").references(() => courseResources.id), // student-facing row
     version: integer("version").notNull().default(0), // bumps on each publish
+    sortOrder: integer("sort_order").notNull().default(0), // ordering within a course (manage view + manual compile)
+    inManual: integer("in_manual", { mode: "boolean" }).notNull().default(true), // include in the compiled course manual
     createdAt: text("created_at").notNull().default(nowUtc),
     updatedAt: text("updated_at").notNull().default(nowUtc),
     publishedAt: text("published_at"),
