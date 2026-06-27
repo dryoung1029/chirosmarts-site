@@ -9,8 +9,7 @@
 
 <div
   id="busy-overlay"
-  hidden
-  style="position:fixed;inset:0;background:rgba(19,39,43,0.35);display:grid;place-items:center;z-index:1000"
+  style="position:fixed;inset:0;background:rgba(19,39,43,0.35);display:none;place-items:center;z-index:1000"
 >
   <div
     style="background:var(--surface);padding:1.25rem 1.75rem;border-radius:12px;display:flex;flex-direction:column;gap:0.5rem;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:80vw;text-align:center"
@@ -61,8 +60,8 @@
   let longTimer: ReturnType<typeof setTimeout> | undefined;
 
   function dismiss() {
-    if (!overlay || overlay.hidden) return;
-    overlay.hidden = true;
+    if (!overlay || overlay.style.display === "none") return;
+    overlay.style.display = "none";
     if (longTimer) clearTimeout(longTimer);
     // Abort the pending form-POST navigation so the user regains control.
     try {
@@ -80,7 +79,7 @@
       submitter?.getAttribute("data-busy") ?? form?.getAttribute("data-busy");
     if (!label || !overlay) return;
     if (lbl) lbl.textContent = label;
-    overlay.hidden = false;
+    overlay.style.display = "grid";
     if (longTimer) clearTimeout(longTimer);
     longTimer = setTimeout(() => {
       if (lbl) lbl.textContent = "Still working — this is taking longer than usual…";
