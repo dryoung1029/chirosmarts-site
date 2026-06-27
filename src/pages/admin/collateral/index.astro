@@ -100,8 +100,8 @@ const TYPE_LABEL: Record<string, string> = {
                 <option value="checklist">Checklist</option>
                 <option value="cheat_sheet">Cheat-sheet</option>
               </select>
-              <select name="scope_ref" style="padding:0.35rem;max-width:14rem">
-                <option value="course">Whole course</option>
+              <select name="scope_ref" required style="padding:0.35rem;max-width:14rem">
+                <option value="" disabled selected>Pick a module…</option>
                 {(modsByCourse.get(c.id) ?? []).map((m) => (
                   <option value={`module:${m.id}`}>Module: {m.title}</option>
                 ))}

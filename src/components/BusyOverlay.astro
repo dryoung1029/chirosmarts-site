@@ -19,13 +19,22 @@
       <span class="busy-spinner" aria-hidden="true"></span>
       <span id="busy-label" style="color:var(--text);font-weight:500">Working…</span>
     </div>
-    <button
-      id="busy-cancel"
-      type="button"
-      style="background:none;border:none;color:var(--muted);font-size:0.82rem;cursor:pointer;text-decoration:underline"
-    >
-      Press Esc or click here to cancel
-    </button>
+    <div style="display:flex;gap:0.6rem;justify-content:center;margin-top:0.25rem">
+      <button
+        id="busy-cancel"
+        type="button"
+        style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:0.82rem;cursor:pointer;padding:0.3rem 0.7rem"
+      >
+        Cancel (Esc)
+      </button>
+      <button
+        id="busy-reload"
+        type="button"
+        style="background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem;cursor:pointer;padding:0.3rem 0.7rem"
+      >
+        Reload page
+      </button>
+    </div>
   </div>
 </div>
 
@@ -79,6 +88,10 @@
   });
 
   document.getElementById("busy-cancel")?.addEventListener("click", dismiss);
+  // Reload is the guaranteed escape: a fresh GET that always cancels a hung POST.
+  document
+    .getElementById("busy-reload")
+    ?.addEventListener("click", () => location.reload());
   overlay?.addEventListener("click", (e) => {
     if (e.target === overlay) dismiss();
   });

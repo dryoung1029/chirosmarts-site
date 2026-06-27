@@ -45,13 +45,18 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
   const type = typeRaw as CollateralType;
 
-  // scope_ref is "course" or "module:<id>".
-  let scope: CollateralScope = "course";
-  let scopeRefId: string | null = null;
-  if (scopeRef.startsWith("module:")) {
-    scope = "module";
-    scopeRefId = scopeRef.slice("module:".length);
+  // scope_ref must be "module:<id>". Whole-course generation is disabled: it
+  // runs too long for a single request and times out (use per-module generation
+  // or "Generate all modules", then Compile manual).
+  if (!scopeRef.startsWith("module:")) {
+    const m =
+      "Generate per module (whole-course generation times out). Use a module or 'Generate all modules'.";
+    return wantsJson
+      ? json({ ok: false, error: m }, 400)
+      : redirect(`${back}?msg=${encodeURIComponent(m)}`, 303);
   }
+  const scope: CollateralScope = "module";
+  const scopeRefId: string = scopeRef.slice("module:".length);
 
   try {
     const source = await assembleSource(db, courseId, scope, scopeRefId);
