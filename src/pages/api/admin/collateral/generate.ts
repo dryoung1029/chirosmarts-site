@@ -19,6 +19,12 @@ import {
 
 const TYPES: CollateralType[] = ["study_guide", "checklist", "cheat_sheet"];
 
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const env = locals.runtime.env;
   const db = getDb(env);
@@ -28,9 +34,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const courseId = String(form.get("courseId") ?? "").trim();
   const typeRaw = String(form.get("type") ?? "");
   const scopeRef = String(form.get("scope_ref") ?? "course").trim();
+  // JSON mode lets the browser orchestrate many per-module generations and read
+  // each result (used by "Generate all modules"); default is the form redirect.
+  const wantsJson = form.get("format") === "json";
 
   if (!courseId || !TYPES.includes(typeRaw as CollateralType)) {
-    return redirect(`${back}?msg=Pick+a+course+and+a+collateral+type`, 303);
+    return wantsJson
+      ? json({ ok: false, error: "Pick a course and a collateral type" }, 400)
+      : redirect(`${back}?msg=Pick+a+course+and+a+collateral+type`, 303);
   }
   const type = typeRaw as CollateralType;
 
@@ -72,20 +83,28 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         generatedAt: new Date().toISOString(),
       }),
     });
-    return redirect(`/admin/collateral/${id}?msg=Draft+generated`, 303);
+    return wantsJson
+      ? json({ ok: true, id, title: result.title })
+      : redirect(`/admin/collateral/${id}?msg=Draft+generated`, 303);
   } catch (err) {
     if (err instanceof NotConfiguredError) {
-      return redirect(
-        `${back}?msg=Set+ANTHROPIC_API_KEY+to+generate+collateral`,
-        303,
-      );
+      return wantsJson
+        ? json({ ok: false, error: "ANTHROPIC_API_KEY is not set" }, 503)
+        : redirect(`${back}?msg=Set+ANTHROPIC_API_KEY+to+generate+collateral`, 303);
     }
     if (err instanceof NoTranscriptError) {
-      return redirect(
-        `${back}?msg=That+scope+has+no+transcripts+to+work+from`,
-        303,
-      );
+      return wantsJson
+        ? json({ ok: false, error: "No transcripts for this scope" }, 422)
+        : redirect(`${back}?msg=That+scope+has+no+transcripts+to+work+from`, 303);
     }
-    return redirect(`${back}?msg=Generation+failed+please+try+again`, 303);
+    return wantsJson
+      ? json(
+          {
+            ok: false,
+            error: err instanceof Error ? err.message : "Generation failed",
+          },
+          500,
+        )
+      : redirect(`${back}?msg=Generation+failed+please+try+again`, 303);
   }
 };

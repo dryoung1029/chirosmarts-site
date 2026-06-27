@@ -72,6 +72,13 @@ const TYPE_LABEL: Record<string, string> = {
   {
     courses.map((c) => {
       const items = byCourse.get(c.id) ?? [];
+      const mods = modsByCourse.get(c.id) ?? [];
+      const haveGuide = new Set(
+        items
+          .filter((it) => it.type === "study_guide" && it.scope === "module")
+          .map((it) => it.scopeRefId),
+      );
+      const modulesNeeding = mods.filter((m) => !haveGuide.has(m.id));
       return (
         <div class="panel" style="margin-bottom:1rem">
           <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
@@ -104,6 +111,23 @@ const TYPE_LABEL: Record<string, string> = {
               </button>
             </form>
           </div>
+
+          {modulesNeeding.length > 0 && (
+            <div style="margin-top:0.7rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+              <button
+                type="button"
+                class="genall-btn btn-primary"
+                data-course={c.id}
+                data-modules={JSON.stringify(
+                  modulesNeeding.map((m) => ({ id: m.id, title: m.title })),
+                )}
+                style="padding:0.4rem 1rem"
+              >
+                ✨ Generate study guides for {modulesNeeding.length} module{modulesNeeding.length === 1 ? "" : "s"}
+              </button>
+              <span class="genall-progress muted" style="font-size:0.85rem"></span>
+            </div>
+          )}
 
           {items.length > 0 && (
             <>
@@ -171,4 +195,71 @@ const TYPE_LABEL: Record<string, string> = {
   }
 
   {courses.length === 0 && <p class="muted">No courses yet.</p>}
+
+  <script>
+    // Client-orchestrated "sub-agents": fire one short generation request per
+    // module in parallel (bounded), with live progress — avoids the whole-course
+    // single-request timeout. Each request returns JSON (format=json).
+    type Mod = { id: string; title: string };
+
+    async function generateAll(btn: HTMLButtonElement) {
+      const course = btn.dataset.course!;
+      const modules: Mod[] = JSON.parse(btn.dataset.modules || "[]");
+      const progress = btn.parentElement?.querySelector(
+        ".genall-progress",
+      ) as HTMLElement | null;
+      if (!modules.length) return;
+
+      btn.disabled = true;
+      let done = 0;
+      let failed = 0;
+      const total = modules.length;
+      const update = () => {
+        if (progress)
+          progress.textContent = `Generating… ${done}/${total} done${
+            failed ? ` · ${failed} failed` : ""
+          }`;
+      };
+      update();
+
+      let next = 0;
+      const CONCURRENCY = 3;
+      async function worker() {
+        while (next < modules.length) {
+          const m = modules[next++];
+          const body = new FormData();
+          body.set("courseId", course);
+          body.set("type", "study_guide");
+          body.set("scope_ref", `module:${m.id}`);
+          body.set("format", "json");
+          try {
+            const res = await fetch("/api/admin/collateral/generate", {
+              method: "POST",
+              body,
+            });
+            const data = (await res
+              .json()
+              .catch(() => ({ ok: false }))) as { ok?: boolean };
+            if (!data.ok) failed++;
+          } catch {
+            failed++;
+          }
+          done++;
+          update();
+        }
+      }
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, modules.length) }, worker),
+      );
+      if (progress)
+        progress.textContent = `Done — ${total - failed}/${total} generated${
+          failed ? ` · ${failed} failed` : ""
+        }. Reloading…`;
+      setTimeout(() => location.reload(), 1400);
+    }
+
+    document
+      .querySelectorAll<HTMLButtonElement>(".genall-btn")
+      .forEach((btn) => btn.addEventListener("click", () => generateAll(btn)));
+  </script>
 </Layout>
