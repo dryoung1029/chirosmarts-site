@@ -1,0 +1,53 @@
+---
+/**
+ * A full-screen "working…" overlay shown while a slow form POST is in flight.
+ * Add `data-busy="Your message…"` to a <form> (or to a specific submit button,
+ * which wins) and this shows a spinner + message until the page navigates.
+ * The overlay also blocks the UI, preventing double-submits.
+ */
+---
+
+<div
+  id="busy-overlay"
+  hidden
+  style="position:fixed;inset:0;background:rgba(19,39,43,0.35);display:grid;place-items:center;z-index:1000"
+>
+  <div
+    style="background:var(--surface);padding:1.25rem 1.75rem;border-radius:12px;display:flex;gap:0.8rem;align-items:center;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:80vw"
+  >
+    <span class="busy-spinner" aria-hidden="true"></span>
+    <span id="busy-label" style="color:var(--text);font-weight:500">Working…</span>
+  </div>
+</div>
+
+<style>
+  .busy-spinner {
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--brand);
+    border-radius: 50%;
+    display: inline-block;
+    animation: busy-spin 0.7s linear infinite;
+  }
+  @keyframes busy-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("submit", (e) => {
+    if (e.defaultPrevented) return;
+    const form = e.target as HTMLFormElement | null;
+    const submitter = (e as SubmitEvent).submitter as HTMLElement | null;
+    const label =
+      submitter?.getAttribute("data-busy") ?? form?.getAttribute("data-busy");
+    if (!label) return;
+    const lbl = document.getElementById("busy-label");
+    const overlay = document.getElementById("busy-overlay");
+    if (lbl) lbl.textContent = label;
+    if (overlay) overlay.hidden = false;
+  });
+</script>

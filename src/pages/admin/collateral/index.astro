@@ -7,6 +7,7 @@
  */
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { asc } from "drizzle-orm";
 
@@ -49,6 +50,7 @@ const TYPE_LABEL: Record<string, string> = {
 ---
 
 <Layout title="Collateral · Admin" showNav={true}>
+  <BusyOverlay />
   <AdminNav active="collateral" />
   <h1>Collateral Studio</h1>
   <p class="muted" style="margin-top:0;max-width:48rem">
@@ -82,6 +84,7 @@ const TYPE_LABEL: Record<string, string> = {
             <form
               method="POST"
               action="/api/admin/collateral/generate"
+              data-busy="Generating from transcripts… this can take up to a minute."
               style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center"
             >
               <input type="hidden" name="courseId" value={c.id} />
@@ -151,7 +154,7 @@ const TYPE_LABEL: Record<string, string> = {
                 ))}
               </ul>
 
-              <form method="POST" action="/api/admin/collateral/compile-manual" style="margin-top:0.85rem">
+              <form method="POST" action="/api/admin/collateral/compile-manual" data-busy="Compiling the manual…" style="margin-top:0.85rem">
                 <input type="hidden" name="courseId" value={c.id} />
                 <button type="submit" class="btn-primary" style="padding:0.4rem 1rem">
                   📘 Compile manual ({items.filter((x) => x.inManual).length} included)
