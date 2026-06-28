@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ChiroSmarts clinic postcard</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      :root {
+        --brand: #0b6b63;
+        --brand-tint: #ecf7f4;
+        --action: #c2410c;
+        --ink: #13272b;
+        --muted: #51646a;
+        --canvas: #fafaf7;
+        --surface: #ffffff;
+        --gold: #b8860b;
+        --border: #e3e9e7;
+      }
+      body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+      .page {
+        width: 1350px;
+        height: 900px;
+        background: var(--canvas);
+        position: relative;
+        overflow: hidden;
+        padding: 70px 80px;
+      }
+      .row { display: flex; align-items: center; }
+      .logo { height: 58px; }
+      .pill {
+        background: var(--brand-tint); color: var(--brand);
+        font-weight: 700; font-size: 19px; letter-spacing: 0.02em;
+        padding: 9px 20px; border-radius: 999px;
+      }
+      /* FRONT */
+      .headline {
+        font-size: 70px; font-weight: 800; line-height: 1.05;
+        letter-spacing: -0.02em; color: var(--ink); max-width: 760px;
+        margin-top: 90px;
+      }
+      .subhead {
+        font-size: 27px; color: var(--muted); line-height: 1.4;
+        max-width: 680px; margin-top: 30px;
+      }
+      .accent-bar { width: 90px; height: 7px; background: var(--brand); border-radius: 4px; margin-top: 46px; }
+      /* dashboard card visual */
+      .card {
+        position: absolute; right: 80px; bottom: 78px; width: 430px;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 18px; box-shadow: 0 18px 50px rgba(19,39,43,0.10);
+        padding: 26px 28px;
+      }
+      .card h4 { font-size: 18px; color: var(--muted); font-weight: 600; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .ca-row { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-top: 1px solid var(--border); }
+      .ca-row:first-of-type { border-top: none; }
+      .ca-name { font-size: 21px; font-weight: 600; color: var(--ink); }
+      .status { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--brand); }
+      .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-size: 13px; }
+      .renew { margin-top: 14px; background: var(--brand-tint); color: var(--brand); font-weight: 600; font-size: 16px; padding: 10px 14px; border-radius: 10px; }
+      /* BACK */
+      .back-h { font-size: 46px; font-weight: 800; color: var(--brand); letter-spacing: -0.01em; margin-top: 18px; }
+      .bullets { margin-top: 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px 48px; max-width: 1190px; }
+      .bullet { display: flex; gap: 16px; align-items: flex-start; }
+      .check { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--brand-tint); color: var(--brand); display: grid; place-items: center; font-size: 17px; font-weight: 800; margin-top: 2px; }
+      .bullet p { font-size: 22px; line-height: 1.35; color: var(--ink); }
+      .credit { margin-top: 34px; background: var(--brand-tint); border-radius: 14px; padding: 20px 26px; font-size: 21px; color: var(--ink); font-style: italic; }
+      .credit b { font-style: normal; color: var(--brand); }
+      .cta-row { position: absolute; left: 80px; right: 80px; bottom: 70px; display: flex; align-items: center; gap: 30px; }
+      .btn { background: var(--action); color: #fff; font-size: 25px; font-weight: 700; padding: 20px 34px; border-radius: 14px; }
+      .url { font-size: 30px; font-weight: 800; color: var(--ink); }
+      .url span { display: block; font-size: 17px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+      .qr { margin-left: auto; width: 130px; height: 130px; border: 2px dashed var(--brand); border-radius: 12px; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 14px; font-weight: 600; }
+      .foot { position: absolute; left: 80px; bottom: 30px; color: var(--muted); font-size: 17px; }
+    </style>
+  </head>
+  <body>
+    <!-- FRONT -->
+    <div class="page" data-document-role="page" data-label="Front">
+      <div class="row" style="justify-content: space-between;">
+        <img class="logo" src="https://chirosmarts-site.pages.dev/logo.png" alt="ChiroSmarts" />
+        <span class="pill">New at ChiroSmarts</span>
+      </div>
+      <h1 class="headline">Every CA certified. Every renewal on time. Nothing on your plate.</h1>
+      <p class="subhead">Oregon CA training and renewal — done online, and tracked for your whole clinic.</p>
+      <div class="accent-bar"></div>
+
+      <div class="card">
+        <h4>Your clinic — at a glance</h4>
+        <div class="ca-row"><span class="ca-name">Maya R.</span><span class="status"><span class="dot">✓</span> Certified</span></div>
+        <div class="ca-row"><span class="ca-name">Devon L.</span><span class="status"><span class="dot">✓</span> Certified</span></div>
+        <div class="ca-row"><span class="ca-name">Priya S.</span><span class="status"><span class="dot">✓</span> Certified</span></div>
+        <div class="renew">↻ Next renewal: 3 on track · reminders on</div>
+      </div>
+    </div>
+
+    <!-- BACK -->
+    <div class="page" data-document-role="page" data-label="Back">
+      <img class="logo" src="https://chirosmarts-site.pages.dev/logo.png" alt="ChiroSmarts" />
+      <h2 class="back-h">What's new for Oregon clinics</h2>
+
+      <div class="bullets">
+        <div class="bullet"><span class="check">✓</span><p>Train new CAs online, on demand — no waiting for a class or driving across the state for a weekend.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>One clinic dashboard: buy seats, invite staff by email, see everyone's status at a glance.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>Renewals tracked automatically by birth month — with reminder emails, so no one lapses.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>State-compliant initial certification plus the annual 6-hour renewal CE, in one place.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>Audit-ready records and publicly verifiable certificates.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>New: downloadable study guides and an AI course tutor.</p></div>
+      </div>
+
+      <div class="credit">Built by <b>Dr. Jason Young, DC</b> — former president of the Oregon Board of Chiropractic Examiners.</div>
+
+      <div class="cta-row">
+        <span class="btn">Module 1 is free — see it tonight</span>
+        <span class="url">chirosmarts.com<span>Oregon CA training &amp; renewal</span></span>
+        <span class="qr">Scan to<br />start</span>
+      </div>
+      <div class="foot">ChiroSmarts · contact@chirosmarts.com</div>
+    </div>
+  </body>
+</html>
