@@ -48,19 +48,33 @@ const fmt = (iso: string | null) =>
       ) : (
         <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.5rem">
           {rows.map((p) => (
-            <li style="border-bottom:1px solid var(--border);padding-bottom:1.5rem">
-              <a href={`/blog/${p.slug}`} style="text-decoration:none;color:var(--text)">
-                <h2 style="margin:0 0 0.3rem;font-size:1.3rem">
-                  {p.title}
-                  {p.status === "draft" && (
-                    <span style="margin-left:0.5rem;padding:0.05rem 0.45rem;border-radius:6px;font-size:0.7rem;background:var(--panel-2);color:var(--muted);vertical-align:middle">draft</span>
-                  )}
-                </h2>
-              </a>
-              {p.excerpt && <p style="margin:0 0 0.5rem;color:var(--muted)">{p.excerpt}</p>}
-              <p style="margin:0;color:var(--muted);font-size:0.85rem">
-                {p.author}{p.publishedAt ? ` · ${fmt(p.publishedAt)}` : ""}
-              </p>
+            <li style="border-bottom:1px solid var(--border);padding-bottom:1.5rem;display:flex;gap:1.1rem;align-items:flex-start">
+              {p.heroImage && (
+                <a href={`/blog/${p.slug}`} style="flex:0 0 auto;line-height:0">
+                  <img
+                    src={p.heroImage}
+                    alt=""
+                    width="160"
+                    height="90"
+                    loading="lazy"
+                    style="width:160px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border);background:var(--canvas)"
+                  />
+                </a>
+              )}
+              <div style="flex:1;min-width:0">
+                <a href={`/blog/${p.slug}`} style="text-decoration:none;color:var(--text)">
+                  <h2 style="margin:0 0 0.3rem;font-size:1.3rem">
+                    {p.title}
+                    {p.status === "draft" && (
+                      <span style="margin-left:0.5rem;padding:0.05rem 0.45rem;border-radius:6px;font-size:0.7rem;background:var(--panel-2);color:var(--muted);vertical-align:middle">draft</span>
+                    )}
+                  </h2>
+                </a>
+                {p.excerpt && <p style="margin:0 0 0.5rem;color:var(--muted)">{p.excerpt}</p>}
+                <p style="margin:0;color:var(--muted);font-size:0.85rem">
+                  {p.author}{p.publishedAt ? ` · ${fmt(p.publishedAt)}` : ""}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
