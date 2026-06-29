@@ -1,0 +1,161 @@
+---
+/**
+ * Admin: AEO — answer-engine citation presence. Shows whether ChiroSmarts is
+ * cited by AI engines (Perplexity / Anthropic web-search / Google AIO) for the
+ * Domain Pack's query set, with week-over-week wins/drops and action items.
+ * Audits run on demand (paid API calls). Powered by @jeldon/aeo-audit + a D1
+ * snapshot store. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
+import { getDb } from "@/db/client";
+import { aggregate, enginesFromPack, engineKeysFromEnv } from "@jeldon/aeo-audit";
+import { jeldonConfig } from "@/lib/jeldon";
+import { D1SnapshotStore } from "@/lib/aeo";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const msg = Astro.url.searchParams.get("msg");
+
+const store = new D1SnapshotStore(db, jeldonConfig.aeo.maxSnapshots ?? 52);
+const data = await store.read();
+const agg = aggregate(data, {
+  queries: jeldonConfig.aeo.querySet,
+  highPriorityTags: jeldonConfig.aeo.highPriorityTags,
+  brandName: jeldonConfig.brand.name,
+});
+
+// Which engines will actually run (have a key), vs configured in the pack.
+const keys = engineKeysFromEnv(env as unknown as Record<string, string | undefined>);
+const active = enginesFromPack(jeldonConfig.aeo, keys).map((e) => e.name);
+const configured = jeldonConfig.aeo.engines;
+const engineCols = agg.engineStats.length
+  ? agg.engineStats.map((s) => s.engine)
+  : active;
+
+const rate = (c: number, t: number) => (t > 0 ? Math.round((c / t) * 100) : 0);
+const cell = (e: { error?: string; noAiOverview?: boolean; cited?: boolean; citationRank?: number | null; brandMentioned?: boolean; delta?: string | null }) => {
+  if (!e) return { text: "—", color: "var(--muted)" };
+  if (e.error) return { text: "err", color: "var(--danger)" };
+  if (e.noAiOverview) return { text: "no AIO", color: "var(--muted)" };
+  if (e.cited) return { text: `#${e.citationRank}`, color: "var(--brand)" };
+  if (e.brandMentioned) return { text: "mention", color: "var(--warning-ink)" };
+  return { text: "no", color: "var(--muted)" };
+};
+const arrow = (d?: string | null) => (d === "gained" ? " ↑" : d === "lost" ? " ↓" : "");
+const prio = (p: string) =>
+  p === "high" ? "var(--danger)" : p === "medium" ? "var(--warning-ink)" : "var(--muted)";
+---
+
+<Layout title="AEO · Admin" showNav={true}>
+  <BusyOverlay />
+  <AdminNav active="aeo" />
+
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1 style="margin:0">Answer-engine presence (AEO)</h1>
+    <form method="POST" action="/api/admin/aeo/run" data-busy="Querying answer engines… (up to ~1 min)" style="margin-left:auto">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">✦ Run audit</button>
+    </form>
+  </div>
+  <p class="muted" style="margin-top:0.25rem;max-width:50rem">
+    Are AI answer engines citing ChiroSmarts for the queries that matter? Each run
+    asks every engine your <a href="/admin/blog">query set</a> and records who cited
+    you. Runs make paid API calls — run it on demand (e.g. weekly), not on every deploy.
+  </p>
+
+  {msg && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
+  )}
+
+  <p class="muted" style="font-size:0.9rem">
+    Engines configured: <strong>{configured.join(", ")}</strong>.
+    {" "}Active (key present): <strong>{active.length ? active.join(", ") : "none — set PERPLEXITY_API_KEY / ANTHROPIC_API_KEY"}</strong>.
+    {agg.lastUpdated && <> · Last run: {new Date(agg.lastUpdated).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })} PT</>}
+  </p>
+
+  {!agg.hasData ? (
+    <p class="panel" style="margin-top:1rem">No audits yet. Click <strong>Run audit</strong> to capture your first snapshot.</p>
+  ) : (
+    <>
+      {/* Engine citation rates (latest snapshot) */}
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0">
+        {agg.engineStats.map((s) => (
+          <div class="panel" style="flex:1;min-width:12rem">
+            <strong style="text-transform:capitalize">{s.engine}</strong>
+            <div style="font-size:1.8rem;font-weight:700;color:var(--brand)">{rate(s.cited, s.total)}%</div>
+            <div class="muted" style="font-size:0.85rem">
+              cited {s.cited}/{s.total} · {s.brandMentions} mentions
+              {s.errors > 0 && ` · ${s.errors} err`}
+              {s.noOpportunity > 0 && ` · ${s.noOpportunity} no-AIO`}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-query scoreboard */}
+      <h2 style="font-size:1.1rem;margin:1.5rem 0 0.5rem">By query <span class="muted" style="font-size:0.8rem">(latest: {agg.latestDate})</span></h2>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+          <thead>
+            <tr style="text-align:left;border-bottom:1px solid var(--border)">
+              <th style="padding:0.4rem 0.6rem">Query</th>
+              {engineCols.map((e) => <th style="padding:0.4rem 0.6rem;text-transform:capitalize">{e}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {agg.queryRows.map((row) => (
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:0.4rem 0.6rem">{row.query}</td>
+                {engineCols.map((e) => {
+                  const c = cell(row.engines[e]);
+                  return (
+                    <td style={`padding:0.4rem 0.6rem;color:${c.color};white-space:nowrap`}>
+                      {c.text}{arrow(row.engines[e]?.delta)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {(agg.wins.length > 0 || agg.drops.length > 0) && (
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:1.25rem">
+          {agg.wins.length > 0 && (
+            <div style="flex:1;min-width:14rem">
+              <strong style="color:var(--brand)">Wins ({agg.wins.length})</strong>
+              <ul style="margin:0.3rem 0 0;padding-left:1.1rem;font-size:0.88rem">
+                {agg.wins.map((w) => <li>{w.query} <span class="muted">· {w.engine}</span></li>)}
+              </ul>
+            </div>
+          )}
+          {agg.drops.length > 0 && (
+            <div style="flex:1;min-width:14rem">
+              <strong style="color:var(--danger)">Drops ({agg.drops.length})</strong>
+              <ul style="margin:0.3rem 0 0;padding-left:1.1rem;font-size:0.88rem">
+                {agg.drops.map((w) => <li>{w.query} <span class="muted">· {w.engine}</span></li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {agg.actionItems.length > 0 && (
+        <>
+          <h2 style="font-size:1.1rem;margin:1.5rem 0 0.5rem">Action items</h2>
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.6rem">
+            {agg.actionItems.map((a) => (
+              <li class="panel" style="margin:0">
+                <span style={`font-size:0.72rem;font-weight:700;text-transform:uppercase;color:${prio(a.priority)}`}>{a.priority}</span>
+                <div style="font-weight:600">{a.action}</div>
+                <div class="muted" style="font-size:0.88rem">{a.why}</div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  )}
+</Layout>

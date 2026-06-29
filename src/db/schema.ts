@@ -730,6 +730,15 @@ export const blogPosts = sqliteTable(
   ],
 );
 
+// AEO citation-presence audit snapshots (@jeldon/aeo-audit). The engine operates
+// on the whole rolling SnapshotStoreData object, so we persist it as one JSON
+// blob (single row, id='default') — the D1 analogue of its FsSnapshotStore.
+export const aeoAuditStore = sqliteTable("aeo_audit_store", {
+  id: text("id").primaryKey(),
+  data: text("data").notNull(), // JSON.stringify(SnapshotStoreData)
+  updatedAt: text("updated_at").notNull().default(nowUtc),
+});
+
 // A bundle is a single saleable `courses` row (one price, one purchase) whose
 // fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
 // maps a bundle course to its children; checkout/webhook fulfilment expands the

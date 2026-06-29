@@ -36,6 +36,8 @@ interface CloudflareEnv {
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string; // Google Gemini / Imagen — blog hero image generation
   GEMINI_IMAGE_MODEL?: string; // override (default gemini-2.5-flash-image; imagen-* uses :predict, needs billing)
+  PERPLEXITY_API_KEY?: string; // @jeldon/aeo-audit — answer-engine citation audit
+  SERPAPI_KEY?: string; // @jeldon/aeo-audit — Google AI Overview engine (optional)
   // Brevo (marketing email — groundwork only; no campaigns wired). Sync pushes
   // CONFIRMED leads + opted-in users; never non-consented contacts.
   BREVO_API_KEY?: string;
