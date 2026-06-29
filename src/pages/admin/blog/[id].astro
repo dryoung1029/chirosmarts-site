@@ -32,6 +32,7 @@ const externalLinks = (md.match(/\]\(https?:\/\//g) ?? []).length;
 const faqCount = extractFaqs(md).length;
 const wc = wordCount(md);
 const verifyFlagged = hasVerifyFlags(md);
+const verifyCount = (md.match(/\[VERIFY\b/gi) ?? []).length;
 const fmtPt = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("en-US", {
@@ -105,8 +106,20 @@ const checks = [
     <label style="font-weight:600">SEO meta description</label>
     <input type="text" name="seoDescription" value={post.seoDescription ?? ""} maxlength="180" style={inp} />
 
-    <label style="font-weight:600">Body (Markdown)</label>
+    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+      <label style="font-weight:600">Body (Markdown)</label>
+      {verifyCount > 0 && (
+        <span id="verify-toolbar" style="margin-left:auto;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+          <span style="color:var(--danger)">⚠ <strong id="verify-count">{verifyCount}</strong> [VERIFY] to resolve</span>
+          <button type="button" id="verify-jump"
+            style="padding:0.25rem 0.7rem;border-radius:7px;border:1px solid var(--danger);background:var(--danger-tint);color:var(--danger);font-weight:600;cursor:pointer">
+            Jump to next →
+          </button>
+        </span>
+      )}
+    </div>
     <textarea
+      id="bodyMarkdown"
       name="bodyMarkdown"
       spellcheck="true"
       style="width:100%;height:26rem;padding:0.75rem;font-family:ui-monospace,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre">{post.bodyMarkdown}</textarea>
@@ -234,5 +247,40 @@ const checks = [
       const iso = document.getElementById("scheduledAtIso") as HTMLInputElement;
       if (local && iso) iso.value = new Date(local).toISOString();
     });
+
+    // Jump to each [VERIFY] flag in the body: select it and scroll it into view,
+    // cycling through all occurrences on repeated clicks.
+    (() => {
+      const ta = document.getElementById("bodyMarkdown") as HTMLTextAreaElement | null;
+      const btn = document.getElementById("verify-jump");
+      const countEl = document.getElementById("verify-count");
+      if (!ta || !btn) return;
+      let from = 0;
+      const find = () => {
+        const val = ta.value;
+        const re = /\[VERIFY\b/gi;
+        const all: number[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(val))) all.push(m.index);
+        if (countEl) countEl.textContent = String(all.length);
+        return all;
+      };
+      btn.addEventListener("click", () => {
+        const all = find();
+        if (!all.length) return;
+        let idx = all.find((i) => i >= from);
+        if (idx === undefined) idx = all[0]; // wrap around
+        // Select the whole [VERIFY ...] token up to the closing bracket.
+        const end = ta.value.indexOf("]", idx);
+        const selEnd = end === -1 ? idx + 7 : end + 1;
+        ta.focus();
+        ta.setSelectionRange(idx, selEnd);
+        // Scroll the match roughly to the middle of the textarea.
+        const line = ta.value.slice(0, idx).split("\n").length - 1;
+        const lh = parseFloat(getComputedStyle(ta).lineHeight) || 18;
+        ta.scrollTop = Math.max(0, line * lh - ta.clientHeight / 2);
+        from = selEnd; // next click advances
+      });
+    })();
   </script>
 </Layout>
