@@ -7,8 +7,10 @@
 import type { APIRoute } from "astro";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { hasVerifyFlags } from "@/lib/blog";
 
 const nowIso = () => new Date().toISOString();
+const VERIFY_MSG = "Resolve+all+%5BVERIFY%5D+flags+before+publishing+or+scheduling";
 
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const db = getDb(locals.runtime.env);
@@ -28,6 +30,9 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   if (action === "publish") {
     if (!row.bodyMarkdown.trim() || !row.title.trim()) {
       return redirect(`${back}?msg=Add+a+title+and+body+before+publishing`, 303);
+    }
+    if (hasVerifyFlags(row.bodyMarkdown)) {
+      return redirect(`${back}?msg=${VERIFY_MSG}#publish`, 303);
     }
     await db
       .update(schema.blogPosts)
@@ -52,6 +57,9 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   if (action === "schedule") {
     if (!row.bodyMarkdown.trim() || !row.title.trim()) {
       return redirect(`${back}?msg=Add+a+title+and+body+before+scheduling#publish`, 303);
+    }
+    if (hasVerifyFlags(row.bodyMarkdown)) {
+      return redirect(`${back}?msg=${VERIFY_MSG}#publish`, 303);
     }
     // Primary: ISO UTC computed client-side from the browser's timezone.
     // Fallback (no JS): treat the datetime-local value as America/Los_Angeles.

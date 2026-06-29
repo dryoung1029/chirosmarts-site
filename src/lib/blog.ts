@@ -47,6 +47,19 @@ function firstParagraph(md: string): string {
   return "";
 }
 
+/** True if the body still contains unresolved [VERIFY] flags. Such posts must
+ * not be published or scheduled — a [VERIFY] marks an unconfirmed regulatory
+ * claim the owner has to certify first. */
+export function hasVerifyFlags(md: string): boolean {
+  return /\[VERIFY\b/i.test(md ?? "");
+}
+
+/** Remove a leading "# H1" from a body (the page renders the title separately,
+ * so the body's own H1 would duplicate it and create a second H1). */
+export function stripLeadingH1(md: string): string {
+  return (md ?? "").replace(/^﻿?\s*#\s+[^\n]*\r?\n+/, "");
+}
+
 /** Derive list/preview excerpt + SEO meta from a finished article body. */
 export function deriveMeta(markdown: string): { excerpt: string; seoDescription: string } {
   const excerpt = firstParagraph(markdown).slice(0, 200);

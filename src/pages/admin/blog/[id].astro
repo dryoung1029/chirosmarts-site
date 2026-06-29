@@ -8,7 +8,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
-import { extractFaqs, wordCount } from "@/lib/blog";
+import { extractFaqs, wordCount, hasVerifyFlags } from "@/lib/blog";
 
 const db = getDb(Astro.locals.runtime.env);
 const id = Astro.params.id!;
@@ -31,6 +31,7 @@ const internalLinks = (md.match(/\]\(\/(?!\/)/g) ?? []).length;
 const externalLinks = (md.match(/\]\(https?:\/\//g) ?? []).length;
 const faqCount = extractFaqs(md).length;
 const wc = wordCount(md);
+const verifyFlagged = hasVerifyFlags(md);
 const fmtPt = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("en-US", {
@@ -167,6 +168,11 @@ const checks = [
   <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
 
   <section id="publish">
+    {verifyFlagged && (
+      <p class="panel" style="margin:0 0 1rem;background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger)">
+        ⚠ This article still contains <strong>[VERIFY]</strong> flags — unconfirmed regulatory claims. Resolve every one in the body before it can be published or scheduled.
+      </p>
+    )}
     {post.status === "scheduled" && (
       <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint);color:var(--warning-ink);border:none">
         ⏱ Scheduled to publish <strong>{fmtPt(post.scheduledAt)}</strong>. It goes live automatically at that time.
@@ -176,7 +182,9 @@ const checks = [
     <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
       <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
         <input type="hidden" name="action" value={post.status === "published" ? "unpublish" : "publish"} />
-        <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem"
+          disabled={verifyFlagged && post.status !== "published"}
+          title={verifyFlagged && post.status !== "published" ? "Resolve [VERIFY] flags first" : undefined}>
           {post.status === "published" ? "Unpublish" : "Publish now"}
         </button>
       </form>
@@ -206,7 +214,9 @@ const checks = [
           <input type="datetime-local" name="scheduledLocal" id="scheduledLocal" required
             style="padding:0.45rem" />
         </div>
-        <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600">
+        <button type="submit" disabled={verifyFlagged}
+          title={verifyFlagged ? "Resolve [VERIFY] flags first" : undefined}
+          style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600">
           {post.status === "scheduled" ? "Reschedule" : "Schedule"}
         </button>
       </form>

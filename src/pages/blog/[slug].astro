@@ -10,7 +10,7 @@ import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb, schema } from "@/db/client";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { renderMarkdown } from "@/lib/markdown";
-import { extractFaqs, wordCount } from "@/lib/blog";
+import { extractFaqs, wordCount, stripLeadingH1 } from "@/lib/blog";
 import { getSiteUrl } from "@/lib/env";
 import { articleLd, faqPageLd } from "@/lib/structured-data";
 import { promoteDuePosts } from "@/lib/blog-schedule";
@@ -34,7 +34,7 @@ if (!post || (post.status !== "published" && !isAdmin)) {
 }
 
 const siteUrl = getSiteUrl(env).replace(/\/$/, "");
-const body = renderMarkdown(post.bodyMarkdown);
+const body = renderMarkdown(stripLeadingH1(post.bodyMarkdown));
 const faqs = extractFaqs(post.bodyMarkdown);
 const wc = wordCount(post.bodyMarkdown);
 const url = `${siteUrl}/blog/${post.slug}`;
@@ -114,7 +114,7 @@ if (faqLd) ld.push(faqLd);
           alt=""
           width="720"
           height="405"
-          style="width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:12px;border:1px solid var(--border);margin:0 0 1.5rem;background:var(--canvas)"
+          style="width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;border-radius:12px;border:1px solid var(--border);margin:0 0 1.5rem;background:var(--canvas)"
         />
       )}
       <h1 style="margin:0 0 0.5rem">{post.title}</h1>

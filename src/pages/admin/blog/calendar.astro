@@ -9,6 +9,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { desc } from "drizzle-orm";
 import { promoteDuePosts } from "@/lib/blog-schedule";
+import { hasVerifyFlags } from "@/lib/blog";
 
 const db = getDb(Astro.locals.runtime.env);
 await promoteDuePosts(db);
@@ -121,7 +122,7 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const isToday = day === today.d && year === today.y && month === today.m;
       const items = day ? byDay[day] ?? [] : [];
       return (
-        <div style={`background:var(--surface);min-height:6.5rem;padding:0.35rem;${day ? "" : "opacity:0.5"}`}>
+        <div style={`background:var(--surface);min-height:6.5rem;min-width:0;padding:0.35rem;${day ? "" : "opacity:0.5"}`}>
           {day && (
             <div style={`font-size:0.78rem;margin-bottom:0.25rem;${isToday ? "color:var(--brand);font-weight:700" : "color:var(--muted)"}`}>
               {isToday ? `• ${day}` : day}
@@ -132,13 +133,13 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
               <a
                 href={`/admin/blog/${p.id}`}
                 title={p.title}
-                style={`display:block;font-size:0.74rem;line-height:1.2;padding:0.2rem 0.3rem;border-radius:5px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${
+                style={`display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;font-size:0.72rem;line-height:1.25;padding:0.2rem 0.3rem;border-radius:5px;text-decoration:none;overflow:hidden;overflow-wrap:anywhere;${
                   p.status === "scheduled"
                     ? "background:var(--warning-tint);color:var(--warning-ink)"
                     : "background:var(--brand-tint);color:var(--brand)"
                 }`}
               >
-                {p.status === "scheduled" ? "⏱ " : ""}{p.title}
+                {hasVerifyFlags(p.bodyMarkdown) ? "⚠ " : p.status === "scheduled" ? "⏱ " : ""}{p.title}
               </a>
             ))}
           </div>
