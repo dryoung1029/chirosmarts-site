@@ -8,6 +8,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
+import { extractFaqs, wordCount } from "@/lib/blog";
 
 const db = getDb(Astro.locals.runtime.env);
 const id = Astro.params.id!;
@@ -21,6 +22,24 @@ if (!post) return Astro.redirect("/admin/blog", 303);
 const msg = Astro.url.searchParams.get("msg");
 const tags = (post.tags ?? []).join(", ");
 const inp = "width:100%;padding:0.5rem;margin-bottom:0.9rem";
+
+// SEO/AEO health checks on the current saved body (refreshes on Save).
+const md = post.bodyMarkdown ?? "";
+const head = md.slice(0, 700);
+const metaLen = (post.seoDescription ?? "").length;
+const internalLinks = (md.match(/\]\(\/(?!\/)/g) ?? []).length;
+const externalLinks = (md.match(/\]\(https?:\/\//g) ?? []).length;
+const faqCount = extractFaqs(md).length;
+const wc = wordCount(md);
+const checks = [
+  { ok: wc >= 700, label: `Length: ${wc} words (aim 900–1400)` },
+  { ok: /\*\*[^*\n]{40,}\*\*/.test(head), label: "Bold direct-answer paragraph up top (AI-extractable)" },
+  { ok: /^##\s+key takeaways/im.test(md), label: "Key takeaways section" },
+  { ok: faqCount >= 3, label: `FAQ section: ${faqCount} Q&A (powers FAQ rich results)` },
+  { ok: internalLinks >= 2, label: `Internal links: ${internalLinks} (aim 2–4)` },
+  { ok: externalLinks >= 1, label: `External/authority links: ${externalLinks} (e.g. OBCE)` },
+  { ok: metaLen >= 70 && metaLen <= 160, label: `Meta description: ${metaLen} chars (aim 120–160)` },
+];
 ---
 
 <Layout title="Edit article · Admin" showNav={true}>
@@ -43,6 +62,18 @@ const inp = "width:100%;padding:0.5rem;margin-bottom:0.9rem";
     {post.model && <span class="muted" style="font-size:0.85rem">drafted by {post.model}</span>}
   </div>
   <p class="muted" style="margin:0.25rem 0 1.25rem;font-size:0.9rem">Public URL: <code>/blog/{post.slug}</code></p>
+
+  <details class="panel" style="margin:0 0 1.25rem" open>
+    <summary style="font-weight:600;cursor:pointer">SEO / AEO checklist</summary>
+    <ul style="list-style:none;margin:0.6rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.3rem">
+      {checks.map((c) => (
+        <li style={`font-size:0.9rem;color:${c.ok ? "var(--brand)" : "var(--muted)"}`}>
+          {c.ok ? "✓" : "○"} {c.label}
+        </li>
+      ))}
+    </ul>
+    <p class="muted" style="margin:0.6rem 0 0;font-size:0.82rem">Refreshes when you Save. These structure cues are what help the article rank and get quoted by AI answer engines.</p>
+  </details>
 
   <form method="POST" action={`/api/admin/blog/${post.id}`}>
     <label style="font-weight:600">Title</label>

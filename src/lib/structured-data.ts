@@ -14,6 +14,7 @@ export function organizationLd(siteUrl: string) {
     name: ORG_NAME,
     legalName: LEGAL.entityName,
     url: siteUrl,
+    logo: `${siteUrl}/logo.png`,
     email: LEGAL.contactEmail,
     address: LEGAL.mailingAddress,
   };
@@ -70,18 +71,47 @@ export function articleLd(input: {
   description?: string;
   url: string;
   authorName: string;
+  authorCredentials?: string | null;
+  authorJobTitle?: string;
+  authorUrl?: string;
+  authorSameAs?: string[];
   datePublished?: string;
   dateModified?: string;
+  image?: string | null;
+  wordCount?: number;
+  section?: string;
+  siteUrl?: string;
 }) {
+  const author: Record<string, unknown> = {
+    "@type": "Person",
+    name: input.authorName,
+  };
+  if (input.authorJobTitle) author.jobTitle = input.authorJobTitle;
+  if (input.authorCredentials) author.description = input.authorCredentials;
+  if (input.authorUrl) author.url = input.authorUrl;
+  if (input.authorSameAs?.length) author.sameAs = input.authorSameAs;
+
+  const publisher: Record<string, unknown> = {
+    "@type": "Organization",
+    name: ORG_NAME,
+  };
+  if (input.siteUrl)
+    publisher.logo = { "@type": "ImageObject", url: `${input.siteUrl}/logo.png` };
+
   return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: input.title,
     description: input.description,
     url: input.url,
-    author: { "@type": "Person", name: input.authorName },
-    publisher: { "@type": "Organization", name: ORG_NAME },
+    mainEntityOfPage: { "@type": "WebPage", "@id": input.url },
+    image: input.image ? [input.image] : undefined,
+    author,
+    publisher,
     datePublished: input.datePublished,
     dateModified: input.dateModified ?? input.datePublished,
+    wordCount: input.wordCount,
+    articleSection: input.section,
+    inLanguage: "en-US",
   };
 }
