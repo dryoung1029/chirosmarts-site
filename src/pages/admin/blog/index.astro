@@ -33,7 +33,10 @@ const fmt = (iso: string | null) =>
 <Layout title="Article Studio · Admin" showNav={true}>
   <BusyOverlay />
   <AdminNav active="blog" />
-  <h1>Article Studio</h1>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1 style="margin-bottom:0">Article Studio</h1>
+    <a href="/admin/blog/calendar" style="margin-left:auto;padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">📅 Content calendar</a>
+  </div>
   <p class="muted" style="margin-top:0;max-width:48rem">
     Draft SEO blog articles for chiropractic assistants — in Dr. Young's voice —
     then edit and publish to <a href="/blog">/blog</a>. Drafts never publish
