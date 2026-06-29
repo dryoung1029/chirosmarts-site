@@ -8,7 +8,8 @@ import AdminNav from "@/components/AdminNav.astro";
 import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
-import { extractFaqs, wordCount, hasVerifyFlags } from "@/lib/blog";
+import { hasVerifyFlags } from "@/lib/blog";
+import { scorePost } from "@/lib/jeldon";
 
 const db = getDb(Astro.locals.runtime.env);
 const id = Astro.params.id!;
@@ -23,14 +24,10 @@ const msg = Astro.url.searchParams.get("msg");
 const tags = (post.tags ?? []).join(", ");
 const inp = "width:100%;padding:0.5rem;margin-bottom:0.9rem";
 
-// SEO/AEO health checks on the current saved body (refreshes on Save).
+// Scoring is the engine's job now — one scorer (@jeldon/core-scoring), fed by
+// jeldon.config.ts. Refreshes on Save. (The [VERIFY] gate is separate.)
 const md = post.bodyMarkdown ?? "";
-const head = md.slice(0, 700);
-const metaLen = (post.seoDescription ?? "").length;
-const internalLinks = (md.match(/\]\(\/(?!\/)/g) ?? []).length;
-const externalLinks = (md.match(/\]\(https?:\/\//g) ?? []).length;
-const faqCount = extractFaqs(md).length;
-const wc = wordCount(md);
+const { seo, geo } = scorePost(post);
 const verifyFlagged = hasVerifyFlags(md);
 const verifyCount = (md.match(/\[VERIFY\b/gi) ?? []).length;
 const fmtPt = (iso: string | null) =>
@@ -41,14 +38,13 @@ const fmtPt = (iso: string | null) =>
         timeStyle: "short",
       }) + " PT"
     : "";
-const checks = [
-  { ok: wc >= 700, label: `Length: ${wc} words (aim 900–1400)` },
-  { ok: /\*\*[^*\n]{40,}\*\*/.test(head), label: "Bold direct-answer paragraph up top (AI-extractable)" },
-  { ok: /^##\s+key takeaways/im.test(md), label: "Key takeaways section" },
-  { ok: faqCount >= 3, label: `FAQ section: ${faqCount} Q&A (powers FAQ rich results)` },
-  { ok: internalLinks >= 2, label: `Internal links: ${internalLinks} (aim 2–4)` },
-  { ok: externalLinks >= 1, label: `External/authority links: ${externalLinks} (e.g. OBCE)` },
-  { ok: metaLen >= 70 && metaLen <= 160, label: `Meta description: ${metaLen} chars (aim 120–160)` },
+const statusColor = (s: string) =>
+  s === "good" ? "var(--brand)" : s === "meh" ? "var(--warning-ink)" : "var(--danger)";
+const scoreColor = (n: number) =>
+  n >= 80 ? "var(--brand)" : n >= 60 ? "var(--warning-ink)" : "var(--danger)";
+const dials = [
+  { key: "GEO", help: "Answer-engine citability (AI Overviews, ChatGPT, Perplexity)", r: geo },
+  { key: "SEO", help: "Classical search health", r: seo },
 ];
 ---
 
@@ -73,17 +69,33 @@ const checks = [
   </div>
   <p class="muted" style="margin:0.25rem 0 1.25rem;font-size:0.9rem">Public URL: <code>/blog/{post.slug}</code></p>
 
-  <details class="panel" style="margin:0 0 1.25rem" open>
-    <summary style="font-weight:600;cursor:pointer">SEO / AEO checklist</summary>
-    <ul style="list-style:none;margin:0.6rem 0 0;padding:0;display:flex;flex-direction:column;gap:0.3rem">
-      {checks.map((c) => (
-        <li style={`font-size:0.9rem;color:${c.ok ? "var(--brand)" : "var(--muted)"}`}>
-          {c.ok ? "✓" : "○"} {c.label}
-        </li>
-      ))}
-    </ul>
-    <p class="muted" style="margin:0.6rem 0 0;font-size:0.82rem">Refreshes when you Save. These structure cues are what help the article rank and get quoted by AI answer engines.</p>
-  </details>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:0 0 1.25rem">
+    {dials.map((d) => (
+      <details class="panel" style="margin:0" open>
+        <summary style="font-weight:600;cursor:pointer;display:flex;align-items:baseline;gap:0.5rem">
+          <span>{d.key}</span>
+          <span style={`font-size:1.25rem;font-weight:700;color:${scoreColor(d.r.score)}`}>{d.r.score}</span>
+          <span class="muted" style="font-size:0.78rem">/100</span>
+          {(d.r.badCount > 0 || d.r.mehCount > 0) && (
+            <span class="muted" style="font-size:0.78rem;margin-left:auto">{d.r.badCount} bad · {d.r.mehCount} meh</span>
+          )}
+        </summary>
+        <p class="muted" style="margin:0.25rem 0 0.5rem;font-size:0.8rem">{d.help}</p>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.25rem">
+          {d.r.checks.map((c) => (
+            <li style={`font-size:0.85rem;display:flex;gap:0.5rem;color:${statusColor(c.status)}`}>
+              <span>{c.status === "good" ? "✓" : c.status === "meh" ? "~" : "✗"}</span>
+              <span style="flex:1;color:var(--text)">{c.label}</span>
+              <span class="muted">{c.value}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ))}
+  </div>
+  <p class="muted" style="margin:-0.5rem 0 1.25rem;font-size:0.8rem">
+    Scored by the shared Jeldon engine (<code>@jeldon/core-scoring</code>), tuned in <code>jeldon.config.ts</code>. Refreshes when you Save.
+  </p>
 
   <form method="POST" action={`/api/admin/blog/${post.id}`}>
     <label style="font-weight:600">Title</label>
