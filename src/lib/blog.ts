@@ -241,14 +241,18 @@ export class GeminiNotConfiguredError extends Error {
  * editorial illustrations and brand tokens (src/styles/tokens.css). No text,
  * no logos: those are layered separately and image models render letters badly.
  */
-const HERO_STYLE = `Flat, modern editorial vector illustration. Warm, clean, optimistic, professional — healthcare/chiropractic context in Oregon. Soft rounded shapes, subtle texture, gentle depth (no harsh gradients). Color palette: warm cream background (#FAFAF7), deep teal-green primary (#0b6b63) with a light teal tint (#ecf7f4), a warm terracotta accent (#c2410c) used sparingly, dark slate ink (#13272b). Wide 16:9 banner composition with generous negative space. Friendly and credible, not clip-art or corporate-stocky. ABSOLUTELY NO text, words, letters, numbers, logos, watermarks, or UI mockups.`;
+const HERO_STYLE = `Minimal, flat, modern editorial vector illustration. ONE single clear focal subject, centered or slightly off-center, surrounded by lots of empty negative space. Calm, uncluttered, and simple — NOT a busy collage of objects. Limit the whole image to the focal subject plus at most ONE small supporting element; do NOT scatter multiple props (no piles of spines, charts, clipboards, exam tables, plants, framed art, or floating diagrams). Clean confident line work, soft rounded shapes, gentle flat shading, no harsh gradients. Restrained palette: warm cream background (#FAFAF7), deep teal-green (#0b6b63) with a light teal tint (#ecf7f4), one small terracotta accent (#c2410c), dark slate ink (#13272b). Warm, optimistic, professional healthcare feel; not clip-art, not corporate stock. ABSOLUTELY NO text, words, letters, numbers, logos, watermarks, or UI mockups.`;
 
-const HERO_PROMPT_SYSTEM = `You write a single image-generation prompt for the hero banner of a ChiroSmarts blog article. Output ONLY the prompt text — one rich paragraph, no preamble, no quotes, no lists.
+const HERO_PROMPT_SYSTEM = `You write a single image-generation prompt for the hero banner of a ChiroSmarts blog article. Output ONLY the prompt text — 2–4 short sentences, no preamble, no quotes, no lists.
 
-The image must match this house style exactly:
+The image MUST match this house style exactly:
 ${HERO_STYLE}
 
-Given the article's title and summary, describe a concrete, tasteful scene/metaphor that fits the topic (e.g. a friendly front-desk chiropractic assistant, a checklist/roadmap motif, a calm clinic reception, certification/learning imagery). Reaffirm the house style and the "no text/letters/logos, 16:9, cream background, generous negative space" constraints inside the prompt so the image model honors them.`;
+Rules for the prompt you write:
+- Choose ONE simple, clear focal subject that fits the article (e.g. a single friendly chiropractic assistant at a tidy front desk, OR one stylized spine icon, OR one clipboard with a checkmark, OR a calm reception nook). Pick exactly one — never combine several.
+- Describe that one subject plus at most one small supporting element, and explicitly call for generous empty background and an uncluttered, minimal composition.
+- Keep the prompt SHORT and restrained — long, detailed prompts make the model cram in clutter. Do not enumerate many objects.
+- Restate the key constraints inside the prompt: flat minimal vector illustration, single focal subject, lots of negative space, cream (#FAFAF7) background, teal/terracotta palette, no text or letters or logos.`;
 
 export async function generateHeroPrompt(
   env: CloudflareEnv,
