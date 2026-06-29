@@ -12,7 +12,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { renderMarkdown } from "@/lib/markdown";
 import { extractFaqs, wordCount, stripLeadingH1 } from "@/lib/blog";
 import { getSiteUrl } from "@/lib/env";
-import { articleLd, faqPageLd } from "@/lib/structured-data";
+import { articleLd, faqPageLd, personLd } from "@/lib/structured-data";
 import { promoteDuePosts } from "@/lib/blog-schedule";
 import { OWNER } from "@/config/marketing";
 
@@ -70,16 +70,15 @@ const ld: unknown[] = [
     description: post.seoDescription ?? post.excerpt ?? undefined,
     url,
     authorName: post.author,
-    authorCredentials: authorCreds,
-    authorJobTitle: "Doctor of Chiropractic",
-    authorUrl: `${siteUrl}/about`,
     datePublished: post.publishedAt ?? undefined,
     dateModified: post.updatedAt,
     image: heroAbs,
     wordCount: wc,
     section: (post.tags ?? [])[0],
+    tags: post.tags ?? [],
     siteUrl,
   }),
+  personLd(siteUrl), // resolves the article author @id (E-E-A-T)
 ];
 const faqLd = faqPageLd(faqs);
 if (faqLd) ld.push(faqLd);

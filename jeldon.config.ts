@@ -209,9 +209,10 @@ export default defineDomainPack({
       url: SITE,
       logoUrl: `${SITE}/logo.png`,
       extra: {
+        // address comes from brand.nap (structured PostalAddress); keep only
+        // fields the engine doesn't already build, so extra never clobbers them.
         legalName: "Talisman Health Enterprise Management, LLC",
         email: "contact@chirosmarts.com",
-        address: "867 NW 23rd St, Corvallis, OR 97330",
       },
     },
     articleTypes: ["Article"], // NOT MedicalWebPage — professional/regulatory content, no PHI
