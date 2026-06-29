@@ -985,10 +985,9 @@ var defaultAnalyticsConfig = {
 };
 
 // src/load.ts
-import { existsSync } from "fs";
-import { resolve } from "path";
-import { pathToFileURL } from "url";
-import { createJiti } from "jiti";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 function validateDomainPack(input) {
   const parsed = domainPackSchema.safeParse(input);
   if (parsed.success) {
@@ -1022,6 +1021,7 @@ async function loadDomainPack(opts = {}) {
       `No Jeldon config found. Expected one of ${CONFIG_CANDIDATES.join(", ")} in ${cwd}.`
     );
   }
+  const { createJiti } = await import("jiti");
   const jiti = createJiti(pathToFileURL(cwd + "/").href);
   const mod = await jiti.import(configPath);
   const raw = mod?.default ?? mod;

@@ -347,7 +347,7 @@ function buildEngines(requested, keys, location) {
 }
 
 // src/store.ts
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 var EMPTY = (maxSnapshots) => ({
   lastUpdated: null,
   maxSnapshots,
