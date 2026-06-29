@@ -8,8 +8,10 @@ import AdminNav from "@/components/AdminNav.astro";
 import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { desc } from "drizzle-orm";
+import { promoteDuePosts } from "@/lib/blog-schedule";
 
 const db = getDb(Astro.locals.runtime.env);
+await promoteDuePosts(db);
 const posts = await db
   .select()
   .from(schema.blogPosts)
@@ -83,12 +85,16 @@ const fmt = (iso: string | null) =>
             style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
               p.status === "published"
                 ? "background:var(--brand-tint);color:var(--brand)"
-                : "background:var(--panel-2);color:var(--muted)"
+                : p.status === "scheduled"
+                  ? "background:var(--warning-tint);color:var(--warning-ink)"
+                  : "background:var(--panel-2);color:var(--muted)"
             }`}
           >
             {p.status}
           </span>
-          <span class="muted" style="font-size:0.85rem;white-space:nowrap">{fmt(p.updatedAt)}</span>
+          <span class="muted" style="font-size:0.85rem;white-space:nowrap">
+            {p.status === "scheduled" && p.scheduledAt ? `→ ${fmt(p.scheduledAt)}` : fmt(p.updatedAt)}
+          </span>
           <a href={`/admin/blog/${p.id}`} style="white-space:nowrap">Edit →</a>
         </li>
       ))}

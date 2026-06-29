@@ -13,6 +13,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import { extractFaqs, wordCount } from "@/lib/blog";
 import { getSiteUrl } from "@/lib/env";
 import { articleLd, faqPageLd } from "@/lib/structured-data";
+import { promoteDuePosts } from "@/lib/blog-schedule";
 import { OWNER } from "@/config/marketing";
 
 const env = Astro.locals.runtime.env;
@@ -20,6 +21,7 @@ const { slug } = Astro.params;
 const isAdmin = Astro.locals.user?.role === "site_admin";
 
 const db = getDb(env);
+await promoteDuePosts(db);
 const post = await db
   .select()
   .from(schema.blogPosts)

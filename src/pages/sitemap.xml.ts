@@ -3,11 +3,13 @@ import type { APIRoute } from "astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getSiteUrl } from "@/lib/env";
+import { promoteDuePosts } from "@/lib/blog-schedule";
 
 export const GET: APIRoute = async ({ locals }) => {
   const env = locals.runtime.env;
   const db = getDb(env);
   const base = getSiteUrl(env).replace(/\/$/, "");
+  await promoteDuePosts(db);
 
   const courses = await db
     .select({ slug: schema.courses.slug })

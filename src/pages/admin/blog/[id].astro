@@ -31,6 +31,14 @@ const internalLinks = (md.match(/\]\(\/(?!\/)/g) ?? []).length;
 const externalLinks = (md.match(/\]\(https?:\/\//g) ?? []).length;
 const faqCount = extractFaqs(md).length;
 const wc = wordCount(md);
+const fmtPt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }) + " PT"
+    : "";
 const checks = [
   { ok: wc >= 700, label: `Length: ${wc} words (aim 900–1400)` },
   { ok: /\*\*[^*\n]{40,}\*\*/.test(head), label: "Bold direct-answer paragraph up top (AI-extractable)" },
@@ -158,24 +166,63 @@ const checks = [
 
   <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
 
-  <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
-    <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
-      <input type="hidden" name="action" value={post.status === "published" ? "unpublish" : "publish"} />
-      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
-        {post.status === "published" ? "Unpublish" : "Publish to /blog"}
-      </button>
-    </form>
-    {post.status === "published" && (
-      <span class="muted" style="font-size:0.9rem">Live at <code>/blog/{post.slug}</code></span>
+  <section id="publish">
+    {post.status === "scheduled" && (
+      <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint);color:var(--warning-ink);border:none">
+        ⏱ Scheduled to publish <strong>{fmtPt(post.scheduledAt)}</strong>. It goes live automatically at that time.
+      </p>
     )}
-    <form id="delete-post" method="POST" action={`/api/admin/blog/${post.id}/delete`} style="margin-left:auto">
-      <button type="submit" style="padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--danger,#b3261e);background:transparent;color:var(--danger,#b3261e)">Delete</button>
-    </form>
-  </div>
+
+    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+      <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
+        <input type="hidden" name="action" value={post.status === "published" ? "unpublish" : "publish"} />
+        <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+          {post.status === "published" ? "Unpublish" : "Publish now"}
+        </button>
+      </form>
+      {post.status === "scheduled" && (
+        <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
+          <input type="hidden" name="action" value="unschedule" />
+          <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel)">Cancel schedule</button>
+        </form>
+      )}
+      {post.status === "published" && (
+        <span class="muted" style="font-size:0.9rem">Live at <code>/blog/{post.slug}</code></span>
+      )}
+      <form id="delete-post" method="POST" action={`/api/admin/blog/${post.id}/delete`} style="margin-left:auto">
+        <button type="submit" style="padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--danger,#b3261e);background:transparent;color:var(--danger,#b3261e)">Delete</button>
+      </form>
+    </div>
+
+    {post.status !== "published" && (
+      <form id="schedule-form" method="POST" action={`/api/admin/blog/${post.id}/publish`}
+        style="margin-top:1rem;display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap">
+        <input type="hidden" name="action" value="schedule" />
+        <input type="hidden" name="scheduledAt" id="scheduledAtIso" />
+        <div>
+          <label style="display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">
+            {post.status === "scheduled" ? "Reschedule for" : "Or schedule for later"} (your local time)
+          </label>
+          <input type="datetime-local" name="scheduledLocal" id="scheduledLocal" required
+            style="padding:0.45rem" />
+        </div>
+        <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600">
+          {post.status === "scheduled" ? "Reschedule" : "Schedule"}
+        </button>
+      </form>
+    )}
+  </section>
 
   <script>
     document.getElementById("delete-post")?.addEventListener("submit", (e) => {
       if (!confirm("Delete this article? This can't be undone.")) e.preventDefault();
+    });
+    // Convert the local datetime to a UTC ISO string using the browser's
+    // timezone, so "publish at 9am" means 9am where the owner is.
+    document.getElementById("schedule-form")?.addEventListener("submit", () => {
+      const local = (document.getElementById("scheduledLocal") as HTMLInputElement)?.value;
+      const iso = document.getElementById("scheduledAtIso") as HTMLInputElement;
+      if (local && iso) iso.value = new Date(local).toISOString();
     });
   </script>
 </Layout>

@@ -712,13 +712,14 @@ export const blogPosts = sqliteTable(
     author: text("author").notNull().default("Jason Young, DC"),
     authorCredentials: text("author_credentials"),
     tags: text("tags", { mode: "json" }).$type<string[]>().default([]),
-    status: text("status", { enum: ["draft", "published"] })
+    status: text("status", { enum: ["draft", "scheduled", "published"] })
       .notNull()
       .default("draft"),
     heroImage: text("hero_image"),
     heroPrompt: text("hero_prompt"), // editable image-gen prompt (two-step hero flow)
     seoDescription: text("seo_description"),
     model: text("model"), // AI generation provenance; null if hand-written
+    scheduledAt: text("scheduled_at"), // UTC; status=scheduled auto-publishes at/after this
     publishedAt: text("published_at"),
     createdAt: text("created_at").notNull().default(nowUtc),
     updatedAt: text("updated_at").notNull().default(nowUtc),
