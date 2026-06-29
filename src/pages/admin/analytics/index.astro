@@ -1,0 +1,134 @@
+---
+/**
+ * Admin analytics — privacy-first. Top-of-funnel traffic comes from Cloudflare
+ * Web Analytics (cookieless); this page shows first-party CONVERSION attribution
+ * (leads/purchases tied to ad campaigns via the `attribution` events) plus the
+ * overall funnel counts. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { eq, desc, sql } from "drizzle-orm";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const attrEvents = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.type, "attribution"))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(2000)
+  .all();
+
+interface Row {
+  source: string;
+  campaign: string;
+  medium: string;
+  lead: number;
+  purchase: number;
+  total: number;
+}
+const byCampaign = new Map<string, Row>();
+for (const e of attrEvents) {
+  const p = (e.payload as Record<string, string> | null) ?? {};
+  const source = p.source || "(none)";
+  const campaign = p.campaign || "(none)";
+  const medium = p.medium || "";
+  const key = `${source}|${campaign}|${medium}`;
+  const row =
+    byCampaign.get(key) ?? { source, campaign, medium, lead: 0, purchase: 0, total: 0 };
+  if (p.context === "lead") row.lead++;
+  else if (p.context === "purchase") row.purchase++;
+  row.total++;
+  byCampaign.set(key, row);
+}
+const rows = [...byCampaign.values()].sort((a, b) => b.total - a.total);
+
+async function countType(t: string): Promise<number> {
+  const r = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(schema.events)
+    .where(eq(schema.events.type, t))
+    .get();
+  return Number(r?.c ?? 0);
+}
+const totals = {
+  leads: await countType("lead_captured"),
+  confirmed: await countType("lead_confirmed"),
+  signups: await countType("signup"),
+  enrollments: await countType("enrollment_activated"),
+};
+const analyticsOn = !!env.CF_WEB_ANALYTICS_TOKEN;
+---
+
+<Layout title="Analytics · Admin" showNav={true}>
+  <AdminNav active="analytics" />
+  <h1>Analytics</h1>
+  <p class="muted" style="margin-top:0;max-width:50rem">
+    Traffic lives in <strong>Cloudflare Web Analytics</strong> (cookieless). This
+    page shows <strong>conversions tied to ad campaigns</strong> — tag your ad URLs
+    with <code>?utm_source=…&amp;utm_campaign=…</code> and the leads/purchases they
+    drive show up below.
+  </p>
+
+  {!analyticsOn && (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+      ⚠️ Cloudflare Web Analytics isn't enabled yet — set <code>CF_WEB_ANALYTICS_TOKEN</code>
+      so raw traffic (visits, top pages, referrers) is captured. Conversion
+      attribution below works regardless.
+    </p>
+  )}
+
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0 1.5rem">
+    {[
+      { label: "Leads captured", v: totals.leads },
+      { label: "Leads confirmed", v: totals.confirmed },
+      { label: "Signups", v: totals.signups },
+      { label: "Enrollments", v: totals.enrollments },
+    ].map((s) => (
+      <div class="panel" style="flex:1;min-width:9rem;text-align:center">
+        <div style="font-size:1.9rem;font-weight:700;color:var(--text)">{s.v}</div>
+        <div class="muted" style="font-size:0.85rem">{s.label}</div>
+      </div>
+    ))}
+  </div>
+
+  <h2 style="margin-bottom:0.5rem">Conversions by campaign</h2>
+  {rows.length === 0 ? (
+    <p class="muted">
+      No campaign conversions yet. They'll appear once visitors arrive via a
+      UTM-tagged link (e.g. your postcard QR) and capture a lead or start checkout.
+    </p>
+  ) : (
+    <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid var(--border)">
+          <th style="padding:0.5rem">Source</th>
+          <th style="padding:0.5rem">Campaign</th>
+          <th style="padding:0.5rem">Medium</th>
+          <th style="padding:0.5rem;text-align:right">Leads</th>
+          <th style="padding:0.5rem;text-align:right">Purchases</th>
+          <th style="padding:0.5rem;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.5rem;color:var(--text)">{r.source}</td>
+            <td style="padding:0.5rem">{r.campaign}</td>
+            <td style="padding:0.5rem;color:var(--muted)">{r.medium || "—"}</td>
+            <td style="padding:0.5rem;text-align:right">{r.lead}</td>
+            <td style="padding:0.5rem;text-align:right">{r.purchase}</td>
+            <td style="padding:0.5rem;text-align:right;font-weight:600">{r.total}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+
+  <p class="muted" style="margin-top:1.5rem;font-size:0.88rem">
+    Raw traffic, top pages, and referrers (filter by your UTM tags): Cloudflare
+    dashboard → your Pages project → <strong>Analytics &amp; Logs → Web Analytics</strong>.
+  </p>
+</Layout>

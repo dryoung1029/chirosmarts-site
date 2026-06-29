@@ -59,6 +59,30 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         data-cf-beacon={`{"token": "${analyticsToken}"}`}
       />
     )}
+    {/* First-touch campaign attribution: store UTM tags in a first-party cookie
+        (no third-party tracking) so conversions can be tied to ad campaigns. */}
+    <script is:inline>
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          var keys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+          if (!keys.some(function (k) { return p.get(k); })) return;
+          if (document.cookie.split("; ").some(function (c) { return c.indexOf("cs_attr=") === 0; })) return;
+          var attr = {
+            source: p.get("utm_source") || "",
+            medium: p.get("utm_medium") || "",
+            campaign: p.get("utm_campaign") || "",
+            term: p.get("utm_term") || "",
+            content: p.get("utm_content") || "",
+            landing: location.pathname,
+            ts: new Date().toISOString(),
+          };
+          document.cookie =
+            "cs_attr=" + encodeURIComponent(JSON.stringify(attr)) +
+            ";path=/;max-age=" + 60 * 60 * 24 * 90 + ";SameSite=Lax";
+        } catch (e) {}
+      })();
+    </script>
     <style is:global>
       html { scroll-behavior: smooth; }
       body {

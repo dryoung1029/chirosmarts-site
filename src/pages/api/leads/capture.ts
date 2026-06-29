@@ -3,10 +3,11 @@
 import type { APIRoute } from "astro";
 import { getDb } from "@/db/client";
 import { captureLead, type LeadSource } from "@/lib/leads";
+import { recordAttribution } from "@/lib/attribution";
 
 const SOURCES: LeadSource[] = ["renewal_checker", "checklist_pdf", "other"];
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = getDb(locals.runtime.env);
   let body: { email?: unknown; source?: unknown; birthMonth?: unknown };
   try {
@@ -26,6 +27,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     source,
     birthMonth,
   });
+  if (result.ok) await recordAttribution(db, cookies, "lead");
   return json(result, result.ok ? 200 : 400);
 };
 

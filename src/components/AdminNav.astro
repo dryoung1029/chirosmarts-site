@@ -1,7 +1,7 @@
 ---
 /** Admin section sub-navigation. */
 interface Props {
-  active?: "overview" | "students" | "content" | "collateral";
+  active?: "overview" | "students" | "content" | "collateral" | "analytics";
 }
 const { active } = Astro.props;
 const links: { key: string; href: string; label: string }[] = [
@@ -9,6 +9,7 @@ const links: { key: string; href: string; label: string }[] = [
   { key: "students", href: "/admin/students", label: "Students" },
   { key: "content", href: "/admin/content", label: "Content" },
   { key: "collateral", href: "/admin/collateral", label: "Collateral" },
+  { key: "analytics", href: "/admin/analytics", label: "Analytics" },
 ];
 ---
 
