@@ -1,0 +1,22 @@
+{
+  "name": "@jeldon/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "bin": {
+    "jeldon": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@jeldon/config": "file:../config",
+    "@jeldon/core-scoring": "file:../core-scoring"
+  }
+}
