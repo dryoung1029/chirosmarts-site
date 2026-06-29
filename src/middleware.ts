@@ -35,6 +35,8 @@ function isPublic(pathname: string): boolean {
   // Public marketing layer (catalog, guides, clinics, renewal, about, sitemap).
   if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
   if (pathname.startsWith("/guides/")) return true;
+  if (pathname === "/blog" || pathname.startsWith("/blog/")) return true;
+  if (pathname === "/blog/rss.xml") return true;
   if (
     pathname === "/clinics" ||
     pathname === "/renewal" ||

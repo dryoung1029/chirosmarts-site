@@ -698,6 +698,36 @@ export const courseCollateral = sqliteTable(
   ],
 );
 
+// Blog (CA content marketing). DB-backed so posts can be AI-drafted, edited, and
+// published from the admin without a redeploy; rendered SSR for SEO. Additive
+// table (no rebuild) — safe on D1.
+export const blogPosts = sqliteTable(
+  "blog_posts",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
+    bodyMarkdown: text("body_markdown").notNull().default(""),
+    author: text("author").notNull().default("Jason Young, DC"),
+    authorCredentials: text("author_credentials"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().default([]),
+    status: text("status", { enum: ["draft", "published"] })
+      .notNull()
+      .default("draft"),
+    heroImage: text("hero_image"),
+    seoDescription: text("seo_description"),
+    model: text("model"), // AI generation provenance; null if hand-written
+    publishedAt: text("published_at"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("blog_posts_slug_idx").on(t.slug),
+    index("blog_posts_status_idx").on(t.status, t.publishedAt),
+  ],
+);
+
 // A bundle is a single saleable `courses` row (one price, one purchase) whose
 // fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
 // maps a bundle course to its children; checkout/webhook fulfilment expands the

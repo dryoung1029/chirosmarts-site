@@ -1,0 +1,70 @@
+---
+/**
+ * Public blog index — published articles for chiropractic assistants.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { and, desc, eq } from "drizzle-orm";
+
+const db = getDb(Astro.locals.runtime.env);
+const isAdmin = Astro.locals.user?.role === "site_admin";
+
+// Admins see drafts too (clearly marked); the public sees only published.
+const rows = isAdmin
+  ? await db.select().from(schema.blogPosts).orderBy(desc(schema.blogPosts.updatedAt)).all()
+  : await db
+      .select()
+      .from(schema.blogPosts)
+      .where(eq(schema.blogPosts.status, "published"))
+      .orderBy(desc(schema.blogPosts.publishedAt))
+      .all();
+
+const fmt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "America/Los_Angeles",
+      })
+    : "";
+---
+
+<MarketingLayout
+  title="Blog — ChiroSmarts"
+  description="Practical guidance, compliance tips, and front-desk skills for Oregon chiropractic assistants."
+  canonicalPath="/blog"
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <div class="mk-container" style="max-width:760px">
+      <h1 style="margin:0 0 0.4rem">The ChiroSmarts Blog</h1>
+      <p style="color:var(--muted);margin:0 0 2rem">
+        Practical guidance, compliance tips, and front-desk skills for chiropractic
+        assistants — from Dr. Jason Young, DC.
+      </p>
+
+      {rows.length === 0 ? (
+        <p class="muted">No articles published yet. Check back soon.</p>
+      ) : (
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1.5rem">
+          {rows.map((p) => (
+            <li style="border-bottom:1px solid var(--border);padding-bottom:1.5rem">
+              <a href={`/blog/${p.slug}`} style="text-decoration:none;color:var(--text)">
+                <h2 style="margin:0 0 0.3rem;font-size:1.3rem">
+                  {p.title}
+                  {p.status === "draft" && (
+                    <span style="margin-left:0.5rem;padding:0.05rem 0.45rem;border-radius:6px;font-size:0.7rem;background:var(--panel-2);color:var(--muted);vertical-align:middle">draft</span>
+                  )}
+                </h2>
+              </a>
+              {p.excerpt && <p style="margin:0 0 0.5rem;color:var(--muted)">{p.excerpt}</p>}
+              <p style="margin:0;color:var(--muted);font-size:0.85rem">
+                {p.author}{p.publishedAt ? ` · ${fmt(p.publishedAt)}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </section>
+</MarketingLayout>

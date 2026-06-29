@@ -1,0 +1,85 @@
+---
+/**
+ * Public blog article. Published posts are public; admins can also preview
+ * drafts (clearly marked). Body is admin-authored Markdown, rendered SSR.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { renderMarkdown } from "@/lib/markdown";
+import { getSiteUrl } from "@/lib/env";
+import { articleLd } from "@/lib/structured-data";
+
+const env = Astro.locals.runtime.env;
+const { slug } = Astro.params;
+const isAdmin = Astro.locals.user?.role === "site_admin";
+
+const db = getDb(env);
+const post = await db
+  .select()
+  .from(schema.blogPosts)
+  .where(eq(schema.blogPosts.slug, slug!))
+  .get();
+
+// Drafts are visible only to admins; everyone else gets a 404 → catalog.
+if (!post || (post.status !== "published" && !isAdmin)) {
+  return Astro.redirect("/blog", 302);
+}
+
+const siteUrl = getSiteUrl(env).replace(/\/$/, "");
+const body = renderMarkdown(post.bodyMarkdown);
+
+const fmt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "America/Los_Angeles",
+      })
+    : "";
+
+const ld = articleLd({
+  title: post.title,
+  description: post.seoDescription ?? post.excerpt ?? undefined,
+  url: `${siteUrl}/blog/${post.slug}`,
+  authorName: post.author,
+  datePublished: post.publishedAt ?? undefined,
+  dateModified: post.updatedAt,
+});
+---
+
+<MarketingLayout
+  title={`${post.title} — ChiroSmarts Blog`}
+  description={post.seoDescription ?? post.excerpt ?? post.title}
+  canonicalPath={`/blog/${post.slug}`}
+  jsonLd={[ld]}
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <article class="mk-container" style="max-width:720px;line-height:1.7">
+      <p style="margin:0 0 1rem"><a href="/blog" style="color:var(--muted);text-decoration:none">← All articles</a></p>
+      {post.status === "draft" && (
+        <p class="mk-card" style="background:var(--panel-2);color:var(--muted);margin:0 0 1.25rem">
+          Draft preview — not visible to the public until published.
+        </p>
+      )}
+      <h1 style="margin:0 0 0.5rem">{post.title}</h1>
+      <p style="color:var(--muted);margin:0 0 1.75rem;font-size:0.9rem">
+        By {post.author}{post.authorCredentials ? `, ${post.authorCredentials}` : ""}
+        {post.publishedAt && ` · ${fmt(post.publishedAt)}`}
+      </p>
+      <div class="blog-body" set:html={body} />
+    </article>
+  </section>
+
+  <style>
+    .blog-body :global(h2) { margin-top: 2rem; }
+    .blog-body :global(h3) { margin-top: 1.5rem; }
+    .blog-body :global(ul), .blog-body :global(ol) { padding-left: 1.25rem; }
+    .blog-body :global(li) { margin: 0.3rem 0; }
+    .blog-body :global(blockquote) {
+      border-left: 3px solid var(--border); margin: 1rem 0; padding: 0.25rem 0 0.25rem 1rem; color: var(--muted);
+    }
+    .blog-body :global(a) { color: var(--brand); }
+  </style>
+</MarketingLayout>

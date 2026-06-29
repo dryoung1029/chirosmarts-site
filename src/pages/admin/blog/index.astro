@@ -1,0 +1,97 @@
+---
+/**
+ * Article Studio — admin blog list. Generate an article from a topic (AI, in
+ * Dr. Young's voice), then edit and publish. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
+import { getDb, schema } from "@/db/client";
+import { desc } from "drizzle-orm";
+
+const db = getDb(Astro.locals.runtime.env);
+const posts = await db
+  .select()
+  .from(schema.blogPosts)
+  .orderBy(desc(schema.blogPosts.updatedAt))
+  .all();
+const msg = Astro.url.searchParams.get("msg");
+
+const fmt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        timeZone: "America/Los_Angeles",
+      })
+    : "";
+---
+
+<Layout title="Article Studio · Admin" showNav={true}>
+  <BusyOverlay />
+  <AdminNav active="blog" />
+  <h1>Article Studio</h1>
+  <p class="muted" style="margin-top:0;max-width:48rem">
+    Draft SEO blog articles for chiropractic assistants — in Dr. Young's voice —
+    then edit and publish to <a href="/blog">/blog</a>. Drafts never publish
+    automatically; you review every word. AI drafts may flag <code>[VERIFY]</code>
+    on anything regulatory — confirm those before publishing.
+  </p>
+
+  {msg && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
+  )}
+
+  <form
+    method="POST"
+    action="/api/admin/blog/generate"
+    data-busy="Writing your article…"
+    class="panel"
+    style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1.5rem"
+  >
+    <strong>New article</strong>
+    <input
+      type="text"
+      name="topic"
+      required
+      placeholder="Topic — e.g. How a CA should handle a difficult patient at check-in"
+      style="padding:0.5rem"
+    />
+    <input
+      type="text"
+      name="keywords"
+      placeholder="Optional: keywords / angle — e.g. de-escalation, front desk, Oregon CA"
+      style="padding:0.5rem"
+    />
+    <div>
+      <button type="submit" class="btn-primary" style="padding:0.45rem 1.1rem">✦ Generate draft</button>
+      <span class="muted" style="font-size:0.85rem;margin-left:0.5rem">Takes a few seconds.</span>
+    </div>
+  </form>
+
+  {posts.length === 0 ? (
+    <p class="muted">No articles yet — generate your first above.</p>
+  ) : (
+    <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column">
+      {posts.map((p) => (
+        <li style="display:flex;align-items:center;gap:0.7rem;border-top:1px solid var(--border);padding:0.6rem 0">
+          <a href={`/admin/blog/${p.id}`} style="color:var(--accent);text-decoration:none;font-weight:600;flex:1;min-width:14rem">
+            {p.title}
+          </a>
+          <span
+            style={`padding:0.1rem 0.5rem;border-radius:6px;font-size:0.78rem;${
+              p.status === "published"
+                ? "background:var(--brand-tint);color:var(--brand)"
+                : "background:var(--panel-2);color:var(--muted)"
+            }`}
+          >
+            {p.status}
+          </span>
+          <span class="muted" style="font-size:0.85rem;white-space:nowrap">{fmt(p.updatedAt)}</span>
+          <a href={`/admin/blog/${p.id}`} style="white-space:nowrap">Edit →</a>
+        </li>
+      ))}
+    </ul>
+  )}
+</Layout>

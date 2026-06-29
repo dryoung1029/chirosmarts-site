@@ -15,12 +15,19 @@ export const GET: APIRoute = async ({ locals }) => {
     .where(eq(schema.courses.status, "published"))
     .all();
 
+  const posts = await db
+    .select({ slug: schema.blogPosts.slug })
+    .from(schema.blogPosts)
+    .where(eq(schema.blogPosts.status, "published"))
+    .all();
+
   const staticPaths = [
     "/",
     "/courses",
     "/clinics",
     "/renewal",
     "/about",
+    "/blog",
     "/verify",
     "/terms",
     "/privacy",
@@ -30,6 +37,7 @@ export const GET: APIRoute = async ({ locals }) => {
   const urls = [
     ...staticPaths,
     ...courses.map((c) => `/courses/${c.slug}`),
+    ...posts.map((p) => `/blog/${p.slug}`),
   ];
 
   const body =
