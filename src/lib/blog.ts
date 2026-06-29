@@ -47,6 +47,12 @@ function firstParagraph(md: string): string {
   return "";
 }
 
+/** Derive list/preview excerpt + SEO meta from a finished article body. */
+export function deriveMeta(markdown: string): { excerpt: string; seoDescription: string } {
+  const excerpt = firstParagraph(markdown).slice(0, 200);
+  return { excerpt, seoDescription: excerpt.slice(0, 160) };
+}
+
 async function complete(
   env: CloudflareEnv,
   system: string,
@@ -187,4 +193,106 @@ export async function reviseArticle(
   const user = `INSTRUCTION:\n${instruction}\n\nCURRENT ARTICLE:\n${currentMarkdown}`;
   const markdown = await complete(env, REVISE_SYSTEM, user, 4500);
   return { markdown, model: MODEL };
+}
+
+const IMPROVE_SYSTEM = `You are an SEO + AEO editor improving a ChiroSmarts blog article so it scores perfectly on the checklist below, WITHOUT losing the author's voice, facts, or meaning. Rewrite/restructure as needed; keep everything that's already good.
+
+VOICE PROFILE
+${voiceProfile}
+
+AUTHOR AUTHORITY (use where relevant; never invent beyond it)
+Jason Young, DC — practicing Oregon chiropractor since 2008; trained Oregon CAs for 10+ years; former president of the Oregon Board of Chiropractic Examiners (OBCE), 2013–2019; first chiropractor in Oregon to offer online CA training.
+
+CHECKLIST TO SATISFY (every item)
+1. "# H1" natural-language title with the primary keyword.
+2. Immediately under the H1, a bold (** **) DIRECT-ANSWER paragraph of 2–4 sentences (~40–60 words) that answers the title question standalone.
+3. "## Key takeaways" with 3–5 bullets.
+4. 3–6 "## H2" sections, several phrased as the reader's literal questions, each answer-first; use lists where they help.
+5. "## Frequently asked questions" with 3–6 "### " question entries, each with a concise standalone 1–3 sentence answer.
+6. "## Bottom line" wrap-up (2–4 sentences).
+7. 2–4 INTERNAL links (root-relative Markdown) to relevant pages: /courses, /clinics, /renewal, /verify, /about, or other /blog articles — descriptive anchor text.
+8. 1–3 EXTERNAL authority links to primary sources, above all the OBCE at https://www.oregon.gov/obce for regulatory points (never invent a URL).
+9. ~900–1400 words.
+
+COMPLIANCE: never fabricate Oregon regulatory specifics/fees/hours — keep general or flag [VERIFY]. No patient-directed clinical advice.
+
+OUTPUT: the COMPLETE improved article as GitHub-Flavored Markdown, starting with the H1. No commentary, no code fences.`;
+
+export async function improveArticle(
+  env: CloudflareEnv,
+  currentMarkdown: string,
+): Promise<{ markdown: string; model: string }> {
+  if (!env.ANTHROPIC_API_KEY) throw new NotConfiguredError();
+  const markdown = await complete(env, IMPROVE_SYSTEM, `ARTICLE TO IMPROVE:\n${currentMarkdown}`, 4500);
+  return { markdown, model: MODEL };
+}
+
+// ---- Hero image (two-step: prompt → image) -------------------------------
+
+export class GeminiNotConfiguredError extends Error {
+  constructor() {
+    super("GEMINI_API_KEY is not set");
+    this.name = "GeminiNotConfiguredError";
+  }
+}
+
+/**
+ * Site visual identity for hero art — kept in sync with the existing flat
+ * editorial illustrations and brand tokens (src/styles/tokens.css). No text,
+ * no logos: those are layered separately and image models render letters badly.
+ */
+const HERO_STYLE = `Flat, modern editorial vector illustration. Warm, clean, optimistic, professional — healthcare/chiropractic context in Oregon. Soft rounded shapes, subtle texture, gentle depth (no harsh gradients). Color palette: warm cream background (#FAFAF7), deep teal-green primary (#0b6b63) with a light teal tint (#ecf7f4), a warm terracotta accent (#c2410c) used sparingly, dark slate ink (#13272b). Wide 16:9 banner composition with generous negative space. Friendly and credible, not clip-art or corporate-stocky. ABSOLUTELY NO text, words, letters, numbers, logos, watermarks, or UI mockups.`;
+
+const HERO_PROMPT_SYSTEM = `You write a single image-generation prompt for the hero banner of a ChiroSmarts blog article. Output ONLY the prompt text — one rich paragraph, no preamble, no quotes, no lists.
+
+The image must match this house style exactly:
+${HERO_STYLE}
+
+Given the article's title and summary, describe a concrete, tasteful scene/metaphor that fits the topic (e.g. a friendly front-desk chiropractic assistant, a checklist/roadmap motif, a calm clinic reception, certification/learning imagery). Reaffirm the house style and the "no text/letters/logos, 16:9, cream background, generous negative space" constraints inside the prompt so the image model honors them.`;
+
+export async function generateHeroPrompt(
+  env: CloudflareEnv,
+  input: { title: string; excerpt?: string },
+): Promise<{ prompt: string; model: string }> {
+  if (!env.ANTHROPIC_API_KEY) throw new NotConfiguredError();
+  const user = `TITLE: ${input.title}${input.excerpt ? `\nSUMMARY: ${input.excerpt}` : ""}`;
+  const prompt = await complete(env, HERO_PROMPT_SYSTEM, user, 600);
+  return { prompt: prompt.replace(/^["'\s]+|["'\s]+$/g, ""), model: MODEL };
+}
+
+/**
+ * Generate a hero image from a prompt via Google's Imagen (Gemini API).
+ * Returns raw image bytes; the caller stores them in R2. Uses fetch (no SDK)
+ * to keep the dependency surface minimal.
+ */
+export async function generateHeroImage(
+  env: CloudflareEnv,
+  prompt: string,
+): Promise<{ bytes: Uint8Array; contentType: string; model: string }> {
+  if (!env.GEMINI_API_KEY) throw new GeminiNotConfiguredError();
+  const model = env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-002";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      instances: [{ prompt: `${prompt}\n\n${HERO_STYLE}` }],
+      parameters: { sampleCount: 1, aspectRatio: "16:9", personGeneration: "allow_adult" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Imagen request failed (${res.status}): ${body.slice(0, 500)}`);
+  }
+  const data = (await res.json()) as {
+    predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+  };
+  const pred = data.predictions?.[0];
+  if (!pred?.bytesBase64Encoded) {
+    throw new Error("Imagen returned no image (the prompt may have been blocked by safety filters).");
+  }
+  const bin = atob(pred.bytesBase64Encoded);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { bytes, contentType: pred.mimeType || "image/png", model };
 }

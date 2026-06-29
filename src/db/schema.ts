@@ -716,6 +716,7 @@ export const blogPosts = sqliteTable(
       .notNull()
       .default("draft"),
     heroImage: text("hero_image"),
+    heroPrompt: text("hero_prompt"), // editable image-gen prompt (two-step hero flow)
     seoDescription: text("seo_description"),
     model: text("model"), // AI generation provenance; null if hand-written
     publishedAt: text("published_at"),

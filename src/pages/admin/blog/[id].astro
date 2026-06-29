@@ -108,12 +108,53 @@ const checks = [
 
     <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
       <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">Save</button>
+      <button type="submit" formaction={`/api/admin/blog/${post.id}/improve`} data-busy="Improving for SEO / AEO…"
+        style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--accent-text);font-weight:600">✦ Improve to checklist</button>
       <button type="submit" formaction={`/api/admin/blog/${post.id}/revise`} data-busy="Applying your edit…"
         style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600">✦ Apply edit</button>
       <a href={`/blog/${post.slug}`} target="_blank" rel="noopener"
         style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)">Preview ↗</a>
     </div>
+    <p class="muted" style="margin:0.4rem 0 0;font-size:0.85rem">"Improve to checklist" rewrites the whole article to hit every SEO/AEO item above (it edits the body, excerpt, and meta) — review the result before publishing.</p>
   </form>
+
+  <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
+
+  {/* Hero image — two-step: draft a prompt in the site style, then generate. */}
+  <section id="hero">
+    <h2 style="margin:0 0 0.25rem;font-size:1.15rem">Hero image</h2>
+    <p class="muted" style="margin:0 0 0.9rem;font-size:0.9rem">
+      Generates a 16:9 illustration in the site's style (used at the top of the
+      article and as its social/OG preview). Step 1: draft a prompt. Step 2: edit
+      it if you like, then generate the image.
+    </p>
+
+    {post.heroImage && (
+      <img
+        src={post.heroImage}
+        alt="Current hero"
+        style="max-width:480px;width:100%;border-radius:12px;border:1px solid var(--border);margin-bottom:0.9rem;display:block"
+      />
+    )}
+
+    <form method="POST" action={`/api/admin/blog/${post.id}/hero-prompt`} style="margin-bottom:0.6rem">
+      <button type="submit" data-busy="Drafting a hero prompt…"
+        style="padding:0.45rem 1.1rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600">
+        {post.heroPrompt ? "↻ Re-draft prompt" : "✦ Generate hero prompt"}
+      </button>
+    </form>
+
+    <form method="POST" action={`/api/admin/blog/${post.id}/hero-image`}>
+      <label style="font-weight:600">Image prompt</label>
+      <textarea name="heroPrompt" placeholder="Click 'Generate hero prompt' above, or write your own…"
+        style="width:100%;height:7rem;padding:0.6rem;margin:0.25rem 0 0.6rem;line-height:1.5">{post.heroPrompt ?? ""}</textarea>
+      <button type="submit" class="btn-primary" data-busy="Generating image — this can take ~15s…"
+        style="padding:0.5rem 1.2rem">
+        {post.heroImage ? "Regenerate image" : "Generate image"}
+      </button>
+      <span class="muted" style="font-size:0.85rem;margin-left:0.5rem">Uses the prompt above.</span>
+    </form>
+  </section>
 
   <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
 
