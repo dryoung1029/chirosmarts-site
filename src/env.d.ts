@@ -35,7 +35,7 @@ interface CloudflareEnv {
   CF_STREAM_SIGNING_KEY_JWK?: string; // base64-encoded JWK (RSA private key)
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string; // Google Gemini / Imagen — blog hero image generation
-  GEMINI_IMAGE_MODEL?: string; // override (default imagen-3.0-generate-002)
+  GEMINI_IMAGE_MODEL?: string; // override (default gemini-2.5-flash-image; imagen-* uses :predict, needs billing)
   // Brevo (marketing email — groundwork only; no campaigns wired). Sync pushes
   // CONFIRMED leads + opted-in users; never non-consented contacts.
   BREVO_API_KEY?: string;

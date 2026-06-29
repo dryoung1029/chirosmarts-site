@@ -45,7 +45,7 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     if (err instanceof GeminiNotConfiguredError) {
       return redirect(`${back}?msg=Set+GEMINI_API_KEY+to+generate+images#hero`, 303);
     }
-    const detail = err instanceof Error ? err.message.slice(0, 120) : "unknown error";
-    return redirect(`${back}?msg=${encodeURIComponent("Image generation failed: " + detail)}#hero`, 303);
+    const detail = err instanceof Error ? err.message.slice(0, 300) : "unknown error";
+    return redirect(`${back}?msg=${encodeURIComponent("Image generation failed — " + detail)}#hero`, 303);
   }
 };

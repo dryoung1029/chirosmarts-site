@@ -265,34 +265,73 @@ export async function generateHeroPrompt(
  * Returns raw image bytes; the caller stores them in R2. Uses fetch (no SDK)
  * to keep the dependency surface minimal.
  */
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/** Default to the native Gemini image model — works on the free tier. Imagen
+ * (`imagen-*`) is higher quality + true 16:9 but needs a billed key. Override
+ * with GEMINI_IMAGE_MODEL. */
+export function heroImageModel(env: CloudflareEnv): string {
+  return env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+}
+
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 export async function generateHeroImage(
   env: CloudflareEnv,
   prompt: string,
 ): Promise<{ bytes: Uint8Array; contentType: string; model: string }> {
   if (!env.GEMINI_API_KEY) throw new GeminiNotConfiguredError();
-  const model = env.GEMINI_IMAGE_MODEL || "imagen-3.0-generate-002";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`;
-  const res = await fetch(url, {
+  const model = heroImageModel(env);
+  const fullPrompt = `${prompt}\n\n${HERO_STYLE}`;
+  const headers = {
+    "content-type": "application/json",
+    "x-goog-api-key": env.GEMINI_API_KEY,
+  };
+
+  // Imagen family → :predict ; Gemini native image model → :generateContent.
+  if (model.startsWith("imagen")) {
+    const res = await fetch(`${GEMINI_BASE}/${model}:predict`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        instances: [{ prompt: fullPrompt }],
+        parameters: { sampleCount: 1, aspectRatio: "16:9" },
+      }),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Imagen ${model} failed (${res.status}): ${text.slice(0, 400)}`);
+    const data = JSON.parse(text) as {
+      predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+    };
+    const pred = data.predictions?.[0];
+    if (!pred?.bytesBase64Encoded)
+      throw new Error(`Imagen returned no image: ${text.slice(0, 400)}`);
+    return { bytes: b64ToBytes(pred.bytesBase64Encoded), contentType: pred.mimeType || "image/png", model };
+  }
+
+  const res = await fetch(`${GEMINI_BASE}/${model}:generateContent`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+    headers,
     body: JSON.stringify({
-      instances: [{ prompt: `${prompt}\n\n${HERO_STYLE}` }],
-      parameters: { sampleCount: 1, aspectRatio: "16:9", personGeneration: "allow_adult" },
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      generationConfig: { responseModalities: ["IMAGE"] },
     }),
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Imagen request failed (${res.status}): ${body.slice(0, 500)}`);
-  }
-  const data = (await res.json()) as {
-    predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Gemini ${model} failed (${res.status}): ${text.slice(0, 400)}`);
+  const data = JSON.parse(text) as {
+    candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[];
+    promptFeedback?: { blockReason?: string };
   };
-  const pred = data.predictions?.[0];
-  if (!pred?.bytesBase64Encoded) {
-    throw new Error("Imagen returned no image (the prompt may have been blocked by safety filters).");
-  }
-  const bin = atob(pred.bytesBase64Encoded);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { bytes, contentType: pred.mimeType || "image/png", model };
+  if (data.promptFeedback?.blockReason)
+    throw new Error(`Gemini blocked the prompt: ${data.promptFeedback.blockReason}`);
+  const part = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  const inline = part?.inlineData;
+  if (!inline?.data) throw new Error(`Gemini returned no image: ${text.slice(0, 400)}`);
+  return { bytes: b64ToBytes(inline.data), contentType: inline.mimeType || "image/png", model };
 }
