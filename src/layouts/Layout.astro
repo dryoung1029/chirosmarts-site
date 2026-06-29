@@ -25,6 +25,9 @@ const isActive = (prefix: string) =>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>{title} · ChiroSmarts</title>
     <style is:global>
       body {
@@ -106,6 +109,7 @@ const isActive = (prefix: string) =>
                 {userIsAdmin && (
                   <a href="/admin" class={isActive("/admin") ? "active" : ""}>Admin</a>
                 )}
+                <a href="/help" class={isActive("/help") ? "active" : ""}>Help</a>
               </div>
               <form method="POST" action="/api/auth/logout" style="display:flex;align-items:center;gap:1rem">
                 <span class="muted">{user.email}</span>
@@ -121,6 +125,7 @@ const isActive = (prefix: string) =>
     </main>
     <footer class="wrap" style="margin-top:2rem;padding:1.25rem 0;border-top:1px solid var(--border);color:var(--muted);font-size:0.85rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center">
       <span>© {new Date().getFullYear()} {legalEntity}</span>
+      <a href="/help">Help</a>
       <a href="/terms">Terms of Service</a>
       <a href="/privacy">Privacy Policy</a>
       <a href="/courses">Courses</a>

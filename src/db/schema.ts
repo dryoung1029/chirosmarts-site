@@ -648,6 +648,88 @@ export const courseResources = sqliteTable(
   (t) => [index("course_resources_course_idx").on(t.courseId)],
 );
 
+// Collateral Studio (docs/collateral-studio-design.md): the editable,
+// owner-approved SOURCE OF TRUTH for generated course collateral (study guides,
+// checklists, cheat-sheets). The PUBLISHED PDF is a derived artifact in R2 +
+// surfaced via `course_resources`; this row stays editable and versioned.
+// Generated from `lesson_transcripts` via Claude, in the owner's voice. Additive
+// table (no rebuild) — safe on D1.
+export const courseCollateral = sqliteTable(
+  "course_collateral",
+  {
+    id: text("id").primaryKey(),
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id),
+    // Scope of the source material this collateral was generated from.
+    scope: text("scope", { enum: ["course", "module", "lesson"] })
+      .notNull()
+      .default("course"),
+    scopeRefId: text("scope_ref_id"), // module/lesson id when scoped; null for whole course
+    type: text("type", {
+      enum: [
+        "study_guide",
+        "checklist",
+        "cheat_sheet",
+        "glossary",
+        "practice_questions",
+        "handout",
+      ],
+    }).notNull(),
+    title: text("title").notNull(),
+    status: text("status", { enum: ["draft", "published"] })
+      .notNull()
+      .default("draft"),
+    bodyMarkdown: text("body_markdown").notNull().default(""),
+    model: text("model"), // generation model id (provenance); null if hand-written
+    sourceMeta: text("source_meta"), // JSON: lesson ids + transcript snapshot used
+    r2Key: text("r2_key"), // published PDF object key; null until published
+    resourceId: text("resource_id").references(() => courseResources.id), // student-facing row
+    version: integer("version").notNull().default(0), // bumps on each publish
+    sortOrder: integer("sort_order").notNull().default(0), // ordering within a course (manage view + manual compile)
+    inManual: integer("in_manual", { mode: "boolean" }).notNull().default(true), // include in the compiled course manual
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+    publishedAt: text("published_at"),
+  },
+  (t) => [
+    index("course_collateral_course_idx").on(t.courseId),
+    index("course_collateral_status_idx").on(t.status),
+  ],
+);
+
+// Blog (CA content marketing). DB-backed so posts can be AI-drafted, edited, and
+// published from the admin without a redeploy; rendered SSR for SEO. Additive
+// table (no rebuild) — safe on D1.
+export const blogPosts = sqliteTable(
+  "blog_posts",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
+    bodyMarkdown: text("body_markdown").notNull().default(""),
+    author: text("author").notNull().default("Jason Young, DC"),
+    authorCredentials: text("author_credentials"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().default([]),
+    status: text("status", { enum: ["draft", "scheduled", "published"] })
+      .notNull()
+      .default("draft"),
+    heroImage: text("hero_image"),
+    heroPrompt: text("hero_prompt"), // editable image-gen prompt (two-step hero flow)
+    seoDescription: text("seo_description"),
+    model: text("model"), // AI generation provenance; null if hand-written
+    scheduledAt: text("scheduled_at"), // UTC; status=scheduled auto-publishes at/after this
+    publishedAt: text("published_at"),
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    uniqueIndex("blog_posts_slug_idx").on(t.slug),
+    index("blog_posts_status_idx").on(t.status, t.publishedAt),
+  ],
+);
+
 // A bundle is a single saleable `courses` row (one price, one purchase) whose
 // fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
 // maps a bundle course to its children; checkout/webhook fulfilment expands the

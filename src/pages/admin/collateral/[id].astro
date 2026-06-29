@@ -1,0 +1,210 @@
+---
+/**
+ * Collateral Studio — draft editor (P1b).
+ * Edit the AI-drafted Markdown, save, or regenerate. Publish (→ PDF/R2/
+ * course_resources) arrives in P1c. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { TYPE_LABEL } from "@/lib/collateral";
+
+const db = getDb(Astro.locals.runtime.env);
+const id = Astro.params.id!;
+const row = await db
+  .select()
+  .from(schema.courseCollateral)
+  .where(eq(schema.courseCollateral.id, id))
+  .get();
+
+if (!row) return Astro.redirect("/admin/collateral", 303);
+
+const course = await db
+  .select({ title: schema.courses.title, slug: schema.courses.slug })
+  .from(schema.courses)
+  .where(eq(schema.courses.id, row.courseId))
+  .get();
+const courseSlug = course?.slug ?? "";
+
+const msg = Astro.url.searchParams.get("msg");
+const meta = row.sourceMeta ? JSON.parse(row.sourceMeta) : {};
+const publishedLabel = row.publishedAt
+  ? new Date(row.publishedAt).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "America/Los_Angeles",
+    })
+  : null;
+---
+
+<Layout title="Edit collateral · Admin" showNav={true}>
+  <BusyOverlay />
+  <AdminNav active="collateral" />
+
+  <p style="margin:0 0 0.5rem"><a href="/admin/collateral">← All collateral</a></p>
+
+  {msg && (
+    <p
+      class="panel"
+      style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none"
+    >
+      {msg}
+    </p>
+  )}
+
+  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap">
+    <h1 style="margin:0">{row.title}</h1>
+    <span
+      style={`padding:0.15rem 0.6rem;border-radius:6px;font-size:0.8rem;${
+        row.status === "published"
+          ? "background:var(--brand-tint);color:var(--brand)"
+          : "background:var(--panel-2);color:var(--muted)"
+      }`}
+    >
+      {row.status}
+    </span>
+  </div>
+  <p class="muted" style="margin:0.25rem 0 1.25rem;font-size:0.9rem">
+    {course?.title} · {TYPE_LABEL[row.type as keyof typeof TYPE_LABEL] ?? row.type}
+    {" · "}{meta.scopeLabel ?? row.scope}
+    {row.model && <> · drafted by {row.model}</>}
+  </p>
+
+  <form method="POST" action={`/api/admin/collateral/${row.id}`}>
+    <label style="display:block;font-weight:600;margin-bottom:0.25rem">Title</label>
+    <input
+      type="text"
+      name="title"
+      value={row.title}
+      required
+      style="width:100%;padding:0.5rem;margin-bottom:1rem"
+    />
+
+    <label style="display:block;font-weight:600;margin-bottom:0.25rem">
+      Content (Markdown)
+    </label>
+    <textarea
+      name="bodyMarkdown"
+      spellcheck="true"
+      style="width:100%;height:30rem;padding:0.75rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre"
+      >{row.bodyMarkdown}</textarea
+    >
+
+    <label
+      style="display:block;font-weight:600;margin:1.25rem 0 0.25rem"
+    >
+      Ask for an edit (optional)
+    </label>
+    <input
+      type="text"
+      name="instruction"
+      placeholder="e.g. Make the checklist shorter, or add a section on cuff sizing"
+      style="width:100%;padding:0.5rem"
+    />
+    <p class="muted" style="margin:0.3rem 0 0;font-size:0.85rem">
+      "Apply edit" revises the draft above using your instruction, in your voice.
+      "Save draft" just saves your manual edits.
+    </p>
+
+    <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        Save draft
+      </button>
+      <button
+        type="submit"
+        formaction={`/api/admin/collateral/${row.id}/revise`}
+        data-busy="Applying your edit…"
+        style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600"
+      >
+        ✦ Apply edit
+      </button>
+    </div>
+  </form>
+
+  <hr style="margin:1.75rem 0;border:none;border-top:1px solid var(--border)" />
+
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+    <form method="POST" action={`/api/admin/collateral/${row.id}/regenerate`} data-busy="Regenerating from transcripts…">
+      <button
+        type="submit"
+        style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)"
+      >
+        ↻ Regenerate from transcripts
+      </button>
+    </form>
+    <span class="muted" style="font-size:0.85rem">
+      Replaces the content above with a fresh draft (your edits will be lost).
+    </span>
+  </div>
+
+  <div style="margin-top:1.5rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+    <a
+      href={`/api/admin/collateral/${row.id}/preview`}
+      target="_blank"
+      rel="noopener"
+      style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)"
+    >
+      Preview PDF ↗
+    </a>
+    <a
+      href={`/api/admin/collateral/${row.id}/markdown`}
+      style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)"
+    >
+      Download .md ↓
+    </a>
+    <form method="POST" action={`/api/admin/collateral/${row.id}/publish`} data-busy="Publishing…">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        {row.status === "published" ? "Re-publish to students" : "Publish to students"}
+      </button>
+    </form>
+    <span class="muted" style="font-size:0.85rem">
+      Preview & publish use the <strong>saved</strong> draft — save your edits first.
+    </span>
+  </div>
+
+  {row.status === "published" && (
+    <p class="muted" style="margin-top:0.75rem;font-size:0.9rem">
+      ✓ Published (v{row.version}{publishedLabel ? ` · ${publishedLabel}` : ""}).
+      {" "}
+      <a href={`/api/admin/collateral/${row.id}/published`} target="_blank" rel="noopener">
+        Download the published PDF ↗
+      </a>
+      <br />
+      Students see it in the <strong>Downloads</strong> panel on the course player
+      page (<code>/learn/{courseSlug}</code>) — visible to <strong>enrolled</strong>
+      students only, so you won't see it there unless you're enrolled in this course.
+    </p>
+  )}
+
+  <hr style="margin:1.75rem 0;border:none;border-top:1px solid var(--border)" />
+  <form
+    id="delete-collateral"
+    method="POST"
+    action={`/api/admin/collateral/${row.id}/delete`}
+  >
+    <button
+      type="submit"
+      style="padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--danger,#b3261e);background:transparent;color:var(--danger,#b3261e)"
+    >
+      Delete collateral
+    </button>
+    <span class="muted" style="font-size:0.85rem;margin-left:0.5rem">
+      {row.status === "published"
+        ? "Removes the draft and the published student download."
+        : "Removes this draft."}
+    </span>
+  </form>
+
+  <script>
+    document
+      .getElementById("delete-collateral")
+      ?.addEventListener("submit", (e) => {
+        if (!confirm("Delete this collateral? This can't be undone.")) {
+          e.preventDefault();
+        }
+      });
+  </script>
+</Layout>

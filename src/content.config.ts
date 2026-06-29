@@ -38,4 +38,20 @@ const guides = defineCollection({
   }),
 });
 
-export const collections = { legal, testimonials, guides };
+// In-app Help Center articles (how-to / FAQ for using the platform). Distinct
+// from `guides` (public SEO long-reads) and the AI course tutor (lesson content
+// only). `audience` drives role-aware ordering on /help; `category` groups them.
+const help = defineCollection({
+  loader: glob({ pattern: "*.md", base: "./src/content/help" }),
+  schema: z.object({
+    title: z.string(),
+    summary: z.string(),
+    audience: z.enum(["everyone", "student", "clinic", "admin"]).default("everyone"),
+    category: z.string(),
+    order: z.number().default(100),
+    related: z.array(z.string()).optional(), // related help slugs
+    updated: z.string().optional(),
+  }),
+});
+
+export const collections = { legal, testimonials, guides, help };

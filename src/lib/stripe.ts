@@ -43,6 +43,7 @@ export async function createCourseCheckout(
   const stripe = getStripe(env);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    allow_promotion_codes: true,
     line_items: args.courses.map((c) => ({
       quantity: 1,
       price_data: {
@@ -68,6 +69,7 @@ export async function createSeatsCheckout(
   const stripe = getStripe(env);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    allow_promotion_codes: true,
     line_items: [
       {
         quantity: args.quantity,

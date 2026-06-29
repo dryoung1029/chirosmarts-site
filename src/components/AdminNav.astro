@@ -1,13 +1,22 @@
 ---
 /** Admin section sub-navigation. */
 interface Props {
-  active?: "overview" | "students" | "content";
+  active?:
+    | "overview"
+    | "students"
+    | "content"
+    | "collateral"
+    | "blog"
+    | "analytics";
 }
 const { active } = Astro.props;
 const links: { key: string; href: string; label: string }[] = [
   { key: "overview", href: "/admin", label: "Overview" },
   { key: "students", href: "/admin/students", label: "Students" },
   { key: "content", href: "/admin/content", label: "Content" },
+  { key: "collateral", href: "/admin/collateral", label: "Collateral" },
+  { key: "blog", href: "/admin/blog", label: "Blog" },
+  { key: "analytics", href: "/admin/analytics", label: "Analytics" },
 ];
 ---
 

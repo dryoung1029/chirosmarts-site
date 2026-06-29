@@ -14,7 +14,27 @@
 | M1 | ✅ fast-forward merged to `main` (was `m1-auth`) |
 | M1.5 | ✅ built (clinic-owner path) |
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
-| Git model | `main` holds approved state; work happens on named milestone branches (`m0-scaffold`, `m1-auth`, `m1.5-clinic`, `m2-player`, …) merged to `main` |
+| Git model | **`main` is the Cloudflare production branch and auto-deploys on push** (Pages is Git-connected). Work happens on feature branches (`claude/charming-faraday-ixrhmb`, milestone branches) and is merged/fast-forwarded into `main` to ship. (`main` was historically stale while prod tracking drifted to `blissful-archimedes`; realigned 2026-06.) |
+
+### Help system (shipped 2026-06)
+- **In-app Help Center** at `/help` (role-aware), distinct from `guides` (public
+  SEO) and the AI course tutor (lesson content only). New `help` content
+  collection (`src/content/help/*.md`, schema: title/summary/audience/category/
+  order/related). 12 starter articles drafted (getting-started, student training,
+  clinic management) with **`[VERIFY]`** flags on pricing/policy/required-minutes.
+  `/help/index.astro` groups by category and surfaces the signed-in user's role
+  topics first; `/help/[slug].astro` renders article + related + contact CTA.
+- **Contact support** form `/help/contact` → `POST /api/help/contact`: zod-validated,
+  honeypot anti-spam, signed-in email can't be spoofed (session email used),
+  delivers via Resend to `EMAIL_REPLY_TO` (fallback: first ADMIN_EMAILS), reply-to
+  = sender; logs a `support_request` event. Surfaces a fallback inbox if Resend
+  fails. **Depends on Resend domain verification to actually deliver.**
+- **Contextual `?` help** = `src/components/HelpTip.astro` (native Popover API,
+  zero JS, optional deep-link to an article). Wired on `/clinic` (Buy seats,
+  Transfer). More placements (course player seat-time/exam-gate) TODO.
+- Wiring: `/help` added to middleware public paths; "Help" link in app nav + footer.
+- **Not built (deferred):** AI help assistant over help docs (owner deprioritized
+  for now); help-article search; admin-audience articles.
 
 ### Design tokens (shipped)
 - **One source of truth:** `src/styles/tokens.css` defines the brand palette (--brand teal, --action orange, --ink/--muted, --canvas/--surface, success/warning/danger + tints, gold, derived --border/--focus/--shadow) and is imported by both layouts — components reference tokens only, **no raw hexes** (emails keep inline hex; CSS vars don't work in mail clients). Back-compat aliases (`--bg/--panel/--text/--accent/--ok/--warn`) re-map the existing app to the light theme.
@@ -29,12 +49,31 @@ Public, SEO-first, dark-themed marketing layer (`MarketingLayout.astro`) on top 
 
 #### Copy status — owner copy is now IN (`src/config/marketing.ts`, `COURSE_MARKETING`, guides, course descriptions). Two registries remain:
 
-**`[VERIFY]` launch blockers** — owner-flagged factual/regulatory claims, kept verbatim & visible; the site must NOT truly launch with any of these unresolved (each renders as a visible flag):
-- Instructor bio: years in practice (`[VERIFY]`).
-- Homepage FAQ: duties-before-certification framing; OBCE fee link/list; legacy-records promise.
-- Course (`oregon-ca-initial`) requirements table: confirm every "Oregon requires" row vs current OAR (the page's biggest claim surface); course FAQ "accepted by the Oregon board" approval phrasing.
-- Renewal page + Guide 2: lapse-consequence phrasing, the 6-hour topic breakdown rows, reinstatement process/fee, board submission fee/method, birth-month deadline rule.
-- Guide 1: the requirements list vs OAR, hands-on required topics, application steps/fee/fingerprint vendor, exam format/score/fee/retakes, accepted BLS providers, state fee amounts, BLS price range.
+**`[VERIFY]` launch blockers — ✅ ALL RESOLVED (2026-06-24).** Owner certified
+these against **oregon.gov/obce as the canonical source** (and his own bio
+facts); every live `[VERIFY]` flag is removed. Record of what was decided:
+- Instructor bio: practicing in Corvallis **since 2008**; NBCE title corrected to
+  **"at-large director"** (bio, credentials, "Who's behind this" FAQ, both guide
+  frontmatters).
+- Homepage FAQ: duties-before-certification framing confirmed; cost answer now
+  cites **$175** initial OBCE application (incl. $45 Fieldprint background) +
+  oregon.gov/obce; legacy-records Q makes **no record-keeping promise** — points
+  to the **/verify** certificate-verification page instead.
+- Course (`oregon-ca-initial`): all six requirements-table rows confirmed vs OBCE
+  (flag removed); "accepted by the board" FAQ reworded to **"Dr. Young is an
+  authorized trainer for the OBCE CA initial training."**
+- Renewal page + Guide 2: birth-month deadline confirmed; **6 CE hrs/yr**;
+  **vitals = 2 hrs EVERY year** (corrected from first-renewal-only, per OBCE);
+  cultural competency 1 hr/yr; grace ($25/30 days) + $75 late + 12-month
+  reinstatement-then-reapply; renewal fee **$117 + $2 OHA survey**.
+- Guide 1: requirements list, hands-on topics (hydro/electro/physiotherapy),
+  online application + **Fieldprint** vendor, **open-book NBCE** exam, $175/$45
+  fees. BLS softened to OBCE's wording (**BLS/AED/CPR from a recognized provider
+  within the first year** — OBCE lists no providers/format).
+- `src/config/oregon-renewal.ts`: `firstRenewalHours`/`subsequentRenewalHours`
+  now **6** (was null); `requirementsNote` filled (cultural competency + vitals).
+- Soft non-OBCE estimate left as-is (not a regulatory claim): Guide 1 BLS price
+  **"$50–90"**.
 
 **Still pending owner inputs** (render as `[OWNER COPY]` chips or are omitted):
 - **Stats** — kept EMPTY (owner's numeric stats were `[VERIFY]`; "only real numbers can ship"). Fill `OWNER.stats` with confirmed figures to show the bar.
@@ -94,6 +133,42 @@ player and **hard-stops at `preview_seconds`** with an enroll overlay. **Marketi
 only — previews accrue NO seat time / heartbeats.** Cap is client-side (a determined
 viewer could fetch more via the token; the rest of the course stays paywalled). Owner
 action: flag a lesson as preview in Admin → Content; run `db:migrate:remote`.
+
+### Collateral Studio — SHIPPED (2026-06)
+Admin tool to generate/edit/publish PDF collateral (Phase 1: **study guide,
+checklist, cheat-sheet**) from a course's `lesson_transcripts`, via Claude
+Sonnet → Markdown editor → `pdf-lib` PDF → R2 → `course_resources` student
+download. **Voice fidelity is a requirement** — a distilled voice profile from
+the owner's transcripts + his `yourbodyofhealth.com/articles` (style only, not
+content) is injected into every prompt; extractive-leaning toward his own
+phrasing. Owner-in-the-loop (nothing publishes unapproved). Diagrams = code-built
+SVG (no Mermaid — needs a browser, unavailable on Workers). **AI image-gen
+deferred** (anatomy/text accuracy = brand/liability risk). No new Phase-1 deps.
+Full spec + data model (`course_collateral`) + build order in
+**`docs/collateral-studio-design.md`**.
+
+**Shipped (P1a–P1c + extras):** migrations **0012** (`course_collateral`) and
+**0013** (`sort_order`, `in_manual`). Generate per scope (course/module);
+Markdown editor with **Save / ✦ Apply edit (AI revise) / Regenerate**; **Preview
+PDF**, **Publish** → R2 + `course_resources` (admins see it on the course page
+w/o enrolling); **Download .md** (single + combined manual). **Reorder / rename /
+in-manual** manage view; **📘 Compile manual** → one branded PDF (title + Contents
++ chapters). **"Generate all modules"** is client-orchestrated (one short request
+per module, parallel, live progress) to dodge the whole-course request timeout —
+**don't use whole-course Generate, it times out**. Best-practices brief
+(`src/config/handout-craft.md`) + voice profile injected into prompts. PDF
+hardened for non-WinAnsi chars (sanitizer). `BusyOverlay` spinner (dismissible).
+
+**NEXT-STEP — Print-on-demand (DEFERRED, secondary):** sell a bound physical copy
+of the manual to old-school DCs. Recommended: **Lulu Print API**
+(`developer.lulu.com`) — on-demand book printing + **dropship**, you set retail
+and keep the margin, no inventory (alts: Gelato, Peecho/Cloudprinter; **not** KDP
+— no API). Shape: "Buy a printed copy" → **Stripe** charges your price → create a
+Lulu print job from the manual PDF → Lulu prints + ships. **Caveat:** needs a
+**print-spec PDF variant** (page size, margins/bleed, separate cover) — current
+PDF is letter w/ clean margins, close but not print-ready. Est. ~1 day (Lulu job
++ Stripe + print PDF + cover). Keep on the back burner until the core collateral
+flow feels right.
 
 ### Phase 4 — per-course clinic seat pools (SHIPPED 2026-06)
 Built on branch `claude/charming-faraday-ixrhmb` from the approved design + DDL

@@ -1,0 +1,64 @@
+---
+import Layout from "@/layouts/Layout.astro";
+
+const user = Astro.locals.user;
+const params = Astro.url.searchParams;
+const sent = params.get("sent") === "1";
+const error = params.get("error");
+// Where the user came from (set by a ?from= link), surfaced to support for context.
+const from = params.get("from") ?? "";
+---
+
+<Layout title="Contact support · Help" showNav={true}>
+  <p style="margin:0 0 0.75rem">
+    <a href="/help" style="font-size:0.9rem">← Help Center</a>
+  </p>
+
+  <h1>Contact support</h1>
+  <p>
+    Send us a message and we'll reply by email. The more detail you give (course,
+    clinic, what you were doing), the faster we can help.
+  </p>
+
+  {sent && (
+    <div class="panel" style="border-color:var(--ok);color:var(--ok)">
+      Thanks — your message is on its way. We'll reply to your email shortly.
+    </div>
+  )}
+  {error && (
+    <div class="panel" style="border-color:var(--warn);color:var(--warn)">{error}</div>
+  )}
+
+  {!sent && (
+    <div class="panel">
+      <form method="POST" action="/api/help/contact">
+        <input type="hidden" name="from" value={from} />
+        {/* Honeypot: real users never fill this; bots do. Hidden from view + a11y. */}
+        <div aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">
+          <label>Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+        </div>
+
+        <label for="email">Your email</label>
+        {user ? (
+          <>
+            <input id="email" type="email" name="email" value={user.email} readonly
+              style="background:var(--surface);color:var(--muted)" />
+            <p class="muted" style="margin:0.3rem 0 0">We'll reply to this address.</p>
+          </>
+        ) : (
+          <input id="email" type="email" name="email" placeholder="you@example.com" required />
+        )}
+
+        <label for="subject">Subject</label>
+        <input id="subject" type="text" name="subject" placeholder="What do you need help with?" required />
+
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="7" required
+          placeholder="Describe the problem or question…"
+          style="width:100%;font:inherit;padding:0.6rem;border:1px solid var(--border);border-radius:8px"></textarea>
+
+        <button type="submit">Send message</button>
+      </form>
+    </div>
+  )}
+</Layout>

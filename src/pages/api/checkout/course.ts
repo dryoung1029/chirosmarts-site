@@ -11,6 +11,7 @@ import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
 import { getSiteUrl } from "@/lib/env";
 import { logEvent } from "@/lib/events";
+import { recordAttribution } from "@/lib/attribution";
 import { LEGAL } from "@/config/legal";
 import { isStripeConfigured, createCourseCheckout } from "@/lib/stripe";
 import {
@@ -19,12 +20,13 @@ import {
   expandFulfillment,
 } from "@/lib/enrollment";
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
+export const POST: APIRoute = async ({ request, locals, redirect, cookies }) => {
   const user = locals.user;
   if (!user) return redirect("/login", 302);
 
   const env = locals.runtime.env;
   const db = getDb(env);
+  await recordAttribution(db, cookies, "purchase", user.id);
   const form = await request.formData();
 
   // Collect course ids from a single `courseId` and/or `courseIds` (CSV/repeated).

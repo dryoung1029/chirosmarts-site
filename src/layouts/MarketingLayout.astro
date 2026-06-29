@@ -11,9 +11,25 @@ interface Props {
   canonicalPath?: string; // defaults to current path
   ogImage?: string; // absolute or root-relative; defaults to /og-default.png (1200x630)
   jsonLd?: unknown[]; // additional structured-data objects for this page
+  ogType?: string; // "website" (default) | "article"
+  articleMeta?: {
+    publishedTime?: string;
+    modifiedTime?: string;
+    author?: string;
+    section?: string;
+    tags?: string[];
+  };
 }
 
-const { title, description, canonicalPath, ogImage, jsonLd = [] } = Astro.props;
+const {
+  title,
+  description,
+  canonicalPath,
+  ogImage,
+  jsonLd = [],
+  ogType = "website",
+  articleMeta,
+} = Astro.props;
 const env = Astro.locals.runtime.env;
 const siteUrl = getSiteUrl(env).replace(/\/$/, "");
 const path = canonicalPath ?? Astro.url.pathname;
@@ -34,17 +50,36 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={og} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="ChiroSmarts" />
+    {ogType === "article" && articleMeta && (
+      <>
+        {articleMeta.publishedTime && (
+          <meta property="article:published_time" content={articleMeta.publishedTime} />
+        )}
+        {articleMeta.modifiedTime && (
+          <meta property="article:modified_time" content={articleMeta.modifiedTime} />
+        )}
+        {articleMeta.author && <meta property="article:author" content={articleMeta.author} />}
+        {articleMeta.section && <meta property="article:section" content={articleMeta.section} />}
+        {(articleMeta.tags ?? []).map((t) => <meta property="article:tag" content={t} />)}
+      </>
+    )}
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={og} />
     {ld.map((obj) => (
       <script type="application/ld+json" set:html={JSON.stringify(obj)} />
@@ -56,6 +91,30 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         data-cf-beacon={`{"token": "${analyticsToken}"}`}
       />
     )}
+    {/* First-touch campaign attribution: store UTM tags in a first-party cookie
+        (no third-party tracking) so conversions can be tied to ad campaigns. */}
+    <script is:inline>
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          var keys = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+          if (!keys.some(function (k) { return p.get(k); })) return;
+          if (document.cookie.split("; ").some(function (c) { return c.indexOf("cs_attr=") === 0; })) return;
+          var attr = {
+            source: p.get("utm_source") || "",
+            medium: p.get("utm_medium") || "",
+            campaign: p.get("utm_campaign") || "",
+            term: p.get("utm_term") || "",
+            content: p.get("utm_content") || "",
+            landing: location.pathname,
+            ts: new Date().toISOString(),
+          };
+          document.cookie =
+            "cs_attr=" + encodeURIComponent(JSON.stringify(attr)) +
+            ";path=/;max-age=" + 60 * 60 * 24 * 90 + ";SameSite=Lax";
+        } catch (e) {}
+      })();
+    </script>
     <style is:global>
       html { scroll-behavior: smooth; }
       body {
@@ -73,7 +132,9 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         max-width: 1080px; margin: 0 auto; padding: 1rem 1.25rem;
       }
       .mk-nav .spacer { flex: 1; }
-      .mk-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; }
+      .mk-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; white-space: nowrap; }
+      /* Header logo: keep it header-sized and responsive (the source PNG is large). */
+      .mk-logo img { height: 52px !important; width: auto; }
       /* Nav sign-in is a brand CTA, keeping --action reserved for the page's primary CTA. */
       .mk-nav a.cta { background: var(--brand); color: var(--surface); padding: 0.45rem 0.9rem; border-radius: 8px; }
       .btn-primary, .btn-secondary { border-radius: 10px; padding: 0.7rem 1.3rem; font-weight: 600; }
@@ -90,16 +151,20 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
       details.mk-faq[open] summary { color: var(--brand); }
       @media (max-width: 640px) {
         .mk-section { padding: 2.25rem 0; }
+        .mk-nav { gap: 0.85rem; padding: 0.75rem 1rem; }
+        .mk-nav a { font-size: 0.9rem; }
+        .mk-logo img { height: 40px !important; }
       }
     </style>
   </head>
   <body>
     <header>
       <nav class="mk-nav">
-        <a href="/" aria-label="ChiroSmarts home"><Logo height={128} /></a>
+        <a href="/" class="mk-logo" aria-label="ChiroSmarts home"><Logo height={52} /></a>
         <span class="spacer"></span>
         <a href="/courses">Courses</a>
         <a href="/clinics">For clinics</a>
+        <a href="/blog">Blog</a>
         {user ? <a class="cta" href="/dashboard">Dashboard</a> : <a class="cta" href="/login">Sign in</a>}
       </nav>
     </header>

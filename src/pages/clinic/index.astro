@@ -1,9 +1,12 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Illustration from "@/components/marketing/Illustration.astro";
+import RoadmapList from "@/components/RoadmapList.astro";
+import HelpTip from "@/components/HelpTip.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getClinicForOwner, getRoster } from "@/lib/clinic";
+import { getUserRoadmap } from "@/lib/roadmap";
 import { listPoolsDetailed, type PoolView } from "@/lib/seat-pools";
 
 const user = Astro.locals.user!;
@@ -14,6 +17,13 @@ const db = getDb(env);
 const clinic =
   user.role === "clinic_admin" ? await getClinicForOwner(db, user.id) : null;
 if (!clinic) return Astro.redirect("/dashboard", 302);
+
+// The clinic-management roadmap ("Train Your CAs") lives here, not on the
+// student dashboard — it's the owner's at-a-glance progress through setup →
+// buy seats → invite → track.
+const clinicRoadmap = (await getUserRoadmap(db, user.id)).filter(
+  ({ template }) => template?.slug === "oregon-clinic-owner",
+);
 
 // CAs who have joined (claimed an account) — eligible to be promoted to manager.
 const claimedCas = (await getRoster(db, clinic.id)).filter(
@@ -83,6 +93,8 @@ const totals = pools.reduce(
     <Illustration name="clinic-dashboard" maxWidth={160} />
   </div>
 
+  <RoadmapList roadmap={clinicRoadmap} />
+
   {q.error && <div class="notice err">{q.error}</div>}
   {q.assigned === "invited" && (
     <div class="notice ok">Invite sent. The CA will get an email to claim their seat.</div>
@@ -103,7 +115,7 @@ const totals = pools.reduce(
 
   {/* Buy seats for a course — opens (or adds to) that course's pool. */}
   <div class="panel">
-    <h2>Buy training seats</h2>
+    <h2>Buy training seats<HelpTip label="What is a training seat?" article="buying-and-assigning-seats">A seat lets you grant one CA access to one course. Seats live in a pool per course — buy what you need, then assign them.</HelpTip></h2>
     <form method="POST" action="/api/clinic/seats">
       <div class="row" style="flex-wrap:wrap">
         <select name="courseId" aria-label="Course" style="flex:2;min-width:200px">
@@ -229,7 +241,7 @@ const totals = pools.reduce(
 
   {/* Transfer the manager role (turnover). */}
   <div class="panel" style="border-color:var(--border)">
-    <h2>Transfer clinic manager</h2>
+    <h2>Transfer clinic manager<HelpTip label="What does transferring do?" article="transferring-your-clinic">Hands full clinic control to a new manager immediately. You keep your own training but become a regular account. Seats and CA assignments move with the clinic.</HelpTip></h2>
     <p class="muted" style="margin-top:0">
       Hand this clinic over to someone else — e.g. when you leave or change roles.
       The new manager gets full access to seats and CAs; you become a regular

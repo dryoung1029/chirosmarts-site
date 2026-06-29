@@ -1,0 +1,182 @@
+---
+/**
+ * Public blog article. Published posts are public; admins can also preview
+ * drafts (clearly marked). Body is admin-authored Markdown, rendered SSR.
+ *
+ * SEO/AEO: enriched Article + FAQPage JSON-LD, og:type=article with article
+ * meta, on-page author E-E-A-T box, and related-article internal links.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { and, desc, eq, ne } from "drizzle-orm";
+import { renderMarkdown } from "@/lib/markdown";
+import { extractFaqs, wordCount, stripLeadingH1 } from "@/lib/blog";
+import { getSiteUrl } from "@/lib/env";
+import { articleLd, faqPageLd, personLd } from "@/lib/structured-data";
+import { promoteDuePosts } from "@/lib/blog-schedule";
+import { OWNER } from "@/config/marketing";
+
+const env = Astro.locals.runtime.env;
+const { slug } = Astro.params;
+const isAdmin = Astro.locals.user?.role === "site_admin";
+
+const db = getDb(env);
+await promoteDuePosts(db);
+const post = await db
+  .select()
+  .from(schema.blogPosts)
+  .where(eq(schema.blogPosts.slug, slug!))
+  .get();
+
+// Drafts are visible only to admins; everyone else gets a 404 → index.
+if (!post || (post.status !== "published" && !isAdmin)) {
+  return Astro.redirect("/blog", 302);
+}
+
+const siteUrl = getSiteUrl(env).replace(/\/$/, "");
+const body = renderMarkdown(stripLeadingH1(post.bodyMarkdown));
+const faqs = extractFaqs(post.bodyMarkdown);
+const wc = wordCount(post.bodyMarkdown);
+const url = `${siteUrl}/blog/${post.slug}`;
+const heroAbs = post.heroImage
+  ? post.heroImage.startsWith("http")
+    ? post.heroImage
+    : `${siteUrl}${post.heroImage}`
+  : null;
+
+// Related published articles (internal linking / topical authority).
+const related = await db
+  .select({ slug: schema.blogPosts.slug, title: schema.blogPosts.title, excerpt: schema.blogPosts.excerpt })
+  .from(schema.blogPosts)
+  .where(and(eq(schema.blogPosts.status, "published"), ne(schema.blogPosts.id, post.id)))
+  .orderBy(desc(schema.blogPosts.publishedAt))
+  .limit(3)
+  .all();
+
+const fmt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "America/Los_Angeles",
+      })
+    : "";
+
+const authorCreds = post.authorCredentials ?? OWNER.instructor.credentials;
+const ld: unknown[] = [
+  articleLd({
+    title: post.title,
+    description: post.seoDescription ?? post.excerpt ?? undefined,
+    url,
+    authorName: post.author,
+    datePublished: post.publishedAt ?? undefined,
+    dateModified: post.updatedAt,
+    image: heroAbs,
+    wordCount: wc,
+    section: (post.tags ?? [])[0],
+    tags: post.tags ?? [],
+    siteUrl,
+  }),
+  personLd(siteUrl), // resolves the article author @id (E-E-A-T)
+];
+const faqLd = faqPageLd(faqs);
+if (faqLd) ld.push(faqLd);
+---
+
+<MarketingLayout
+  title={`${post.title} — ChiroSmarts Blog`}
+  description={post.seoDescription ?? post.excerpt ?? post.title}
+  canonicalPath={`/blog/${post.slug}`}
+  ogImage={post.heroImage ?? undefined}
+  ogType="article"
+  articleMeta={{
+    publishedTime: post.publishedAt ?? undefined,
+    modifiedTime: post.updatedAt,
+    author: post.author,
+    section: (post.tags ?? [])[0],
+    tags: post.tags ?? [],
+  }}
+  jsonLd={ld}
+>
+  <section class="mk-section" style="padding-top:2.5rem">
+    <article class="mk-container" style="max-width:720px;line-height:1.7">
+      <p style="margin:0 0 1rem"><a href="/blog" style="color:var(--muted);text-decoration:none">← All articles</a></p>
+      {post.status === "draft" && (
+        <p class="mk-card" style="background:var(--panel-2);color:var(--muted);margin:0 0 1.25rem">
+          Draft preview — not visible to the public until published.
+        </p>
+      )}
+      {post.heroImage && (
+        <img
+          src={post.heroImage}
+          alt=""
+          width="720"
+          height="405"
+          style="width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;border-radius:12px;border:1px solid var(--border);margin:0 0 1.5rem;background:var(--canvas)"
+        />
+      )}
+      <h1 style="margin:0 0 0.5rem">{post.title}</h1>
+      <p style="color:var(--muted);margin:0 0 1.75rem;font-size:0.9rem">
+        By <a href="/about" style="color:inherit">{post.author}</a>{authorCreds ? `, ${authorCreds}` : ""}
+        {post.publishedAt && (
+          <> · <time datetime={post.publishedAt}>{fmt(post.publishedAt)}</time></>
+        )}
+      </p>
+      <div class="blog-body" set:html={body} />
+
+      {/* On-page E-E-A-T: who wrote this and why they're credible. */}
+      <aside class="mk-card" style="margin-top:2.5rem;display:flex;gap:1rem;align-items:flex-start">
+        {OWNER.instructor.photo && (
+          <img
+            src={OWNER.instructor.photo}
+            alt={OWNER.instructor.name}
+            width="64"
+            height="64"
+            loading="lazy"
+            style="border-radius:50%;object-fit:cover;flex:0 0 auto"
+          />
+        )}
+        <div>
+          <strong style="color:var(--text)">{OWNER.instructor.name}</strong>
+          <p style="margin:0.15rem 0 0;color:var(--muted);font-size:0.9rem">{OWNER.instructor.bio}</p>
+          <p style="margin:0.5rem 0 0"><a href="/about">More about Dr. Young →</a></p>
+        </div>
+      </aside>
+
+      {/* Internal-link CTA to the product. */}
+      <div class="mk-card" style="margin-top:1.25rem;background:var(--brand-tint);border:none">
+        <strong style="color:var(--text)">Becoming an Oregon CA?</strong>
+        <p style="margin:0.3rem 0 0.7rem;color:var(--muted)">
+          ChiroSmarts is the state-required training, exam, and verifiable certificate — Module 1 is free.
+        </p>
+        <a class="btn-primary" href="/courses">See the courses →</a>
+      </div>
+
+      {related.length > 0 && (
+        <section style="margin-top:2.5rem">
+          <h2 style="font-size:1.15rem;margin:0 0 0.75rem">Keep reading</h2>
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.75rem">
+            {related.map((r) => (
+              <li>
+                <a href={`/blog/${r.slug}`} style="font-weight:600;text-decoration:none;color:var(--accent)">{r.title}</a>
+                {r.excerpt && <p style="margin:0.15rem 0 0;color:var(--muted);font-size:0.9rem">{r.excerpt}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </article>
+  </section>
+
+  <style>
+    .blog-body :global(h2) { margin-top: 2rem; }
+    .blog-body :global(h3) { margin-top: 1.5rem; }
+    .blog-body :global(ul), .blog-body :global(ol) { padding-left: 1.25rem; }
+    .blog-body :global(li) { margin: 0.3rem 0; }
+    .blog-body :global(blockquote) {
+      border-left: 3px solid var(--border); margin: 1rem 0; padding: 0.25rem 0 0.25rem 1rem; color: var(--muted);
+    }
+    .blog-body :global(a) { color: var(--brand); }
+  </style>
+</MarketingLayout>

@@ -1,0 +1,100 @@
+---
+/**
+ * A full-screen "working…" overlay shown while a slow form POST is in flight.
+ * Add `data-busy="Your message…"` to a <form> (or to a specific submit button,
+ * which wins) and this shows a spinner + message until the page navigates.
+ * The overlay also blocks the UI, preventing double-submits.
+ */
+---
+
+<div
+  id="busy-overlay"
+  style="position:fixed;inset:0;background:rgba(19,39,43,0.35);display:none;place-items:center;z-index:1000"
+>
+  <div
+    style="background:var(--surface);padding:1.25rem 1.75rem;border-radius:12px;display:flex;flex-direction:column;gap:0.5rem;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:80vw;text-align:center"
+  >
+    <div style="display:flex;gap:0.8rem;align-items:center;justify-content:center">
+      <span class="busy-spinner" aria-hidden="true"></span>
+      <span id="busy-label" style="color:var(--text);font-weight:500">Working…</span>
+    </div>
+    <div style="display:flex;gap:0.6rem;justify-content:center;margin-top:0.25rem">
+      <button
+        id="busy-cancel"
+        type="button"
+        style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:0.82rem;cursor:pointer;padding:0.3rem 0.7rem"
+      >
+        Cancel (Esc)
+      </button>
+      <button
+        id="busy-reload"
+        type="button"
+        style="background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem;cursor:pointer;padding:0.3rem 0.7rem"
+      >
+        Reload page
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .busy-spinner {
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--brand);
+    border-radius: 50%;
+    display: inline-block;
+    animation: busy-spin 0.7s linear infinite;
+  }
+  @keyframes busy-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+
+<script>
+  const overlay = document.getElementById("busy-overlay");
+  const lbl = document.getElementById("busy-label");
+  let longTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function dismiss() {
+    if (!overlay || overlay.style.display === "none") return;
+    overlay.style.display = "none";
+    if (longTimer) clearTimeout(longTimer);
+    // Abort the pending form-POST navigation so the user regains control.
+    try {
+      window.stop();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  document.addEventListener("submit", (e) => {
+    if (e.defaultPrevented) return;
+    const form = e.target as HTMLFormElement | null;
+    const submitter = (e as SubmitEvent).submitter as HTMLElement | null;
+    const label =
+      submitter?.getAttribute("data-busy") ?? form?.getAttribute("data-busy");
+    if (!label || !overlay) return;
+    if (lbl) lbl.textContent = label;
+    overlay.style.display = "grid";
+    if (longTimer) clearTimeout(longTimer);
+    longTimer = setTimeout(() => {
+      if (lbl) lbl.textContent = "Still working — this is taking longer than usual…";
+    }, 45000);
+  });
+
+  document.getElementById("busy-cancel")?.addEventListener("click", dismiss);
+  // Reload is the guaranteed escape: a fresh GET that always cancels a hung POST.
+  document
+    .getElementById("busy-reload")
+    ?.addEventListener("click", () => location.reload());
+  overlay?.addEventListener("click", (e) => {
+    if (e.target === overlay) dismiss();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") dismiss();
+  });
+</script>

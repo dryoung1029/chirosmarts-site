@@ -24,14 +24,14 @@ export const OWNER = {
   instructor: {
     name: "Jason Young, DC",
     credentials:
-      "Chiropractic physician · Former director, National Board of Chiropractic Examiners",
-    bio: "Dr. Young has practiced in Corvallis, Oregon for [VERIFY] years and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as a director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
-    photo: null as string | null,
+      "Chiropractic physician · Former president, Oregon Board of Chiropractic Examiners",
+    bio: "Dr. Young has practiced in Corvallis, Oregon since 2008 and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as an at-large director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
+    photo: "/instructor/jason-young.jpg" as string | null,
   },
   homepageFaq: [
     {
       q: "Do I need this training before I can work in a chiropractic office?",
-      a: "You can be hired first — most CAs are. But Oregon requires certification before you perform clinical duties like therapies, so most clinics want you certified quickly. Our students typically finish the online training within a week of starting. [VERIFY framing against current OBCE rule on duties prior to certification]",
+      a: "You can be hired first — most CAs are. But Oregon requires certification before you perform clinical duties like therapies, so most clinics want you certified quickly. Our students typically finish the online training within a week of starting.",
     },
     {
       q: "Is this the official Oregon certification?",
@@ -43,7 +43,7 @@ export const OWNER = {
     },
     {
       q: "How much does it cost?",
-      a: "Initial certification training is $149, and Module 1 is free before you pay anything. Renewal courses run $29–89. State application and exam fees are paid separately to the board. [VERIFY: link or list current OBCE fees]",
+      a: "Initial certification training is $149, and Module 1 is free before you pay anything. Renewal courses run $29–89. Your state certification fee is paid separately to the Oregon Board of Chiropractic Examiners — currently $175 for initial certification (which includes your background check). See the OBCE Chiropractic Assistant page (oregon.gov/obce) for current fees and to apply.",
     },
     {
       q: "What if it's not for me?",
@@ -51,11 +51,11 @@ export const OWNER = {
     },
     {
       q: "I was certified years ago through ChiroSmarts. Do you still have my records?",
-      a: "Reach out — we can help you locate your training history. [VERIFY what you can actually promise for legacy records before publishing this answer]",
+      a: "Every ChiroSmarts certificate carries a verification code that stays valid. You, an employer, or the board can confirm a past certification anytime on our public certificate verification page — just visit /verify and enter the code.",
     },
     {
       q: "Who's behind this?",
-      a: "Dr. Jason Young — an Oregon chiropractor in active practice who has trained Oregon CAs for over a decade and previously served as a director of the National Board of Chiropractic Examiners. You're learning the requirements from someone who has worked on both sides of them.",
+      a: "Dr. Jason Young — an Oregon chiropractor in active practice who has trained Oregon CAs for over a decade and previously served as an at-large director of the National Board of Chiropractic Examiners. You're learning the requirements from someone who has worked on both sides of them.",
     },
   ] as { q: string; a: string }[],
   clinics: {
@@ -68,7 +68,10 @@ export const OWNER = {
       "See it in 90 seconds. Dr. Young walks through buying seats, inviting a new CA, and the compliance view your front office will actually use.",
     demoVideoStreamUid: null as string | null,
   },
-  about: null as string | null,
+  about:
+    "I'm Dr. Jason Young, and I've practiced chiropractic in Corvallis, Oregon since 2008. ChiroSmarts grew out of a problem I kept running into in my own clinic: a new chiropractic assistant needed to be trained and certified quickly, but the only options were waiting months for an opening in a classroom course or traveling across the state for an entire weekend. Getting a CA properly trained in Oregon was harder, and slower, than it needed to be.\n\nI was the first chiropractor in Oregon to offer online chiropractic assistant training. At the time the state's rules didn't account for online instruction, so I went to the Oregon Board of Chiropractic Examiners (OBCE) and made the case for allowing it. Later I served on that board from 2013 to 2019 — including two terms as its president — and helped shape the rules that govern CA practice in Oregon today. I've also served as an at-large director of the National Board of Chiropractic Examiners.\n\nThat's the perspective behind this platform: I've trained Oregon CAs for over a decade, and I've sat on the regulatory side of the table. ChiroSmarts is the resource I wanted for my own staff — training that's clear about exactly what Oregon requires, with the hours, exam, certificate, and yearly renewals all tracked to audit standard, so nothing is left to guess." as
+      | string
+      | null,
 } as const;
 
 export const COURSE_MARKETING: Record<
@@ -112,12 +115,10 @@ export const COURSE_MARKETING: Record<
           "Your renewal date tracked automatically by birth month, with reminder emails and a one-click renewal bundle",
       },
     ],
-    requirementsVerify:
-      "[VERIFY] Confirm each “Oregon requires” row against current OAR language before launch — this table is the page's biggest claim surface.",
     faqs: [
       {
         q: "Is this course accepted by the Oregon board?",
-        a: "This course is built to Oregon's didactic-hour requirement and has been used by Oregon CAs for over a decade. [VERIFY exact acceptable approval phrasing — this is the one answer to be most careful with.]",
+        a: "Yes. This course is provided by Dr. Jason Young, an authorized trainer for the OBCE chiropractic-assistant initial training, and it meets Oregon's 8-hour didactic requirement. It has been used by Oregon CAs for over a decade.",
       },
       {
         q: "Can I really try it free?",

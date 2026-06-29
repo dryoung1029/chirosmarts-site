@@ -1,0 +1,298 @@
+---
+/**
+ * Article Studio — post editor. Edit fields + Markdown body, AI "Apply edit",
+ * publish/unpublish, preview, delete. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
+import { getDb, schema } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { hasVerifyFlags } from "@/lib/blog";
+import { scorePost } from "@/lib/jeldon";
+
+const db = getDb(Astro.locals.runtime.env);
+const id = Astro.params.id!;
+const post = await db
+  .select()
+  .from(schema.blogPosts)
+  .where(eq(schema.blogPosts.id, id))
+  .get();
+if (!post) return Astro.redirect("/admin/blog", 303);
+
+const msg = Astro.url.searchParams.get("msg");
+const tags = (post.tags ?? []).join(", ");
+const inp = "width:100%;padding:0.5rem;margin-bottom:0.9rem";
+
+// Scoring is the engine's job now — one scorer (@jeldon/core-scoring), fed by
+// jeldon.config.ts. Refreshes on Save. (The [VERIFY] gate is separate.)
+const md = post.bodyMarkdown ?? "";
+const { seo, geo } = scorePost(post);
+const verifyFlagged = hasVerifyFlags(md);
+const verifyCount = (md.match(/\[VERIFY\b/gi) ?? []).length;
+const fmtPt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        dateStyle: "medium",
+        timeStyle: "short",
+      }) + " PT"
+    : "";
+const statusColor = (s: string) =>
+  s === "good" ? "var(--brand)" : s === "meh" ? "var(--warning-ink)" : "var(--danger)";
+const scoreColor = (n: number) =>
+  n >= 80 ? "var(--brand)" : n >= 60 ? "var(--warning-ink)" : "var(--danger)";
+const dials = [
+  { key: "GEO", help: "Answer-engine citability (AI Overviews, ChatGPT, Perplexity)", r: geo },
+  { key: "SEO", help: "Classical search health", r: seo },
+];
+---
+
+<Layout title="Edit article · Admin" showNav={true}>
+  <BusyOverlay />
+  <AdminNav active="blog" />
+  <p style="margin:0 0 0.5rem"><a href="/admin/blog">← All articles</a></p>
+  {msg && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
+  )}
+
+  <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap">
+    <h1 style="margin:0">{post.title}</h1>
+    <span
+      style={`padding:0.15rem 0.6rem;border-radius:6px;font-size:0.8rem;${
+        post.status === "published"
+          ? "background:var(--brand-tint);color:var(--brand)"
+          : "background:var(--panel-2);color:var(--muted)"
+      }`}
+    >{post.status}</span>
+    {post.model && <span class="muted" style="font-size:0.85rem">drafted by {post.model}</span>}
+  </div>
+  <p class="muted" style="margin:0.25rem 0 1.25rem;font-size:0.9rem">Public URL: <code>/blog/{post.slug}</code></p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:0 0 1.25rem">
+    {dials.map((d) => (
+      <details class="panel" style="margin:0" open>
+        <summary style="font-weight:600;cursor:pointer;display:flex;align-items:baseline;gap:0.5rem">
+          <span>{d.key}</span>
+          <span style={`font-size:1.25rem;font-weight:700;color:${scoreColor(d.r.score)}`}>{d.r.score}</span>
+          <span class="muted" style="font-size:0.78rem">/100</span>
+          {(d.r.badCount > 0 || d.r.mehCount > 0) && (
+            <span class="muted" style="font-size:0.78rem;margin-left:auto">{d.r.badCount} bad · {d.r.mehCount} meh</span>
+          )}
+        </summary>
+        <p class="muted" style="margin:0.25rem 0 0.5rem;font-size:0.8rem">{d.help}</p>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.25rem">
+          {d.r.checks.map((c) => (
+            <li style={`font-size:0.85rem;display:flex;gap:0.5rem;color:${statusColor(c.status)}`}>
+              <span>{c.status === "good" ? "✓" : c.status === "meh" ? "~" : "✗"}</span>
+              <span style="flex:1;color:var(--text)">{c.label}</span>
+              <span class="muted">{c.value}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ))}
+  </div>
+  <p class="muted" style="margin:-0.5rem 0 1.25rem;font-size:0.8rem">
+    Scored by the shared Jeldon engine (<code>@jeldon/core-scoring</code>), tuned in <code>jeldon.config.ts</code>. Refreshes when you Save.
+  </p>
+
+  <form method="POST" action={`/api/admin/blog/${post.id}`}>
+    <label style="font-weight:600">Title</label>
+    <input type="text" name="title" value={post.title} required style={inp} />
+
+    <div style="display:flex;gap:1rem;flex-wrap:wrap">
+      <div style="flex:1;min-width:14rem">
+        <label style="font-weight:600">Slug</label>
+        <input type="text" name="slug" value={post.slug} style={inp} />
+      </div>
+      <div style="flex:1;min-width:14rem">
+        <label style="font-weight:600">Tags (comma-separated)</label>
+        <input type="text" name="tags" value={tags} placeholder="compliance, front desk" style={inp} />
+      </div>
+    </div>
+
+    <label style="font-weight:600">Excerpt (list/preview text)</label>
+    <textarea name="excerpt" style="width:100%;padding:0.5rem;height:3.5rem;margin-bottom:0.9rem">{post.excerpt}</textarea>
+
+    <label style="font-weight:600">SEO meta description</label>
+    <input type="text" name="seoDescription" value={post.seoDescription ?? ""} maxlength="180" style={inp} />
+
+    <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+      <label style="font-weight:600">Body (Markdown)</label>
+      {verifyCount > 0 && (
+        <span id="verify-toolbar" style="margin-left:auto;display:inline-flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+          <span style="color:var(--danger)">⚠ <strong id="verify-count">{verifyCount}</strong> [VERIFY] to resolve</span>
+          <button type="button" id="verify-jump"
+            style="padding:0.25rem 0.7rem;border-radius:7px;border:1px solid var(--danger);background:var(--danger-tint);color:var(--danger);font-weight:600;cursor:pointer">
+            Jump to next →
+          </button>
+        </span>
+      )}
+    </div>
+    <textarea
+      id="bodyMarkdown"
+      name="bodyMarkdown"
+      spellcheck="true"
+      style="width:100%;height:26rem;padding:0.75rem;font-family:ui-monospace,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre">{post.bodyMarkdown}</textarea>
+
+    <label style="display:block;font-weight:600;margin:1.1rem 0 0.25rem">Ask for an edit (optional)</label>
+    <input type="text" name="instruction" placeholder="e.g. Make the intro punchier, add a section on documentation" style="width:100%;padding:0.5rem" />
+    <p class="muted" style="margin:0.3rem 0 0;font-size:0.85rem">"Apply edit" rewrites the body above in your voice. "Save" just saves your changes.</p>
+
+    <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">Save</button>
+      <button type="submit" formaction={`/api/admin/blog/${post.id}/improve`} data-busy="Improving for SEO / AEO…"
+        style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:var(--accent-text);font-weight:600">✦ Improve to checklist</button>
+      <button type="submit" formaction={`/api/admin/blog/${post.id}/revise`} data-busy="Applying your edit…"
+        style="padding:0.5rem 1.2rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600">✦ Apply edit</button>
+      <a href={`/blog/${post.slug}`} target="_blank" rel="noopener"
+        style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);text-decoration:none;color:var(--text)">Preview ↗</a>
+    </div>
+    <p class="muted" style="margin:0.4rem 0 0;font-size:0.85rem">"Improve to checklist" rewrites the whole article to hit every SEO/AEO item above (it edits the body, excerpt, and meta) — review the result before publishing.</p>
+  </form>
+
+  <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
+
+  {/* Hero image — two-step: draft a prompt in the site style, then generate. */}
+  <section id="hero">
+    <h2 style="margin:0 0 0.25rem;font-size:1.15rem">Hero image</h2>
+    <p class="muted" style="margin:0 0 0.9rem;font-size:0.9rem">
+      Generates a 16:9 illustration in the site's style (used at the top of the
+      article and as its social/OG preview). Step 1: draft a prompt. Step 2: edit
+      it if you like, then generate the image.
+    </p>
+
+    {post.heroImage && (
+      <img
+        src={post.heroImage}
+        alt="Current hero"
+        style="max-width:480px;width:100%;border-radius:12px;border:1px solid var(--border);margin-bottom:0.9rem;display:block"
+      />
+    )}
+
+    <form method="POST" action={`/api/admin/blog/${post.id}/hero-prompt`} style="margin-bottom:0.6rem">
+      <button type="submit" data-busy="Drafting a hero prompt…"
+        style="padding:0.45rem 1.1rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600">
+        {post.heroPrompt ? "↻ Re-draft prompt" : "✦ Generate hero prompt"}
+      </button>
+    </form>
+
+    <form method="POST" action={`/api/admin/blog/${post.id}/hero-image`}>
+      <label style="font-weight:600">Image prompt</label>
+      <textarea name="heroPrompt" placeholder="Click 'Generate hero prompt' above, or write your own…"
+        style="width:100%;height:7rem;padding:0.6rem;margin:0.25rem 0 0.6rem;line-height:1.5">{post.heroPrompt ?? ""}</textarea>
+      <button type="submit" class="btn-primary" data-busy="Generating image — this can take ~15s…"
+        style="padding:0.5rem 1.2rem">
+        {post.heroImage ? "Regenerate image" : "Generate image"}
+      </button>
+      <span class="muted" style="font-size:0.85rem;margin-left:0.5rem">Uses the prompt above.</span>
+    </form>
+  </section>
+
+  <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
+
+  <section id="publish">
+    {verifyFlagged && (
+      <p class="panel" style="margin:0 0 1rem;background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger)">
+        ⚠ This article still contains <strong>[VERIFY]</strong> flags — unconfirmed regulatory claims. Resolve every one in the body before it can be published or scheduled.
+      </p>
+    )}
+    {post.status === "scheduled" && (
+      <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint);color:var(--warning-ink);border:none">
+        ⏱ Scheduled to publish <strong>{fmtPt(post.scheduledAt)}</strong>. It goes live automatically at that time.
+      </p>
+    )}
+
+    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+      <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
+        <input type="hidden" name="action" value={post.status === "published" ? "unpublish" : "publish"} />
+        <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem"
+          disabled={verifyFlagged && post.status !== "published"}
+          title={verifyFlagged && post.status !== "published" ? "Resolve [VERIFY] flags first" : undefined}>
+          {post.status === "published" ? "Unpublish" : "Publish now"}
+        </button>
+      </form>
+      {post.status === "scheduled" && (
+        <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
+          <input type="hidden" name="action" value="unschedule" />
+          <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel)">Cancel schedule</button>
+        </form>
+      )}
+      {post.status === "published" && (
+        <span class="muted" style="font-size:0.9rem">Live at <code>/blog/{post.slug}</code></span>
+      )}
+      <form id="delete-post" method="POST" action={`/api/admin/blog/${post.id}/delete`} style="margin-left:auto">
+        <button type="submit" style="padding:0.45rem 1rem;border-radius:8px;border:1px solid var(--danger,#b3261e);background:transparent;color:var(--danger,#b3261e)">Delete</button>
+      </form>
+    </div>
+
+    {post.status !== "published" && (
+      <form id="schedule-form" method="POST" action={`/api/admin/blog/${post.id}/publish`}
+        style="margin-top:1rem;display:flex;gap:0.6rem;align-items:flex-end;flex-wrap:wrap">
+        <input type="hidden" name="action" value="schedule" />
+        <input type="hidden" name="scheduledAt" id="scheduledAtIso" />
+        <div>
+          <label style="display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">
+            {post.status === "scheduled" ? "Reschedule for" : "Or schedule for later"} (your local time)
+          </label>
+          <input type="datetime-local" name="scheduledLocal" id="scheduledLocal" required
+            style="padding:0.45rem" />
+        </div>
+        <button type="submit" disabled={verifyFlagged}
+          title={verifyFlagged ? "Resolve [VERIFY] flags first" : undefined}
+          style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600">
+          {post.status === "scheduled" ? "Reschedule" : "Schedule"}
+        </button>
+      </form>
+    )}
+  </section>
+
+  <script>
+    document.getElementById("delete-post")?.addEventListener("submit", (e) => {
+      if (!confirm("Delete this article? This can't be undone.")) e.preventDefault();
+    });
+    // Convert the local datetime to a UTC ISO string using the browser's
+    // timezone, so "publish at 9am" means 9am where the owner is.
+    document.getElementById("schedule-form")?.addEventListener("submit", () => {
+      const local = (document.getElementById("scheduledLocal") as HTMLInputElement)?.value;
+      const iso = document.getElementById("scheduledAtIso") as HTMLInputElement;
+      if (local && iso) iso.value = new Date(local).toISOString();
+    });
+
+    // Jump to each [VERIFY] flag in the body: select it and scroll it into view,
+    // cycling through all occurrences on repeated clicks.
+    (() => {
+      const ta = document.getElementById("bodyMarkdown") as HTMLTextAreaElement | null;
+      const btn = document.getElementById("verify-jump");
+      const countEl = document.getElementById("verify-count");
+      if (!ta || !btn) return;
+      let from = 0;
+      const find = () => {
+        const val = ta.value;
+        const re = /\[VERIFY\b/gi;
+        const all: number[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(val))) all.push(m.index);
+        if (countEl) countEl.textContent = String(all.length);
+        return all;
+      };
+      btn.addEventListener("click", () => {
+        const all = find();
+        if (!all.length) return;
+        let idx = all.find((i) => i >= from);
+        if (idx === undefined) idx = all[0]; // wrap around
+        // Select the whole [VERIFY ...] token up to the closing bracket.
+        const end = ta.value.indexOf("]", idx);
+        const selEnd = end === -1 ? idx + 7 : end + 1;
+        ta.focus();
+        ta.setSelectionRange(idx, selEnd);
+        // Scroll the match roughly to the middle of the textarea.
+        const line = ta.value.slice(0, idx).split("\n").length - 1;
+        const lh = parseFloat(getComputedStyle(ta).lineHeight) || 18;
+        ta.scrollTop = Math.max(0, line * lh - ta.clientHeight / 2);
+        from = selEnd; // next click advances
+      });
+    })();
+  </script>
+</Layout>

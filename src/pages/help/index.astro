@@ -1,0 +1,81 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getCollection } from "astro:content";
+
+const user = Astro.locals.user;
+const role = user?.role ?? null;
+
+// Load every help article, sorted by the author-controlled order within a group.
+const all = (await getCollection("help")).sort(
+  (a, b) => a.data.order - b.data.order,
+);
+
+// Admin-only articles are hidden from non-admins. Everything else is public so
+// prospective students/owners can read it before signing up.
+const isAdmin = role === "site_admin";
+const visible = all.filter((a) => a.data.audience !== "admin" || isAdmin);
+
+// Group by category, preserving first-seen (order-sorted) sequence.
+const byCategory = new Map<string, typeof visible>();
+for (const a of visible) {
+  const list = byCategory.get(a.data.category) ?? [];
+  list.push(a);
+  byCategory.set(a.data.category, list);
+}
+
+// Role-aware ordering: surface the categories most relevant to this user first.
+// Clinic managers see clinic topics first; students see training topics first.
+const audienceRank = (cat: typeof visible): number => {
+  const auds = new Set(cat.map((a) => a.data.audience));
+  if (role === "clinic_admin") {
+    if (auds.has("clinic")) return 0;
+    if (auds.has("student")) return 2;
+  } else {
+    if (auds.has("student")) return 0;
+    if (auds.has("clinic")) return 2;
+  }
+  return 1; // "everyone" / getting-started sits in the middle-front
+};
+const categories = [...byCategory.entries()].sort(
+  ([, a], [, b]) => audienceRank(a) - audienceRank(b),
+);
+---
+
+<Layout title="Help Center" showNav={true}>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div>
+      <h1 style="margin-bottom:0.25rem">Help Center</h1>
+      <p style="margin:0">
+        How-to guides and answers for using ChiroSmarts. Looking for course
+        content instead? Use the in-course tutor.
+      </p>
+    </div>
+    <a class="btn" href="/help/contact" style="white-space:nowrap;margin:0">Contact support →</a>
+  </div>
+
+  {
+    categories.map(([category, articles]) => (
+      <div class="panel">
+        <h2>{category}</h2>
+        <ul style="list-style:none;padding:0;margin:0">
+          {articles.map((a) => (
+            <li style="padding:0.7rem 0;border-top:1px solid var(--border)">
+              <a href={`/help/${a.id}`} style="font-weight:600;color:var(--text);text-decoration:none">
+                {a.data.title}
+              </a>
+              <p class="muted" style="margin:0.2rem 0 0">{a.data.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))
+  }
+
+  <div class="panel" style="border-color:var(--brand)">
+    <h2 style="margin:0 0 0.35rem">Still need help?</h2>
+    <p style="margin:0 0 0.9rem">
+      Can't find an answer? Send us a message and we'll get back to you by email.
+    </p>
+    <a class="btn" href="/help/contact" style="margin:0">Contact support</a>
+  </div>
+</Layout>

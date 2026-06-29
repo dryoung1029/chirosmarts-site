@@ -35,6 +35,8 @@ function isPublic(pathname: string): boolean {
   // Public marketing layer (catalog, guides, clinics, renewal, about, sitemap).
   if (pathname === "/courses" || pathname.startsWith("/courses/")) return true;
   if (pathname.startsWith("/guides/")) return true;
+  if (pathname === "/blog" || pathname.startsWith("/blog/")) return true;
+  if (pathname === "/blog/rss.xml") return true;
   if (
     pathname === "/clinics" ||
     pathname === "/renewal" ||
@@ -42,14 +44,17 @@ function isPublic(pathname: string): boolean {
     pathname === "/sitemap.xml"
   )
     return true;
+  // Help Center (articles + contact form) is open to everyone, incl. prospects.
+  if (pathname === "/help" || pathname.startsWith("/help/")) return true;
+  if (pathname === "/api/help/contact") return true;
   // Funnel: lead capture, double-opt-in confirm, and gated asset download.
   if (pathname === "/api/leads/capture") return true;
   if (pathname === "/leads/confirm") return true;
   if (pathname === "/api/leads/asset") return true;
   // Public free-preview token (hard-gated on lessons.is_preview in the handler).
   if (pathname === "/api/stream/preview-token") return true;
-  // public verification route (M4) and static assets
-  if (pathname.startsWith("/verify/")) return true;
+  // public verification route (M4) — entry form AND code deep-links — + static assets
+  if (pathname === "/verify" || pathname.startsWith("/verify/")) return true;
   if (pathname.startsWith("/_")) return true; // _astro, _image, _server-islands
   if (pathname.startsWith("/favicon")) return true;
   return false;

@@ -7,6 +7,7 @@ import { getDb } from "@/db/client";
 import { getCourseBySlug } from "@/lib/courses";
 import { hasActiveEnrollment } from "@/lib/entitlement";
 import { getCourseResource, getCourseResourceBytes } from "@/lib/course-resources";
+import { isAdmin } from "@/lib/admin";
 
 export const GET: APIRoute = async ({ params, locals, redirect }) => {
   const user = locals.user;
@@ -23,7 +24,8 @@ export const GET: APIRoute = async ({ params, locals, redirect }) => {
   }
 
   if (res.visibility !== "public") {
-    const entitled = await hasActiveEnrollment(db, user.id, course.id);
+    const entitled =
+      (await hasActiveEnrollment(db, user.id, course.id)) || isAdmin(env, user);
     if (!entitled) return redirect(`/courses/${course.slug}`, 302);
   }
 

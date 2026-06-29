@@ -1,0 +1,183 @@
+---
+/**
+ * Article Studio — content calendar. Month grid of scheduled (by scheduledAt)
+ * and published (by publishedAt) posts, plus an unscheduled-drafts backlog and
+ * an upcoming list. Navigate months with ?m=YYYY-MM. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { desc } from "drizzle-orm";
+import { promoteDuePosts } from "@/lib/blog-schedule";
+import { hasVerifyFlags } from "@/lib/blog";
+
+const db = getDb(Astro.locals.runtime.env);
+await promoteDuePosts(db);
+const posts = await db
+  .select()
+  .from(schema.blogPosts)
+  .orderBy(desc(schema.blogPosts.scheduledAt))
+  .all();
+
+// LA calendar date for an ISO timestamp.
+const laYmd = (iso: string) => {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date(iso))
+    .split("-")
+    .map(Number);
+  return { y, m, d };
+};
+
+const todayIso = new Date().toISOString();
+const today = laYmd(todayIso);
+
+// Target month from ?m=YYYY-MM (default: this month, LA).
+const mParam = Astro.url.searchParams.get("m") ?? "";
+const mm = mParam.match(/^(\d{4})-(\d{2})$/);
+let year = mm ? Number(mm[1]) : today.y;
+let month = mm ? Number(mm[2]) : today.m; // 1-based
+if (month < 1 || month > 12) { year = today.y; month = today.m; }
+
+const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay(); // 0=Sun
+
+// The relevant calendar date for a post (scheduled vs published).
+const postDate = (p: (typeof posts)[number]) =>
+  p.status === "scheduled" ? p.scheduledAt : p.status === "published" ? p.publishedAt : null;
+
+const byDay: Record<number, (typeof posts)[number][]> = {};
+for (const p of posts) {
+  const iso = postDate(p);
+  if (!iso) continue;
+  const { y, m, d } = laYmd(iso);
+  if (y === year && m === month) (byDay[d] ??= []).push(p);
+}
+
+// Grid cells: leading blanks + day numbers.
+const cells: (number | null)[] = [
+  ...Array(firstWeekday).fill(null),
+  ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+];
+while (cells.length % 7 !== 0) cells.push(null);
+
+const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
+const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+const pad = (n: number) => String(n).padStart(2, "0");
+const monthName = new Date(Date.UTC(year, month - 1, 1)).toLocaleString("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+const drafts = posts.filter((p) => p.status === "draft");
+const upcoming = posts
+  .filter((p) => p.status === "scheduled" && p.scheduledAt && p.scheduledAt > todayIso)
+  .sort((a, b) => (a.scheduledAt! < b.scheduledAt! ? -1 : 1));
+const fmtPt = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }) + " PT"
+    : "";
+
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+---
+
+<Layout title="Content calendar · Admin" showNav={true}>
+  <AdminNav active="blog" />
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:0.5rem">
+    <h1 style="margin:0">Content calendar</h1>
+    <a href="/admin/blog" style="margin-left:auto">← Article list</a>
+  </div>
+  <p class="muted" style="margin-top:0">
+    Scheduled posts (amber) publish automatically at their time; published posts
+    (green) show on their publish date. Click any post to edit it.
+  </p>
+
+  <div style="display:flex;align-items:center;gap:0.75rem;margin:1rem 0">
+    <a class="btn-secondary" href={`/admin/blog/calendar?m=${prev.y}-${pad(prev.m)}`}
+      style="padding:0.35rem 0.8rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">← {prev.y}-{pad(prev.m)}</a>
+    <strong style="font-size:1.1rem;min-width:11rem;text-align:center">{monthName}</strong>
+    <a class="btn-secondary" href={`/admin/blog/calendar?m=${next.y}-${pad(next.m)}`}
+      style="padding:0.35rem 0.8rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">{next.y}-{pad(next.m)} →</a>
+    {(year !== today.y || month !== today.m) && (
+      <a href="/admin/blog/calendar" style="font-size:0.9rem">Today</a>
+    )}
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+    {WD.map((d) => (
+      <div style="background:var(--panel-2);padding:0.4rem;text-align:center;font-size:0.8rem;font-weight:600;color:var(--muted)">{d}</div>
+    ))}
+    {cells.map((day) => {
+      const isToday = day === today.d && year === today.y && month === today.m;
+      const items = day ? byDay[day] ?? [] : [];
+      return (
+        <div style={`background:var(--surface);min-height:6.5rem;min-width:0;padding:0.35rem;${day ? "" : "opacity:0.5"}`}>
+          {day && (
+            <div style={`font-size:0.78rem;margin-bottom:0.25rem;${isToday ? "color:var(--brand);font-weight:700" : "color:var(--muted)"}`}>
+              {isToday ? `• ${day}` : day}
+            </div>
+          )}
+          <div style="display:flex;flex-direction:column;gap:0.2rem">
+            {items.map((p) => (
+              <a
+                href={`/admin/blog/${p.id}`}
+                title={p.title}
+                style={`display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;font-size:0.72rem;line-height:1.25;padding:0.2rem 0.3rem;border-radius:5px;text-decoration:none;overflow:hidden;overflow-wrap:anywhere;${
+                  p.status === "scheduled"
+                    ? "background:var(--warning-tint);color:var(--warning-ink)"
+                    : "background:var(--brand-tint);color:var(--brand)"
+                }`}
+              >
+                {hasVerifyFlags(p.bodyMarkdown) ? "⚠ " : p.status === "scheduled" ? "⏱ " : ""}{p.title}
+              </a>
+            ))}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.75rem">
+    <section>
+      <h2 style="font-size:1.05rem;margin:0 0 0.6rem">Upcoming ({upcoming.length})</h2>
+      {upcoming.length === 0 ? (
+        <p class="muted" style="font-size:0.9rem">Nothing scheduled. Open a draft and pick a publish time.</p>
+      ) : (
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.5rem">
+          {upcoming.map((p) => (
+            <li style="display:flex;gap:0.6rem;align-items:baseline">
+              <span style="font-size:0.8rem;color:var(--warning-ink);white-space:nowrap;min-width:6.5rem">{fmtPt(p.scheduledAt)}</span>
+              <a href={`/admin/blog/${p.id}`} style="font-weight:600;text-decoration:none;color:var(--accent)">{p.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section>
+      <h2 style="font-size:1.05rem;margin:0 0 0.6rem">Unscheduled drafts ({drafts.length})</h2>
+      {drafts.length === 0 ? (
+        <p class="muted" style="font-size:0.9rem">No drafts in the backlog.</p>
+      ) : (
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.5rem">
+          {drafts.map((p) => (
+            <li>
+              <a href={`/admin/blog/${p.id}`} style="font-weight:600;text-decoration:none;color:var(--accent)">{p.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+</Layout>

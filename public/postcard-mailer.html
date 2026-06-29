@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ChiroSmarts clinic postcard</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      :root {
+        --brand: #0b6b63;
+        --brand-tint: #ecf7f4;
+        --action: #c2410c;
+        --ink: #13272b;
+        --muted: #51646a;
+        --canvas: #fafaf7;
+        --surface: #ffffff;
+        --gold: #b8860b;
+        --border: #e3e9e7;
+      }
+      body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+      .page {
+        width: 1350px; height: 900px; background: var(--canvas);
+        position: relative; overflow: hidden; padding: 64px 80px;
+      }
+      .row { display: flex; align-items: center; }
+      .logo { height: 56px; }
+      .pill {
+        background: var(--brand-tint); color: var(--brand);
+        font-weight: 700; font-size: 19px; letter-spacing: 0.02em;
+        padding: 9px 20px; border-radius: 999px;
+      }
+      /* FRONT */
+      .front-body { display: flex; align-items: center; gap: 36px; margin-top: 54px; }
+      .front-left { flex: 1; }
+      .hero-ill { width: 500px; height: auto; flex: none; }
+      .headline {
+        font-size: 62px; font-weight: 800; line-height: 1.05;
+        letter-spacing: -0.02em; color: var(--ink);
+      }
+      .subhead { font-size: 25px; color: var(--muted); line-height: 1.4; margin-top: 26px; }
+      .accent-bar { width: 90px; height: 7px; background: var(--brand); border-radius: 4px; margin-top: 40px; }
+      /* BACK */
+      .back-h { font-size: 44px; font-weight: 800; color: var(--brand); letter-spacing: -0.01em; margin-top: 16px; }
+      .bullets { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 17px 48px; max-width: 1190px; }
+      .bullet { display: flex; gap: 15px; align-items: flex-start; }
+      .check { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--brand-tint); color: var(--brand); display: grid; place-items: center; font-size: 16px; font-weight: 800; margin-top: 2px; }
+      .bullet p { font-size: 20px; line-height: 1.32; color: var(--ink); }
+      .bullet b { color: var(--ink); }
+      .credit { margin-top: 24px; background: var(--brand-tint); border-radius: 14px; padding: 16px 24px; font-size: 19px; color: var(--ink); font-style: italic; max-width: 1010px; }
+      .credit b { font-style: normal; color: var(--brand); }
+      .tagline { margin-top: 20px; font-size: 31px; font-weight: 800; color: var(--brand); letter-spacing: -0.01em; }
+      .cta-row { position: absolute; left: 80px; right: 80px; bottom: 66px; display: flex; align-items: center; gap: 30px; }
+      .btn { background: var(--action); color: #fff; font-size: 25px; font-weight: 700; padding: 20px 34px; border-radius: 14px; }
+      .url { font-size: 30px; font-weight: 800; color: var(--ink); }
+      .url span { display: block; font-size: 17px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+      .qr-box { margin-left: auto; text-align: center; }
+      .qr-img { width: 132px; height: 132px; display: block; }
+      .qr-box span { display: block; font-size: 14px; font-weight: 600; color: var(--muted); margin-top: 5px; }
+      .foot { position: absolute; left: 80px; bottom: 28px; color: var(--muted); font-size: 17px; }
+    </style>
+  </head>
+  <body>
+    <!-- FRONT -->
+    <div class="page" data-document-role="page" data-label="Front">
+      <div class="row" style="justify-content: space-between;">
+        <img class="logo" src="https://raw.githubusercontent.com/dryoung1029/chirosmarts-site/main/public/logo.png" alt="ChiroSmarts" />
+        <span class="pill">New at ChiroSmarts</span>
+      </div>
+      <div class="front-body">
+        <div class="front-left">
+          <h1 class="headline">Every CA certified. Every renewal on time. Nothing on your plate.</h1>
+          <p class="subhead">Oregon CA training and renewal — done online from any device, and tracked for your whole clinic.</p>
+          <div class="accent-bar"></div>
+        </div>
+        <img class="hero-ill" src="https://raw.githubusercontent.com/dryoung1029/chirosmarts-site/main/public/postcard-illustration.png" alt="Certified chiropractic assistants" />
+      </div>
+    </div>
+
+    <!-- BACK -->
+    <div class="page" data-document-role="page" data-label="Back">
+      <img class="logo" src="https://raw.githubusercontent.com/dryoung1029/chirosmarts-site/main/public/logo.png" alt="ChiroSmarts" />
+      <h2 class="back-h">What's new for Oregon clinics</h2>
+
+      <div class="bullets">
+        <div class="bullet"><span class="check">✓</span><p>The <b>8 didactic hours</b> for initial CA certification — online and self-paced, and it comes with a <b>downloadable study guide</b>.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>Learn from <b>any device</b> — computer, phone, or tablet, right from home. Progress saves as you go.</p></div>
+        <div class="bullet"><span class="check">✓</span><p><b>Vitals training included</b> — the hours required in Year 1, done right and documented for audit.</p></div>
+        <div class="bullet"><span class="check">✓</span><p><b>One clinic dashboard</b> — buy seats, invite staff, and see everyone's certification and renewal status at a glance.</p></div>
+        <div class="bullet"><span class="check">✓</span><p>Renewals tracked automatically by birth month, with reminder emails so no one lapses.</p></div>
+        <div class="bullet"><span class="check">✓</span><p><b>HIPAA training for your whole team</b> — a standalone course any employee can take.</p></div>
+      </div>
+
+      <div class="credit">Built by <b>Dr. Jason Young, DC</b> — former president of the Oregon Board of Chiropractic Examiners.</div>
+      <div class="tagline">Training has never been easier.</div>
+
+      <div class="cta-row">
+        <span class="btn">Module 1 is free — see it tonight</span>
+        <span class="url">chirosmarts.com<span>Oregon CA training &amp; renewal</span></span>
+        <div class="qr-box">
+          <img class="qr-img" src="https://raw.githubusercontent.com/dryoung1029/chirosmarts-site/main/public/postcard-qr.png" alt="Scan to start" />
+          <span>Scan to start</span>
+        </div>
+      </div>
+      <div class="foot">ChiroSmarts · contact@chirosmarts.com</div>
+    </div>
+  </body>
+</html>

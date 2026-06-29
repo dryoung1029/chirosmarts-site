@@ -1,20 +1,24 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Illustration from "@/components/marketing/Illustration.astro";
+import RoadmapList from "@/components/RoadmapList.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
-import {
-  getClinicForOwner,
-  getCaMembershipForUser,
-  type CaMembership,
-} from "@/lib/clinic";
-import { listPoolsDetailed } from "@/lib/seat-pools";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
-const roadmap = await getUserRoadmap(db, user.id);
+
+// This is the STUDENT dashboard — TRAINING ONLY. Every clinic-side thing (the
+// "Train Your CAs" roadmap, seat tools, and the "which clinic am I a CA at"
+// context) lives on its own screen (/clinic). Nothing clinic-related renders
+// here, so a person who is both a student and a clinic owner sees two clean,
+// separate screens instead of one mixed one.
+const isClinicOwner = user.role === "clinic_admin";
+const roadmap = (await getUserRoadmap(db, user.id)).filter(
+  ({ template }) => template?.slug !== "oregon-clinic-owner",
+);
 
 // Courses the student is enrolled in (multi-course "Your courses" grid).
 const myCourses = await db
@@ -32,29 +36,6 @@ const activeCourses = myCourses.filter(
   (c) => c.status === "active" || c.status === "completed",
 );
 
-// Clinic owners get a callout linking to the dedicated clinic-management page
-// (/clinic) where seats are bought and assigned. Seat usage shown for context.
-let clinic = null;
-let seatTotals: { purchased: number; available: number } | null = null;
-if (user.role === "clinic_admin") {
-  clinic = await getClinicForOwner(db, user.id);
-  if (clinic) {
-    const pools = await listPoolsDetailed(db, clinic.id);
-    seatTotals = pools.reduce(
-      (acc, p) => ({
-        purchased: acc.purchased + p.summary.purchased,
-        available: acc.available + p.summary.available,
-      }),
-      { purchased: 0, available: 0 },
-    );
-  }
-}
-
-// Staff CAs (not owners) see which clinic they belong to.
-const caMembership: CaMembership | null = clinic
-  ? null
-  : await getCaMembershipForUser(db, user.id);
-
 const justTransferred = Astro.url.searchParams.get("transferred") === "1";
 const readOnlyBlocked =
   Astro.url.searchParams.get("impersonation_readonly") === "1";
@@ -63,21 +44,6 @@ const months = [
   "", "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-const statusLabel: Record<string, string> = {
-  complete: "Done",
-  available: "Up next",
-  in_progress: "In progress",
-  locked: "Locked",
-  waived: "Waived",
-};
-const statusColor: Record<string, string> = {
-  complete: "var(--ok)",
-  available: "var(--accent)",
-  in_progress: "var(--warn)",
-  locked: "var(--muted)",
-  waived: "var(--muted)",
-};
 ---
 
 <Layout title="Your roadmap" showNav={true}>
@@ -133,41 +99,7 @@ const statusColor: Record<string, string> = {
   </div>
 
   {
-    clinic && (
-      <div class="panel" style="border-color:var(--brand);background:var(--brand-tint, var(--surface))">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
-          <div style="flex:1;min-width:240px">
-            <h2 style="margin:0 0 0.35rem">{clinic.name}</h2>
-            <p style="margin:0">
-              {seatTotals && seatTotals.purchased > 0
-                ? `${seatTotals.available} of ${seatTotals.purchased} training seats available. Buy more or assign CAs from your clinic page.`
-                : "Buy a pool of training seats and assign them to your Chiropractic Assistants."}
-            </p>
-          </div>
-          <a class="btn" href="/clinic" style="white-space:nowrap;margin:0">
-            Manage clinic →
-          </a>
-        </div>
-      </div>
-    )
-  }
-
-  {
-    caMembership && (
-      <div class="panel">
-        <h2 style="margin:0">Your clinic</h2>
-        <p style="margin:0.4rem 0 0">
-          You're a CA at <strong style="color:var(--text)">{caMembership.clinic.name}</strong>.
-          {activeCourses.length > 0
-            ? " Your training is below — keep working through your roadmap."
-            : " When your clinic assigns you a course seat, it'll appear above."}
-        </p>
-      </div>
-    )
-  }
-
-  {
-    roadmap.length === 0 && !clinic && (
+    roadmap.length === 0 && !isClinicOwner && (
       <div class="panel">
         <h2>No roadmap yet</h2>
         <p>You don't have an active roadmap. If this seems wrong, contact support.</p>
@@ -175,41 +107,5 @@ const statusColor: Record<string, string> = {
     )
   }
 
-  {
-    roadmap.map(({ template, steps }) => (
-      <div class="panel">
-        <h2>{template?.name ?? "Roadmap"}</h2>
-        {template?.description && <p style="margin-top:0">{template.description}</p>}
-        <ol style="list-style:none;padding:0;margin:0.5rem 0 0">
-          {steps.map((s) => (
-            <li
-              style="display:flex;align-items:center;gap:0.75rem;padding:0.7rem 0;border-top:1px solid var(--border)"
-            >
-              <span
-                aria-hidden="true"
-                style={`flex:0 0 auto;width:1.4rem;height:1.4rem;border-radius:50%;display:grid;place-items:center;font-size:0.8rem;border:2px solid ${statusColor[s.status]};color:${statusColor[s.status]}`}
-              >
-                {s.status === "complete" ? "✓" : s.position}
-              </span>
-              <span style="flex:1">
-                {s.href ? <a href={s.href}>{s.title}</a> : s.title}
-              </span>
-              <span
-                style={`font-size:0.8rem;color:${statusColor[s.status]}`}
-              >
-                {s.href && s.status !== "complete" ? (
-                  <a href={s.href} style={`color:${statusColor[s.status]}`}>
-                    {statusLabel[s.status] ?? s.status} →
-                  </a>
-                ) : (
-                  statusLabel[s.status] ?? s.status
-                )}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
-    ))
-  }
-
+  <RoadmapList roadmap={roadmap} />
 </Layout>
