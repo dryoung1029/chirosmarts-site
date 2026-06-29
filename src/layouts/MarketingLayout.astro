@@ -132,7 +132,9 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         max-width: 1080px; margin: 0 auto; padding: 1rem 1.25rem;
       }
       .mk-nav .spacer { flex: 1; }
-      .mk-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; }
+      .mk-nav a { color: var(--ink); text-decoration: none; font-size: 0.95rem; white-space: nowrap; }
+      /* Header logo: keep it header-sized and responsive (the source PNG is large). */
+      .mk-logo img { height: 52px !important; width: auto; }
       /* Nav sign-in is a brand CTA, keeping --action reserved for the page's primary CTA. */
       .mk-nav a.cta { background: var(--brand); color: var(--surface); padding: 0.45rem 0.9rem; border-radius: 8px; }
       .btn-primary, .btn-secondary { border-radius: 10px; padding: 0.7rem 1.3rem; font-weight: 600; }
@@ -149,13 +151,16 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
       details.mk-faq[open] summary { color: var(--brand); }
       @media (max-width: 640px) {
         .mk-section { padding: 2.25rem 0; }
+        .mk-nav { gap: 0.85rem; padding: 0.75rem 1rem; }
+        .mk-nav a { font-size: 0.9rem; }
+        .mk-logo img { height: 40px !important; }
       }
     </style>
   </head>
   <body>
     <header>
       <nav class="mk-nav">
-        <a href="/" aria-label="ChiroSmarts home"><Logo height={128} /></a>
+        <a href="/" class="mk-logo" aria-label="ChiroSmarts home"><Logo height={52} /></a>
         <span class="spacer"></span>
         <a href="/courses">Courses</a>
         <a href="/clinics">For clinics</a>
