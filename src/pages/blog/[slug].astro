@@ -7,6 +7,7 @@
  * meta, on-page author E-E-A-T box, and related-article internal links.
  */
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
 import { getDb, schema } from "@/db/client";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { renderMarkdown } from "@/lib/markdown";
@@ -167,6 +168,15 @@ if (faqLd) ld.push(faqLd);
           </ul>
         </section>
       )}
+
+      <div style="margin-top:2.5rem">
+        <LeadCapture
+          source="newsletter"
+          heading="Get more like this"
+          blurb="Join the ChiroSmarts newsletter — practical tips for Oregon chiropractic assistants, in your inbox. Confirm your email and you're in."
+          buttonLabel="Subscribe"
+        />
+      </div>
     </article>
   </section>
 

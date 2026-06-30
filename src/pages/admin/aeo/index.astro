@@ -52,6 +52,24 @@ const cell = (e: { error?: string; noAiOverview?: boolean; cited?: boolean; cita
 const arrow = (d?: string | null) => (d === "gained" ? " ↑" : d === "lost" ? " ↓" : "");
 const prio = (p: string) =>
   p === "high" ? "var(--danger)" : p === "medium" ? "var(--warning-ink)" : "var(--muted)";
+
+// Classify each action item. "Win the query …" / "Climb on …" are content
+// items → draft an article on that query. Everything else (lost citation,
+// brand-mention, technical) → a prompt the owner pastes into a coding agent.
+function classifyAction(a: { action: string; why: string }) {
+  const isArticle = /^win the query|^climb on/i.test(a.action);
+  const topic = isArticle ? a.action.match(/"([^"]+)"/)?.[1] ?? "" : "";
+  const coderPrompt = [
+    "Work in the chirosmarts-site repo (Astro 5 SSR on Cloudflare; blog is D1-backed; SEO/GEO scoring + schema come from the Jeldon engine via jeldon.config.ts — the single source of truth, don't duplicate it).",
+    "",
+    "Address this answer-engine-optimization (AEO) action item:",
+    `ACTION: ${a.action}`,
+    `WHY: ${a.why}`,
+    "",
+    "Investigate the relevant pages/components, implement the change, and verify with `npx astro check` and `npm run build`. Keep Dr. Young's voice and never fabricate Oregon regulatory specifics.",
+  ].join("\n");
+  return { isArticle, topic, coderPrompt };
+}
 ---
 
 <Layout title="AEO · Admin" showNav={true}>
@@ -161,16 +179,42 @@ const prio = (p: string) =>
         <>
           <h2 style="font-size:1.1rem;margin:1.5rem 0 0.5rem">Action items</h2>
           <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.6rem">
-            {agg.actionItems.map((a) => (
-              <li class="panel" style="margin:0">
-                <span style={`font-size:0.72rem;font-weight:700;text-transform:uppercase;color:${prio(a.priority)}`}>{a.priority}</span>
-                <div style="font-weight:600">{a.action}</div>
-                <div class="muted" style="font-size:0.88rem">{a.why}</div>
-              </li>
-            ))}
+            {agg.actionItems.map((a) => {
+              const c = classifyAction(a);
+              return (
+                <li class="panel" style="margin:0">
+                  <span style={`font-size:0.72rem;font-weight:700;text-transform:uppercase;color:${prio(a.priority)}`}>{a.priority}</span>
+                  <div style="font-weight:600">{a.action}</div>
+                  <div class="muted" style="font-size:0.88rem">{a.why}</div>
+                  <div style="margin-top:0.5rem">
+                    {c.isArticle && c.topic ? (
+                      <a class="btn-primary" href={`/admin/blog?topic=${encodeURIComponent(c.topic)}`}
+                        style="display:inline-block;padding:0.35rem 0.9rem;font-size:0.85rem">✍️ Draft this article →</a>
+                    ) : (
+                      <button type="button" data-coder-prompt={c.coderPrompt}
+                        style="padding:0.35rem 0.9rem;font-size:0.85rem;border-radius:8px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);font-weight:600;cursor:pointer">⌘ Copy coder prompt</button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
     </>
   )}
+
+  <script>
+    // Copy the coder prompt for a (non-article) action item to the clipboard.
+    document.querySelectorAll("[data-coder-prompt]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const text = btn.getAttribute("data-coder-prompt") || "";
+        navigator.clipboard.writeText(text).then(() => {
+          const prev = btn.textContent;
+          btn.textContent = "Copied ✓ — paste into your coding agent";
+          setTimeout(() => (btn.textContent = prev), 1800);
+        });
+      });
+    });
+  </script>
 </Layout>

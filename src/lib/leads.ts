@@ -13,7 +13,7 @@ import { getSiteUrl } from "@/lib/env";
 import { sendEmail } from "@/lib/email/resend";
 import { logEvent } from "@/lib/events";
 
-export type LeadSource = "renewal_checker" | "checklist_pdf" | "other";
+export type LeadSource = "renewal_checker" | "checklist_pdf" | "newsletter" | "other";
 
 export function normalizeEmail(e: string): string {
   return e.trim().toLowerCase();
@@ -24,16 +24,25 @@ export function isValidEmail(e: string): boolean {
 
 function emailBody(source: LeadSource, confirmUrl: string, site: string) {
   const isChecklist = source === "checklist_pdf";
+  const isNewsletter = source === "newsletter";
   const subject = isChecklist
     ? "Confirm your email to get the Oregon CA certification checklist"
-    : "Confirm your ChiroSmarts renewal reminder";
+    : isNewsletter
+      ? "Confirm your ChiroSmarts newsletter subscription"
+      : "Confirm your ChiroSmarts renewal reminder";
   const lead = isChecklist
     ? "Thanks for requesting the Oregon CA certification checklist."
-    : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
-  const cta = isChecklist ? "Confirm & get the checklist" : "Confirm my email";
+    : isNewsletter
+      ? "Thanks for subscribing to the ChiroSmarts newsletter — practical tips for Oregon chiropractic assistants."
+      : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
+  const cta = isChecklist
+    ? "Confirm & get the checklist"
+    : isNewsletter
+      ? "Confirm my subscription"
+      : "Confirm my email";
   // Decorative renewal-reminder illustration (09), hosted as an absolute PNG so it
   // renders in every email client. Only the renewal flow has a mapped image.
-  const hero = isChecklist
+  const hero = isChecklist || isNewsletter
     ? ""
     : `<img src="${site}/email/renewal.png" alt="" width="320" style="display:block;max-width:320px;height:auto;margin:0 0 12px">`;
   const text = `${lead}\n\nPlease confirm your email to continue:\n${confirmUrl}\n\nIf you didn't request this, you can ignore this message.`;

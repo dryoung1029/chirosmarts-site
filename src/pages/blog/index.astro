@@ -3,6 +3,7 @@
  * Public blog index — published articles for chiropractic assistants.
  */
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
 import { getDb, schema } from "@/db/client";
 import { desc, eq } from "drizzle-orm";
 import { promoteDuePosts } from "@/lib/blog-schedule";
@@ -40,10 +41,19 @@ const fmt = (iso: string | null) =>
   <section class="mk-section" style="padding-top:2.5rem">
     <div class="mk-container" style="max-width:760px">
       <h1 style="margin:0 0 0.4rem">The ChiroSmarts Blog</h1>
-      <p style="color:var(--muted);margin:0 0 2rem">
+      <p style="color:var(--muted);margin:0 0 1.5rem">
         Practical guidance, compliance tips, and front-desk skills for chiropractic
         assistants — from Dr. Jason Young, DC.
       </p>
+
+      <div style="margin:0 0 2rem">
+        <LeadCapture
+          source="newsletter"
+          heading="Get the ChiroSmarts newsletter"
+          blurb="Practical tips for Oregon chiropractic assistants — new articles and compliance reminders, no spam. Confirm your email and you're in."
+          buttonLabel="Subscribe"
+        />
+      </div>
 
       {rows.length === 0 ? (
         <p class="muted">No articles published yet. Check back soon.</p>

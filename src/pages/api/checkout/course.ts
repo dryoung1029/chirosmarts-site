@@ -19,6 +19,7 @@ import {
   activateEnrollment,
   expandFulfillment,
 } from "@/lib/enrollment";
+import { recordCoursePurchase } from "@/lib/sales";
 
 export const POST: APIRoute = async ({ request, locals, redirect, cookies }) => {
   const user = locals.user;
@@ -73,6 +74,17 @@ export const POST: APIRoute = async ({ request, locals, redirect, cookies }) => 
           paymentStatus: "comp",
         });
       }
+    }
+    // Ledger: record comped purchases at the SKU level (zero cash, flagged comp).
+    // Non-blocking — a ledger failure must never break the comp grant.
+    try {
+      await recordCoursePurchase(db, {
+        userId: user.id,
+        courseIds: buyable.map((c) => c.id),
+        source: "comp",
+      });
+    } catch {
+      /* ledger is best-effort; access already granted */
     }
     return redirect(
       isSingle ? `/learn/${first.slug}?comped=1` : `/dashboard?comped=1`,

@@ -13,6 +13,36 @@ export function isBrevoConfigured(env: CloudflareEnv): boolean {
   return !!env.BREVO_API_KEY;
 }
 
+/** Brevo list id for a lead source — newsletter has its own list, else LEADS. */
+function listIdForSource(env: CloudflareEnv, source: string): number {
+  if (source === "newsletter")
+    return Number(env.BREVO_LIST_ID_NEWSLETTER) || Number(env.BREVO_LIST_ID_LEADS) || 0;
+  return Number(env.BREVO_LIST_ID_LEADS) || 0;
+}
+
+/** Push ONE confirmed lead to Brevo immediately (real-time on confirm), then
+ *  stamp it synced. Safe to call when Brevo is unconfigured (no-op). */
+export async function syncLeadToBrevo(
+  env: CloudflareEnv,
+  db: Db,
+  lead: { id: string; email: string; source: string; birthMonth: number | null },
+): Promise<boolean> {
+  if (!isBrevoConfigured(env)) return false;
+  const listId = listIdForSource(env, lead.source);
+  const ok = await upsertContact(env, {
+    email: lead.email,
+    attributes: { SOURCE: lead.source, BIRTH_MONTH: lead.birthMonth ?? "", ROLE: "lead" },
+    listIds: listId ? [listId] : [],
+  });
+  if (ok) {
+    await db
+      .update(schema.marketingLeads)
+      .set({ syncedToBrevoAt: nowIso() })
+      .where(eq(schema.marketingLeads.id, lead.id));
+  }
+  return ok;
+}
+
 async function upsertContact(
   env: CloudflareEnv,
   contact: {
@@ -54,7 +84,6 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
   if (!isBrevoConfigured(env)) {
     return { ok: false, message: "Brevo is not configured (BREVO_API_KEY unset).", leadsSynced: 0, usersSynced: 0 };
   }
-  const leadsList = Number(env.BREVO_LIST_ID_LEADS) || 0;
   const usersList = Number(env.BREVO_LIST_ID_USERS) || 0;
 
   // CONFIRMED leads not yet synced (or never synced).
@@ -78,7 +107,7 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
         BIRTH_MONTH: lead.birthMonth ?? "",
         ROLE: "lead",
       },
-      listIds: leadsList ? [leadsList] : [],
+      listIds: listIdForSource(env, lead.source) ? [listIdForSource(env, lead.source)] : [],
     });
     if (ok) {
       await db

@@ -43,6 +43,7 @@ interface CloudflareEnv {
   BREVO_API_KEY?: string;
   BREVO_LIST_ID_LEADS?: string;
   BREVO_LIST_ID_USERS?: string;
+  BREVO_LIST_ID_NEWSLETTER?: string; // newsletter subscribers (falls back to LEADS)
 }
 
 type Runtime = import("@astrojs/cloudflare").Runtime<CloudflareEnv>;

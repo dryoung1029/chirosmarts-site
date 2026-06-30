@@ -8,7 +8,8 @@ interface Props {
     | "collateral"
     | "blog"
     | "aeo"
-    | "analytics";
+    | "analytics"
+    | "revenue";
 }
 const { active } = Astro.props;
 const links: { key: string; href: string; label: string }[] = [
@@ -19,6 +20,7 @@ const links: { key: string; href: string; label: string }[] = [
   { key: "blog", href: "/admin/blog", label: "Blog" },
   { key: "aeo", href: "/admin/aeo", label: "AEO" },
   { key: "analytics", href: "/admin/analytics", label: "Analytics" },
+  { key: "revenue", href: "/admin/revenue", label: "Revenue" },
 ];
 ---
 

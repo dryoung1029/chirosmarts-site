@@ -1,6 +1,7 @@
 ---
 import "@/styles/tokens.css";
 import Logo from "@/components/Logo.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
 import { getSiteUrl } from "@/lib/env";
 import { LEGAL } from "@/config/legal";
 import { organizationLd } from "@/lib/structured-data";
@@ -172,6 +173,19 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
     <main>
       <slot />
     </main>
+
+    {!path.startsWith("/blog") && (
+      <section class="mk-section" style="padding:2.25rem 0;background:var(--brand-tint)">
+        <div class="mk-container" style="max-width:620px">
+          <LeadCapture
+            source="newsletter"
+            heading="Get the ChiroSmarts newsletter"
+            blurb="Practical tips for Oregon chiropractic assistants and the clinics that employ them — new guides and compliance reminders, no spam."
+            buttonLabel="Subscribe"
+          />
+        </div>
+      </section>
+    )}
 
     <footer class="mk-footer">
       <div class="mk-container">
