@@ -829,6 +829,10 @@ export const importedContacts = sqliteTable(
     // Where we first saw them: a form label like "paid_cert" / "free_ceu".
     firstSource: text("first_source"),
     everBought: integer("ever_bought", { mode: "boolean" }).notNull().default(false),
+    // Completed a course (from the WP Courseware gradebook): certified status +
+    // the (earliest) completion date. Drives the "certified CA" marketing segment.
+    certified: integer("certified", { mode: "boolean" }).notNull().default(false),
+    completedAt: text("completed_at"),
     // Earliest signup/purchase date seen (UTC ISO) — proxy for renewal timing.
     firstSeenAt: text("first_seen_at"),
     lastSeenAt: text("last_seen_at"),
