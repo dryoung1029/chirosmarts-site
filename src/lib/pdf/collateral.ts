@@ -97,6 +97,24 @@ function parseInline(text: string): Run[] {
   return runs.length ? runs : [{ text: "", bold: false }];
 }
 
+/**
+ * Flatten inline Markdown to plain text for single-font contexts (table cells).
+ * Drops link/code/bold markers so they never render literally; reports whether
+ * the whole cell was wrapped in **bold** so the cell can be drawn bold.
+ */
+function stripInline(text: string): { text: string; bold: boolean } {
+  const trimmed = text.trim();
+  const wholeBold =
+    /^\*\*[\s\S]+\*\*$/.test(trimmed) && !trimmed.slice(2, -2).includes("**");
+  const plain = trimmed
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [t](u) → t
+    .replace(/`([^`]+)`/g, "$1") // `code` → code
+    .replace(/\*\*/g, "") // bold markers
+    .replace(/(^|\s)\*(\S)/g, "$1$2") // opening italic *
+    .replace(/(\S)\*(\s|$)/g, "$1$2"); // closing italic *
+  return { text: plain, bold: wholeBold };
+}
+
 export async function renderCollateralPdf(
   opts: CollateralPdfOpts,
 ): Promise<Uint8Array> {
@@ -270,9 +288,11 @@ export async function renderCollateralPdf(
     const size = 9.5;
     const padY = 5;
     rows.forEach((cells, ri) => {
-      // measure row height by wrapping each cell
-      const cellLines = cells.map((c) =>
-        wrapPlain(c, font, size, colW - 10),
+      // strip inline markdown so **bold**/links don't render literally; a fully
+      // bolded cell (or any header cell) is drawn in the bold font.
+      const parsed = cells.map((c) => stripInline(c));
+      const cellLines = parsed.map((p) =>
+        wrapPlain(p.text, font, size, colW - 10),
       );
       const rowH = Math.max(...cellLines.map((l) => l.length)) * (size + 3) + padY * 2;
       ensure(rowH);
@@ -289,12 +309,13 @@ export async function renderCollateralPdf(
       cells.forEach((_, ci) => {
         const cx = MARGIN + ci * colW + 5;
         let cy = top - padY - size;
+        const cellFont = ri === 0 || parsed[ci].bold ? bold : font;
         for (const line of cellLines[ci]) {
           page.drawText(line, {
             x: cx,
             y: cy,
             size,
-            font: ri === 0 ? bold : font,
+            font: cellFont,
             color: INK,
           });
           cy -= size + 3;
@@ -386,22 +407,28 @@ export async function renderCollateralPdf(
       i++;
       continue;
     }
-    if (/^###\s+/.test(t)) {
-      y -= 4;
-      drawParagraph(parseInline(t.replace(/^###\s+/, "")), 12.5, INK, 0, 3);
-      i++;
-      continue;
-    }
-    if (/^##\s+/.test(t)) {
-      y -= 8;
-      drawParagraph(parseInline(t.replace(/^##\s+/, "")), 15, ACCENT, 0, 4);
-      y -= 2;
-      i++;
-      continue;
-    }
-    if (/^#\s+/.test(t)) {
-      y -= 6;
-      drawParagraph(parseInline(t.replace(/^#\s+/, "")), 17, INK, 0, 4);
+    // headings, levels 1-6 (#### and deeper render as small bold subheads)
+    const hm = t.match(/^(#{1,6})\s+(.*)$/);
+    if (hm) {
+      const level = hm[1].length;
+      const txt = hm[2];
+      if (level === 1) {
+        y -= 6;
+        drawParagraph(parseInline(txt), 17, INK, 0, 4);
+      } else if (level === 2) {
+        y -= 8;
+        drawParagraph(parseInline(txt), 15, ACCENT, 0, 4);
+        y -= 2;
+      } else if (level === 3) {
+        y -= 4;
+        drawParagraph(parseInline(txt), 12.5, INK, 0, 3);
+      } else {
+        // h4-h6: render as a small bold subheading so it's visually distinct
+        // from body text (which is regular weight at 10.5).
+        y -= 3;
+        const runs = parseInline(txt).map((r) => ({ ...r, bold: true }));
+        drawParagraph(runs, 11, INK, 0, 3);
+      }
       i++;
       continue;
     }
