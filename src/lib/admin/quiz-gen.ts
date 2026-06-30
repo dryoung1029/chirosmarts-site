@@ -136,6 +136,10 @@ export async function generateQuizQuestions(
     `VERBATIM phrase (6-15 words) copied exactly from the content where the answer is taught. ` +
     `Exactly one option is correct. Distractors must be plausible but clearly wrong per the ` +
     `material. Base every question STRICTLY on the provided content — never invent facts. ` +
+    `Write all four options at roughly the SAME length, detail, and specificity — the correct ` +
+    `answer must NOT be the longest, most-qualified, or most-detailed choice, since that gives ` +
+    `the answer away. Vary which position (index 0-3) is correct across questions. Avoid ` +
+    `"all/none of the above" and absolute words (always, never) unless they appear in the source. ` +
     `No preamble, no markdown, no code fences.`;
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
