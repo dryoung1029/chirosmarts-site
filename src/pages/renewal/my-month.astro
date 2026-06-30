@@ -1,0 +1,142 @@
+---
+/**
+ * Birth-month capture — the bridge that moves legacy certified CAs into the
+ * precise renewal-reminder flow. Reached from a tokenized link in the
+ * re-permission / renewal email (no login). Sets the contact's renewal (birth)
+ * month, confirms their marketing opt-in, and syncs to Brevo.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb, schema } from "@/db/client";
+import { eq, and } from "drizzle-orm";
+import { verifyContactToken } from "@/lib/contact-token";
+import { nextRenewalDeadline } from "@/lib/renewal";
+import { syncLeadToBrevo } from "@/lib/brevo";
+import { newId } from "@/lib/crypto";
+import { nowIso } from "@/lib/time";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const url = Astro.url;
+const email = (url.searchParams.get("e") ?? "").trim().toLowerCase();
+const token = (url.searchParams.get("t") ?? "").trim();
+const valid = email && (await verifyContactToken(env, email, token));
+
+let saved = false;
+let savedMonth: number | null = null;
+let deadlineLabel = "";
+let error = "";
+
+if (Astro.request.method === "POST" && valid) {
+  const form = await Astro.request.formData();
+  const month = Number(form.get("birthMonth"));
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    error = "Please pick your birth month.";
+  } else {
+    // Roster: stamp the month on the imported contact (if present).
+    await db
+      .update(schema.importedContacts)
+      .set({ birthMonth: month })
+      .where(eq(schema.importedContacts.email, email));
+    // If they have an account, fill the month when missing.
+    const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+    if (user && user.birthMonth == null) {
+      await db.update(schema.users).set({ birthMonth: month }).where(eq(schema.users.id, user.id));
+    }
+    // Confirmed opt-in lead (so the renewal flow + Brevo have the month) → real-time sync.
+    const src = "renewal_checker";
+    const existing = await db
+      .select()
+      .from(schema.marketingLeads)
+      .where(and(eq(schema.marketingLeads.email, email), eq(schema.marketingLeads.source, src)))
+      .get();
+    let leadId: string;
+    if (existing) {
+      leadId = existing.id;
+      await db
+        .update(schema.marketingLeads)
+        .set({ status: "confirmed", birthMonth: month, confirmedAt: nowIso() })
+        .where(eq(schema.marketingLeads.id, existing.id));
+    } else {
+      leadId = newId("lead");
+      await db.insert(schema.marketingLeads).values({
+        id: leadId,
+        email,
+        source: src,
+        status: "confirmed",
+        birthMonth: month,
+        confirmedAt: nowIso(),
+      });
+    }
+    try {
+      await syncLeadToBrevo(env, db, { id: leadId, email, source: src, birthMonth: month });
+    } catch {
+      /* admin batch sync will pick it up */
+    }
+    saved = true;
+    savedMonth = month;
+    deadlineLabel = nextRenewalDeadline(month)?.label ?? "";
+  }
+}
+
+// Prefill from an existing record.
+let current: number | null = null;
+if (valid) {
+  const c = await db.select({ b: schema.importedContacts.birthMonth }).from(schema.importedContacts).where(eq(schema.importedContacts.email, email)).get();
+  current = c?.b ?? null;
+}
+---
+
+<MarketingLayout
+  title="Set your Oregon CA renewal month"
+  description="Tell us your birth month and we'll remind you before your Oregon CA renewal is due."
+  canonicalPath="/renewal/my-month"
+>
+  <section class="mk-section" style="padding-top:3rem">
+    <div class="mk-container" style="max-width:560px">
+      {!valid ? (
+        <>
+          <h1>That link didn't work</h1>
+          <p style="color:var(--muted)">
+            This link is invalid or incomplete. You can still look up your renewal
+            date on the <a href="/renewal">renewal page</a>.
+          </p>
+        </>
+      ) : saved ? (
+        <div style="text-align:center">
+          <h1>You're all set ✓</h1>
+          <p style="color:var(--muted)">
+            We'll remind you before your Oregon CA renewal each year
+            {deadlineLabel && (<> — your next deadline is <strong>{deadlineLabel}</strong></>)}.
+          </p>
+          <p style="margin-top:1.25rem"><a class="btn-primary" href="/renewal">See what renewal requires →</a></p>
+          <p style="margin-top:0.5rem;font-size:0.85rem"><a href="/courses/annual-renewal-bundle">Get the 6-hour Renewal Pack ($89)</a></p>
+        </div>
+      ) : (
+        <>
+          <h1>When's your renewal due?</h1>
+          <p style="color:var(--muted)">
+            Oregon CAs renew every year in their <strong>birth month</strong>. Tell us yours
+            and we'll send a heads-up before each deadline — plus your CE options — so you're
+            never scrambling. {error && (<span style="color:var(--danger,#b3261e)">{error}</span>)}
+          </p>
+          <form method="POST" style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;margin-top:1rem">
+            <label for="bm" style="font-weight:600">My birth month</label>
+            <select id="bm" name="birthMonth" required style="padding:0.5rem;min-width:12rem">
+              <option value="">Choose…</option>
+              {MONTHS.map((m, i) => (
+                <option value={i + 1} selected={current === i + 1}>{m}</option>
+              ))}
+            </select>
+            <button type="submit" class="btn-primary" style="padding:0.5rem 1.1rem">Set my reminders</button>
+          </form>
+          <p style="color:var(--muted);font-size:0.82rem;margin-top:1rem">
+            You can unsubscribe from reminders anytime. We'll only use this to time your renewal notices.
+          </p>
+        </>
+      )}
+    </div>
+  </section>
+</MarketingLayout>

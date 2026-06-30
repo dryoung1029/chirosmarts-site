@@ -5,10 +5,21 @@
 import type { APIRoute } from "astro";
 import { getDb } from "@/db/client";
 import { getContactsForExport, toCsv } from "@/lib/contacts";
+import { getSiteUrl } from "@/lib/env";
+import { renewalSetupUrl } from "@/lib/contact-token";
 
 export const GET: APIRoute = async ({ locals }) => {
-  const db = getDb(locals.runtime.env);
+  const env = locals.runtime.env;
+  const db = getDb(env);
+  const site = getSiteUrl(env);
   const contacts = await getContactsForExport(db);
+  // Add a personalized birth-month-capture link per contact (Brevo merge field).
+  const rows = await Promise.all(
+    contacts.map(async (c) => ({
+      ...c,
+      renewalSetupUrl: c.email ? await renewalSetupUrl(env, site, c.email) : "",
+    })),
+  );
   const csv = toCsv(
     [
       { key: "email", label: "Email" },
@@ -22,8 +33,9 @@ export const GET: APIRoute = async ({ locals }) => {
       { key: "zip", label: "ZIP" },
       { key: "everBought", label: "Past buyer" },
       { key: "firstSeenAt", label: "First seen" },
+      { key: "renewalSetupUrl", label: "Renewal setup URL" },
     ],
-    contacts as unknown as Record<string, unknown>[],
+    rows as unknown as Record<string, unknown>[],
   );
   return new Response(csv, {
     headers: {

@@ -1,0 +1,91 @@
+---
+/**
+ * Testimonial collection — the landing for the post-completion review email.
+ * Tokenized (no login). Stores the testimonial to the append-only events log
+ * for an admin to curate onto the marketing site, and (optionally) nudges a
+ * Google review when GOOGLE_REVIEW_URL is configured.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb } from "@/db/client";
+import { eq } from "drizzle-orm";
+import { schema } from "@/db/client";
+import { verifyContactToken } from "@/lib/contact-token";
+import { logEvent } from "@/lib/events";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const url = Astro.url;
+const email = (url.searchParams.get("e") ?? "").trim().toLowerCase();
+const token = (url.searchParams.get("t") ?? "").trim();
+const valid = !!email && (await verifyContactToken(env, email, token));
+const googleUrl = env.GOOGLE_REVIEW_URL || "";
+
+let saved = false;
+let error = "";
+if (Astro.request.method === "POST" && valid) {
+  const form = await Astro.request.formData();
+  const rating = Math.min(5, Math.max(1, Number(form.get("rating")) || 0));
+  const text = String(form.get("text") ?? "").trim().slice(0, 2000);
+  const name = String(form.get("name") ?? "").trim().slice(0, 120);
+  const consentPublish = form.get("consentPublish") != null;
+  if (!text) {
+    error = "Please add a sentence or two.";
+  } else {
+    const user = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).get();
+    await logEvent(db, {
+      userId: user?.id ?? null,
+      type: "testimonial_submitted",
+      payload: { rating, text, name, email, consentPublish },
+    });
+    saved = true;
+  }
+}
+---
+
+<MarketingLayout title="Leave a review" description="Tell us how your ChiroSmarts course went." canonicalPath="/review">
+  <section class="mk-section" style="padding-top:3rem">
+    <div class="mk-container" style="max-width:560px">
+      {!valid ? (
+        <>
+          <h1>That link didn't work</h1>
+          <p style="color:var(--muted)">This review link is invalid or incomplete.</p>
+        </>
+      ) : saved ? (
+        <div style="text-align:center">
+          <h1>Thank you 🙏</h1>
+          <p style="color:var(--muted)">We really appreciate you taking the time.</p>
+          {googleUrl && (
+            <p style="margin-top:1.25rem"><a class="btn-primary" href={googleUrl} target="_blank" rel="noopener">Leave a Google review too →</a></p>
+          )}
+        </div>
+      ) : (
+        <>
+          <h1>How was your course?</h1>
+          <p style="color:var(--muted)">
+            A sentence or two helps other Oregon CAs decide to get certified.
+            {error && (<span style="color:var(--danger,#b3261e)"> {error}</span>)}
+          </p>
+          <form method="POST" style="display:flex;flex-direction:column;gap:0.7rem;margin-top:1rem">
+            <label style="font-weight:600">Rating
+              <select name="rating" style="width:100%;padding:0.5rem;margin-top:0.25rem">
+                <option value="5">★★★★★ — Excellent</option>
+                <option value="4">★★★★ — Good</option>
+                <option value="3">★★★ — Okay</option>
+                <option value="2">★★ — Below average</option>
+                <option value="1">★ — Poor</option>
+              </select>
+            </label>
+            <label style="font-weight:600">Your review
+              <textarea name="text" rows="4" required placeholder="What stood out? Would you recommend it?" style="width:100%;padding:0.5rem;margin-top:0.25rem"></textarea>
+            </label>
+            <label style="font-weight:600">Name to display (optional)
+              <input type="text" name="name" placeholder="e.g. Jamie R., Portland" style="width:100%;padding:0.5rem;margin-top:0.25rem" />
+            </label>
+            <label style="font-weight:400;font-size:0.9rem"><input type="checkbox" name="consentPublish" checked /> You may publish my review on the ChiroSmarts site.</label>
+            <button type="submit" class="btn-primary" style="padding:0.55rem 1.2rem;align-self:flex-start">Submit review</button>
+          </form>
+        </>
+      )}
+    </div>
+  </section>
+</MarketingLayout>

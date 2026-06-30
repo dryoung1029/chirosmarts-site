@@ -44,6 +44,12 @@ interface CloudflareEnv {
   BREVO_LIST_ID_LEADS?: string;
   BREVO_LIST_ID_USERS?: string;
   BREVO_LIST_ID_NEWSLETTER?: string; // newsletter subscribers (falls back to LEADS)
+  // Lifecycle email flows (Resend): shared secret to authorize the daily cron
+  // tick endpoint, and an HMAC secret for stateless birth-month-capture links.
+  CRON_SECRET?: string;
+  CONTACT_TOKEN_SECRET?: string;
+  // Optional: if set, the review page also offers a "leave a Google review" link.
+  GOOGLE_REVIEW_URL?: string;
 }
 
 type Runtime = import("@astrojs/cloudflare").Runtime<CloudflareEnv>;
