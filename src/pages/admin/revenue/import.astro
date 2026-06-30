@@ -1,0 +1,187 @@
+---
+/**
+ * Import legacy Gravity Forms CSV exports → sales ledger + imported_contacts.
+ * Self-posting: upload to preview (dry run), uncheck "Dry run" to commit.
+ * Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb } from "@/db/client";
+import { parseGravityCsv, summarize } from "@/lib/import/gf-import";
+import { loadSales, loadContacts } from "@/lib/import/gf-load";
+import { fmtUsd } from "@/lib/revenue-projection";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+let result:
+  | null
+  | {
+      fileName: string;
+      summary: ReturnType<typeof summarize>;
+      warnings: string[];
+      committed: boolean;
+      sourceLabel: string;
+      courseSlug: string;
+      sales?: Awaited<ReturnType<typeof loadSales>>;
+      contacts?: Awaited<ReturnType<typeof loadContacts>>;
+      error?: string;
+    } = null;
+
+if (Astro.request.method === "POST") {
+  try {
+    const form = await Astro.request.formData();
+    const file = form.get("file");
+    const courseSlug = String(form.get("courseSlug") || "oregon-ca-initial").trim();
+    const dryRun = form.get("dryRun") != null; // checkbox present = dry run
+    const doSales = form.get("doSales") != null;
+    const doContacts = form.get("doContacts") != null;
+    let sourceLabel = String(form.get("sourceLabel") || "auto").trim();
+
+    if (!(file instanceof File) || file.size === 0) {
+      result = {
+        fileName: "",
+        summary: summarize([]),
+        warnings: ["No file uploaded."],
+        committed: false,
+        sourceLabel,
+        courseSlug,
+      };
+    } else {
+      const text = await file.text();
+      const { records, warnings } = parseGravityCsv(text);
+      const summary = summarize(records);
+      if (sourceLabel === "auto") sourceLabel = summary.paid > 0 ? "paid_cert" : "free_ceu";
+
+      result = { fileName: file.name, summary, warnings, committed: false, sourceLabel, courseSlug };
+
+      if (!dryRun) {
+        if (doSales) result.sales = await loadSales(db, records, courseSlug);
+        if (doContacts) result.contacts = await loadContacts(db, records, sourceLabel);
+        result.committed = true;
+      }
+    }
+  } catch (e) {
+    result = {
+      fileName: "",
+      summary: summarize([]),
+      warnings: [],
+      committed: false,
+      sourceLabel: "",
+      courseSlug: "",
+      error:
+        "Import failed: " +
+        ((e as Error)?.message ?? String(e)) +
+        ". If this mentions a missing table, run npm run db:migrate:remote first.",
+    };
+  }
+}
+---
+
+<Layout title="Import legacy data · Admin" showNav={true}>
+  <AdminNav active="revenue" />
+  <p style="margin:0"><a href="/admin/revenue">← Revenue</a></p>
+  <h1 style="margin-bottom:0.25rem">Import legacy Gravity Forms data</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Upload a Gravity Forms <strong>Export Entries</strong> CSV. Paid rows load into the
+    revenue ledger; everyone (name, email, clinic, address, phone) loads into the
+    contact roster. <strong>Dry run is on by default</strong> — preview the numbers,
+    then uncheck it and re-upload to commit. Re-running is safe (deduped).
+  </p>
+
+  <form method="POST" enctype="multipart/form-data" class="panel" style="display:flex;flex-direction:column;gap:0.7rem;max-width:40rem">
+    <label style="font-size:0.9rem">CSV file
+      <input type="file" name="file" accept=".csv,text/csv" required style="display:block;margin-top:0.25rem" />
+    </label>
+    <label style="font-size:0.9rem">Map paid sales to course (slug)
+      <input type="text" name="courseSlug" value="oregon-ca-initial" style="width:100%;padding:0.4rem" />
+    </label>
+    <label style="font-size:0.9rem">Contact source label
+      <select name="sourceLabel" style="width:100%;padding:0.4rem">
+        <option value="auto">Auto-detect (paid → paid_cert, else free_ceu)</option>
+        <option value="paid_cert">paid_cert</option>
+        <option value="free_ceu">free_ceu</option>
+        <option value="other">other</option>
+      </select>
+    </label>
+    <label style="font-size:0.9rem"><input type="checkbox" name="doSales" checked /> Load paid rows into the revenue ledger</label>
+    <label style="font-size:0.9rem"><input type="checkbox" name="doContacts" checked /> Load everyone into the contact roster</label>
+    <label style="font-size:0.9rem;font-weight:600"><input type="checkbox" name="dryRun" checked /> Dry run (preview only — don't write)</label>
+    <button type="submit" class="btn-primary" style="padding:0.5rem 1.1rem;align-self:flex-start">Upload &amp; analyze</button>
+  </form>
+
+  {result && (
+    <div style="margin-top:1.5rem">
+      {result.error ? (
+        <p class="panel" style="background:var(--danger-tint,#fdecea);color:var(--danger,#b3261e);border:none">{result.error}</p>
+      ) : (
+        <>
+          <h2 style="margin-bottom:0.5rem">
+            {result.committed ? "✓ Imported" : "Preview"}: {result.fileName}
+          </h2>
+          {result.warnings.length > 0 && (
+            <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+              {result.warnings.join(" ")}
+            </p>
+          )}
+
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:0.5rem 0 1rem">
+            {[
+              { label: "Rows", v: result.summary.total },
+              { label: "Paid", v: result.summary.paid },
+              { label: "Gross revenue", v: fmtUsd(result.summary.grossCents) },
+              { label: "Net (after refunds)", v: fmtUsd(result.summary.netCents) },
+              { label: "Unique emails", v: result.summary.uniqueEmails },
+              { label: "With clinic", v: result.summary.withClinic },
+            ].map((s) => (
+              <div class="panel" style="flex:1;min-width:8rem;text-align:center">
+                <div style="font-size:1.4rem;font-weight:700;color:var(--text)">{s.v}</div>
+                <div class="muted" style="font-size:0.8rem">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {result.summary.byYear.length > 0 && (
+            <table style="border-collapse:collapse;font-size:0.9rem;margin-bottom:1rem">
+              <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border)">
+                  <th style="padding:0.4rem 1rem 0.4rem 0">Year</th>
+                  <th style="padding:0.4rem;text-align:right">Paid</th>
+                  <th style="padding:0.4rem;text-align:right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.summary.byYear.map((y) => (
+                  <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:0.4rem 1rem 0.4rem 0">{y.year}</td>
+                    <td style="padding:0.4rem;text-align:right">{y.paid}</td>
+                    <td style="padding:0.4rem;text-align:right">{fmtUsd(y.grossCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <p class="muted" style="font-size:0.85rem">
+            Status breakdown: {result.summary.paid} paid · {result.summary.refunded} refunded ·
+            {" "}{result.summary.processing} processing (abandoned/duplicate — not counted) ·
+            {" "}{result.summary.otherStatus} other.
+          </p>
+
+          {result.committed ? (
+            <p class="panel" style="background:var(--brand-tint);color:var(--brand);border:none">
+              {result.sales && `Ledger: +${result.sales.salesCreated} sales, +${result.sales.refundsCreated} refunds (${result.sales.skipped} already present). `}
+              {result.contacts && `Contacts: +${result.contacts.inserted} new, ${result.contacts.updated} merged. `}
+              Mapped to source “{result.sourceLabel}”, course “{result.courseSlug}”.
+            </p>
+          ) : (
+            <p class="panel" style="border:none;background:var(--panel-2)">
+              This was a <strong>dry run</strong> — nothing was written. If the numbers look right,
+              uncheck <strong>Dry run</strong> and upload the same file again to commit.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )}
+</Layout>

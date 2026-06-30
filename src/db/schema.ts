@@ -806,6 +806,38 @@ export const marketingLeads = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// Imported contacts — roster from the legacy site's signup/purchase forms.
+// ---------------------------------------------------------------------------
+// One row per unique email (merged across forms). Richer than `marketing_leads`
+// (which only holds email + birth month for the new double-opt-in funnel) so we
+// keep name / clinic / mailing address / phone for the renewal list and the
+// clinic B2B postcard mailer. `everBought` flags prior paying customers.
+export const importedContacts = sqliteTable(
+  "imported_contacts",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(), // normalized lowercase
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    clinic: text("clinic"),
+    phone: text("phone"),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressZip: text("address_zip"),
+    birthMonth: integer("birth_month"),
+    // Where we first saw them: a form label like "paid_cert" / "free_ceu".
+    firstSource: text("first_source"),
+    everBought: integer("ever_bought", { mode: "boolean" }).notNull().default(false),
+    // Earliest signup/purchase date seen (UTC ISO) — proxy for renewal timing.
+    firstSeenAt: text("first_seen_at"),
+    lastSeenAt: text("last_seen_at"),
+    importedAt: text("imported_at").notNull().default(nowUtc),
+  },
+  (t) => [uniqueIndex("imported_contacts_email_idx").on(t.email)],
+);
+
+// ---------------------------------------------------------------------------
 // Sales ledger — APPEND-ONLY record of actual cash, for revenue tracking.
 // ---------------------------------------------------------------------------
 // Why a dedicated ledger instead of summing `enrollments.amountCents`: a bundle

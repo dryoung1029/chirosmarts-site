@@ -48,13 +48,25 @@ export interface RevenueModel {
   lines: ModelLine[];
 }
 
+/**
+ * CALIBRATION NOTE (from the imported 11-year Gravity Forms history):
+ *  - The $99 initial cert generated $68.4k gross lifetime (691 paid, 666 unique
+ *    buyers), but volume PEAKED at 134/yr in 2022 and has DECLINED to ~55/yr
+ *    (trailing 12 mo) — roughly half. So initial-cert units are modeled flat-to-
+ *    modest, NOT growing off a peak: the new platform's job is to stabilize and
+ *    reverse the slide, with the $99→$149 price doing most of the Year-1 lift.
+ *  - The old site sold almost NO repeat purchases (only 22 buyers ever bought
+ *    twice) — the entire renewal/CE flywheel is greenfield. But there is now a
+ *    warm list of ~1,800 prior contacts (free-CEU signups + buyers) to activate,
+ *    so the recurring lines ramp a touch faster than a cold start would.
+ */
 export const REVENUE_MODEL: RevenueModel = {
   startDateIso: "2026-07-01",
   baseline: {
-    label: "Last year",
-    revenueCents: 673200, // 68 × $99
-    units: 68,
-    note: "68 initial certifications at the old $99 price.",
+    label: "Trailing 12 mo (old site)",
+    revenueCents: 544500, // 55 paid × $99
+    units: 55,
+    note: "55 paid certifications at $99 — down from a 2022 peak of 134/yr; the cert line has been declining.",
   },
   lines: [
     {
@@ -63,10 +75,11 @@ export const REVENUE_MODEL: RevenueModel = {
       courseSlug: "oregon-ca-initial",
       fallbackPriceCents: 14900,
       channel: "direct",
+      // Flat-to-modest: stabilize the decline; price ($99→$149) is the real lift.
       units: {
-        conservative: [66, 70, 74],
-        base: [70, 72, 75],
-        optimistic: [82, 92, 100],
+        conservative: [55, 54, 54],
+        base: [66, 68, 70],
+        optimistic: [82, 95, 110],
       },
     },
     {
@@ -76,9 +89,10 @@ export const REVENUE_MODEL: RevenueModel = {
       fallbackPriceCents: 8900,
       channel: "direct",
       recurring: true,
+      // Greenfield, but seeded by the ~1,800-contact warm list + reminders.
       units: {
-        conservative: [18, 35, 55],
-        base: [22, 45, 75],
+        conservative: [18, 38, 60],
+        base: [30, 55, 85],
         optimistic: [120, 210, 300],
       },
     },
@@ -91,7 +105,7 @@ export const REVENUE_MODEL: RevenueModel = {
       recurring: true,
       units: {
         conservative: [3, 10, 20],
-        base: [5, 15, 30],
+        base: [6, 18, 34],
         optimistic: [20, 140, 240],
       },
     },
@@ -104,7 +118,7 @@ export const REVENUE_MODEL: RevenueModel = {
       recurring: true,
       units: {
         conservative: [10, 18, 26],
-        base: [12, 22, 30],
+        base: [14, 26, 38],
         optimistic: [70, 95, 120],
       },
     },
@@ -117,7 +131,7 @@ export const REVENUE_MODEL: RevenueModel = {
       recurring: true,
       units: {
         conservative: [8, 12, 16],
-        base: [10, 16, 22],
+        base: [10, 18, 26],
         optimistic: [55, 75, 95],
       },
     },
@@ -128,8 +142,8 @@ export const REVENUE_MODEL: RevenueModel = {
       fallbackPriceCents: 3500,
       channel: "direct",
       units: {
-        conservative: [12, 18, 22],
-        base: [14, 20, 26],
+        conservative: [10, 16, 20],
+        base: [12, 20, 26],
         optimistic: [40, 60, 78],
       },
     },
@@ -151,9 +165,10 @@ export const REVENUE_MODEL: RevenueModel = {
       courseSlug: "__clinic__", // synthetic: any clinic-channel sale maps here
       fallbackPriceCents: 12000, // blended seat ACV
       channel: "clinic",
+      // ~450 enumerable clinics from the imported list feed the postcard mailer.
       units: {
         conservative: [4, 12, 22],
-        base: [6, 16, 28],
+        base: [8, 18, 30],
         optimistic: [36, 90, 165],
       },
     },

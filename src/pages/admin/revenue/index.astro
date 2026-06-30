@@ -9,7 +9,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { asc } from "drizzle-orm";
 import { buildProjection, fmtUsd } from "@/lib/revenue-projection";
-import { getRecentSales } from "@/lib/sales";
+import { getRecentSales, getSalesByYear } from "@/lib/sales";
 import { SCENARIOS, SCENARIO_LABEL } from "@/config/revenue-model";
 import { formatPacific } from "@/lib/time";
 import {
@@ -31,6 +31,7 @@ const recent = await getRecentSales(db, 40).catch(() => {
   ledgerReady = false;
   return [] as Awaited<ReturnType<typeof getRecentSales>>;
 });
+const salesByYear = await getSalesByYear(db).catch(() => [] as Awaited<ReturnType<typeof getSalesByYear>>);
 const courses = await db
   .select({ id: schema.courses.id, title: schema.courses.title, status: schema.courses.status })
   .from(schema.courses)
@@ -122,11 +123,27 @@ const productChart = pairedBarsSvg({
   rows: lineRows.map((r) => ({ label: r.label, target: r.projRev, actual: r.actRev })),
   fmt: fmtK,
 });
+
+// 5) Historical actual revenue by year (from the ledger, incl. imported history).
+const historyChart =
+  salesByYear.length > 0
+    ? stackedBarSvg({
+        categories: salesByYear.map((y) => y.year),
+        segments: [
+          { label: "Actual revenue", color: "#0B6B63", values: salesByYear.map((y) => y.revenueCents) },
+        ],
+        fmt: fmtK,
+      })
+    : "";
+const historyTotalCents = salesByYear.reduce((a, y) => a + y.revenueCents, 0);
 ---
 
 <Layout title="Revenue · Admin" showNav={true}>
   <AdminNav active="revenue" />
-  <h1 style="margin-bottom:0.25rem">Revenue projection &amp; tracking</h1>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1 style="margin-bottom:0.25rem">Revenue projection &amp; tracking</h1>
+    <a href="/admin/revenue/import" style="margin-left:auto;padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">⬆ Import legacy data</a>
+  </div>
   <p class="muted" style="margin-top:0;max-width:52rem">
     The 3-year forecast is stored as projected <strong>units</strong> per product
     and priced at your <strong>current catalog prices</strong> — so changing a price
@@ -143,6 +160,19 @@ const productChart = pairedBarsSvg({
       ⚠️ The sales ledger table isn't created yet — run <code>npm run db:migrate:remote</code> to apply the
       migration, then use <strong>Backfill</strong> below. The forecast shows now; actuals stay at $0 until then.
     </p>
+  )}
+
+  {/* ---- Historical actuals (from the ledger, incl. imported legacy sales) ---- */}
+  {historyChart && (
+    <>
+      <h2 style="margin-bottom:0.5rem">Actual revenue by year</h2>
+      <p class="muted" style="margin-top:0;font-size:0.9rem">
+        From the sales ledger (includes imported history). All-time total {fmtUsd(historyTotalCents)}.
+      </p>
+      <div class="panel" style="margin-bottom:1.75rem">
+        <Fragment set:html={historyChart} />
+      </div>
+    </>
   )}
 
   {/* ---- Scenario summary ---- */}

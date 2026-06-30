@@ -232,6 +232,33 @@ export async function getSalesInRange(
     .all();
 }
 
+/** All-time revenue grouped by calendar year (for the historical trend chart). */
+export async function getSalesByYear(
+  db: Db,
+): Promise<{ year: string; revenueCents: number; units: number }[]> {
+  const rows = await db
+    .select({
+      occurredAt: schema.sales.occurredAt,
+      amountCents: schema.sales.amountCents,
+      kind: schema.sales.kind,
+      quantity: schema.sales.quantity,
+    })
+    .from(schema.sales)
+    .all();
+  const byYear = new Map<string, { revenueCents: number; units: number }>();
+  for (const r of rows) {
+    const year = (r.occurredAt ?? "").slice(0, 4);
+    if (!/^\d{4}$/.test(year)) continue;
+    const y = byYear.get(year) ?? { revenueCents: 0, units: 0 };
+    y.revenueCents += r.amountCents;
+    y.units += r.kind === "refund" ? -r.quantity : r.kind === "sale" ? r.quantity : 0;
+    byYear.set(year, y);
+  }
+  return [...byYear.entries()]
+    .map(([year, v]) => ({ year, ...v }))
+    .sort((a, b) => a.year.localeCompare(b.year));
+}
+
 /** Most recent ledger rows for the admin view. */
 export async function getRecentSales(db: Db, limit = 50): Promise<Sale[]> {
   return db
