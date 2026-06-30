@@ -130,6 +130,23 @@ export async function renderCollateralPdf(
   const widthOf = (t: string, f: PDFFont, size: number) =>
     f.widthOfTextAtSize(t, size);
 
+  // Trim text to fit a pixel width, appending an ellipsis when clipped.
+  function truncateToWidth(text: string, f: PDFFont, size: number, maxW: number) {
+    if (widthOf(text, f, size) <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && widthOf(s + "…", f, size) > maxW) s = s.slice(0, -1);
+    return s.replace(/\s+$/, "") + "…";
+  }
+
+  // Reserve a centered zone for the "Page X of Y" label so the footer's left
+  // text can be truncated to never collide with it.
+  const PAGE_ZONE_HALF = 52;
+  const copyrightYear = (opts.generatedDate.match(/\d{4}/) ?? ["2026"])[0];
+  const copyrightLine = winAnsiSafe(
+    `© ${copyrightYear} ChiroSmarts. All rights reserved. This material may not be ` +
+      `reproduced or distributed without written permission.`,
+  );
+
   function footer(p: PDFPage) {
     p.drawLine({
       start: { x: MARGIN, y: FOOT_Y + 12 },
@@ -137,18 +154,28 @@ export async function renderCollateralPdf(
       thickness: 0.5,
       color: RULE,
     });
-    p.drawText(winAnsiSafe(`${opts.courseTitle} · ${opts.typeLabel}`), {
-      x: MARGIN,
-      y: FOOT_Y,
-      size: 8,
+    const leftMaxW = PAGE_W / 2 - PAGE_ZONE_HALF - 8 - MARGIN;
+    const left = truncateToWidth(
+      winAnsiSafe(`${opts.courseTitle} · ${opts.typeLabel}`),
       font,
-      color: MUTED,
-    });
+      8,
+      leftMaxW,
+    );
+    p.drawText(left, { x: MARGIN, y: FOOT_Y, size: 8, font, color: MUTED });
     const right = winAnsiSafe(`ChiroSmarts · ${opts.generatedDate}`);
     p.drawText(right, {
       x: PAGE_W - MARGIN - widthOf(right, font, 8),
       y: FOOT_Y,
       size: 8,
+      font,
+      color: MUTED,
+    });
+    // Copyright / reproduction notice, centered on its own line below.
+    const cw = widthOf(copyrightLine, font, 6.5);
+    p.drawText(copyrightLine, {
+      x: (PAGE_W - cw) / 2,
+      y: FOOT_Y - 11,
+      size: 6.5,
       font,
       color: MUTED,
     });
