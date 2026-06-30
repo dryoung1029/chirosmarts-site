@@ -1,0 +1,57 @@
+name: ci
+
+# Pre-deploy gates for the Jeldon integration. Cloudflare Pages deploys on push
+# to main; these run independently on PRs (and main) so a bad config or a broken
+# build is caught before it ships.
+#
+# Adapted from the engine template for THIS repo:
+#  - npm (not pnpm); Node 20.
+#  - `doctor --pre`: the structural health check (config valid, GEO floor <=
+#    category targets, category enum consistent, AEO query set, voice anchors).
+#    `--pre` downgrades missing-env to warnings, since the real secrets live in
+#    Cloudflare, not GitHub. To enforce env presence too, add the
+#    services.requiredEnv vars as repo secrets and drop `--pre`.
+#  - build gate runs a fresh `npm ci` + `npm run build` — the same path
+#    Cloudflare runs, so a fresh-clone breakage (e.g. an un-committed file) fails
+#    here first.
+#
+# NOT included (and why): geo-floor / citation-lint / frontmatter-guard. The
+# scored blog content lives in D1, not in-repo markdown, so a content GEO gate
+# can't run in CI without remote DB access. If we later want it, a job can hit a
+# read-only remote D1 and score published posts with the SAME @jeldon/core-scoring.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  doctor:
+    name: validate + doctor (Domain Pack health)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Validate the Domain Pack shape
+        run: npm run validate
+      - name: Doctor — wired-correctly health check
+        run: npm run doctor -- --pre
+
+  build:
+    name: build (fresh-clone parity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx astro check
+      - name: Production build
+        run: npm run build

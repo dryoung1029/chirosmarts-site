@@ -21,7 +21,10 @@
     "db:seed:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed.sql",
     "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql",
     "db:seed:catalog:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed-catalog.sql",
-    "db:seed:catalog:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed-catalog.sql"
+    "db:seed:catalog:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed-catalog.sql",
+    "jeldon": "jeldon",
+    "validate": "jeldon validate",
+    "doctor": "jeldon doctor"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
