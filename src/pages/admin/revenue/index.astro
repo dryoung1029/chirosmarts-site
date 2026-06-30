@@ -1,0 +1,355 @@
+---
+/**
+ * Revenue projection & tracking. Compares the units-based forecast model
+ * (config/revenue-model.ts), priced at LIVE catalog prices, against actual sales
+ * from the append-only ledger. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { asc } from "drizzle-orm";
+import { buildProjection, fmtUsd } from "@/lib/revenue-projection";
+import { getRecentSales } from "@/lib/sales";
+import { SCENARIOS, SCENARIO_LABEL } from "@/config/revenue-model";
+import { formatPacific } from "@/lib/time";
+import {
+  lineChartSvg,
+  stackedBarSvg,
+  bulletSvg,
+  pairedBarsSvg,
+  CHART_COLORS,
+} from "@/lib/charts";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const msg = Astro.url.searchParams.get("msg");
+
+const proj = await buildProjection(db);
+// Resilient if the ledger migration hasn't been applied yet.
+let ledgerReady = true;
+const recent = await getRecentSales(db, 40).catch(() => {
+  ledgerReady = false;
+  return [] as Awaited<ReturnType<typeof getRecentSales>>;
+});
+const courses = await db
+  .select({ id: schema.courses.id, title: schema.courses.title, status: schema.courses.status })
+  .from(schema.courses)
+  .orderBy(asc(schema.courses.title))
+  .all();
+
+const cur = proj.current;
+const yi = cur.index >= 0 ? cur.index : 0;
+const elapsedPct = Math.round(cur.elapsedFraction * 100);
+
+// Pace: actual revenue vs base expected-to-date.
+const paced = proj.currentYearPacedRevenueCents;
+const actualRev = proj.actualTotal.revenueCents;
+const paceRatio = paced > 0 ? actualRev / paced : 0;
+const paceLabel =
+  cur.preLaunch
+    ? "Projection hasn't started yet"
+    : paceRatio >= 1.0
+      ? `Ahead of pace (${Math.round(paceRatio * 100)}% of expected-to-date)`
+      : `Behind pace (${Math.round(paceRatio * 100)}% of expected-to-date)`;
+
+// Per-line rows for the CURRENT projection year (base scenario), with actuals.
+const lineRows = proj.lines.map((lp) => {
+  const base = lp.byScenario.base[yi];
+  const actual = proj.actualByLine[lp.line.key] ?? { units: 0, revenueCents: 0 };
+  return {
+    key: lp.line.key,
+    label: lp.line.label,
+    priceCents: lp.priceCents,
+    livePrice: lp.livePrice,
+    synthetic: lp.line.courseSlug.startsWith("__"),
+    recurring: !!lp.line.recurring,
+    projUnits: base.units,
+    projRev: base.revenueCents,
+    actUnits: actual.units,
+    actRev: actual.revenueCents,
+  };
+});
+const other = proj.actualByLine["__other__"];
+const fmtDay = (iso: string) => formatPacific(iso, { dateStyle: "medium" });
+
+// ---- Charts (server-rendered SVG) ----
+const fmtK = (cents: number) => {
+  const d = Math.round(cents / 100);
+  if (Math.abs(d) >= 1000) return `$${(d / 1000).toFixed(d % 1000 === 0 ? 0 : 1)}k`;
+  return `$${d}`;
+};
+const yearLabels = proj.years.map((y) => y.label);
+
+// 1) Scenario forecast — one line per scenario across the 3 years.
+const scenarioColor: Record<string, string> = {
+  conservative: "#8aa0a6",
+  base: "#0B6B63",
+  optimistic: "#B8860B",
+};
+const forecastChart = lineChartSvg({
+  xLabels: yearLabels,
+  series: SCENARIOS.map((s) => ({
+    label: SCENARIO_LABEL[s],
+    color: scenarioColor[s],
+    values: proj.totals[s].perYearRevenueCents,
+  })),
+  fmt: fmtK,
+});
+
+// 2) Base-case revenue mix — stacked by product across the 3 years.
+const mixChart = stackedBarSvg({
+  categories: yearLabels,
+  segments: proj.lines.map((lp, i) => ({
+    label: lp.line.label,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+    values: lp.byScenario.base.map((ly) => ly.revenueCents),
+  })),
+  fmt: fmtK,
+});
+
+// 3) Current-year pace bullet.
+const bulletChart = cur.preLaunch
+  ? ""
+  : bulletSvg({
+      actual: actualRev,
+      pace: paced,
+      target: proj.currentYearBaseRevenueCents,
+      fmt: fmtUsd,
+    });
+
+// 4) Per-product target vs actual (current year).
+const productChart = pairedBarsSvg({
+  rows: lineRows.map((r) => ({ label: r.label, target: r.projRev, actual: r.actRev })),
+  fmt: fmtK,
+});
+---
+
+<Layout title="Revenue · Admin" showNav={true}>
+  <AdminNav active="revenue" />
+  <h1 style="margin-bottom:0.25rem">Revenue projection &amp; tracking</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    The 3-year forecast is stored as projected <strong>units</strong> per product
+    and priced at your <strong>current catalog prices</strong> — so changing a price
+    (or publishing a planned course) re-bases it automatically. Actual sales are
+    recorded in an append-only ledger and tracked against the <strong>Base</strong> case below.
+  </p>
+
+  {msg && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
+  )}
+
+  {!ledgerReady && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+      ⚠️ The sales ledger table isn't created yet — run <code>npm run db:migrate:remote</code> to apply the
+      migration, then use <strong>Backfill</strong> below. The forecast shows now; actuals stay at $0 until then.
+    </p>
+  )}
+
+  {/* ---- Scenario summary ---- */}
+  <h2 style="margin-bottom:0.5rem">3-year forecast</h2>
+  <p class="muted" style="margin-top:0;font-size:0.9rem">
+    Projection years start {fmtDay(proj.startDateIso)}. Baseline {proj.baseline.label.toLowerCase()}:
+    <strong>{fmtUsd(proj.baseline.revenueCents)}</strong> ({proj.baseline.note})
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.92rem;margin-bottom:1.75rem">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--border)">
+        <th style="padding:0.5rem">Scenario</th>
+        {proj.years.map((y) => <th style="padding:0.5rem;text-align:right">{y.label}</th>)}
+        <th style="padding:0.5rem;text-align:right">3-yr total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {SCENARIOS.map((s) => (
+        <tr style={`border-bottom:1px solid var(--border);${s === "base" ? "font-weight:700;background:var(--panel-2)" : ""}`}>
+          <td style="padding:0.5rem;color:var(--text)">{SCENARIO_LABEL[s]}</td>
+          {proj.totals[s].perYearRevenueCents.map((c) => (
+            <td style="padding:0.5rem;text-align:right">{fmtUsd(c)}</td>
+          ))}
+          <td style="padding:0.5rem;text-align:right;color:var(--text)">{fmtUsd(proj.totals[s].threeYearRevenueCents)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(22rem,1fr));gap:1rem;margin-bottom:1.75rem">
+    <div class="panel">
+      <strong style="font-size:0.92rem">Revenue forecast by scenario</strong>
+      <Fragment set:html={forecastChart} />
+    </div>
+    <div class="panel">
+      <strong style="font-size:0.92rem">Base-case revenue mix by product</strong>
+      <Fragment set:html={mixChart} />
+    </div>
+  </div>
+
+  {/* ---- Current-year pace ---- */}
+  <h2 style="margin-bottom:0.5rem">{cur.preLaunch ? "Upcoming year" : `${cur.label} — actual vs. plan`}</h2>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:0.5rem 0 1rem">
+    {[
+      { label: cur.preLaunch ? "Starts" : `${cur.label} elapsed`, v: cur.preLaunch ? fmtDay(proj.startDateIso) : `${elapsedPct}%` },
+      { label: "Actual revenue (this year)", v: fmtUsd(actualRev) },
+      { label: "Expected to date (Base)", v: fmtUsd(paced) },
+      { label: "Full-year target (Base)", v: fmtUsd(proj.currentYearBaseRevenueCents) },
+    ].map((s) => (
+      <div class="panel" style="flex:1;min-width:10rem;text-align:center">
+        <div style="font-size:1.5rem;font-weight:700;color:var(--text)">{s.v}</div>
+        <div class="muted" style="font-size:0.82rem">{s.label}</div>
+      </div>
+    ))}
+  </div>
+  {!cur.preLaunch && (
+    <>
+      <div class="panel" style="margin:0 0 0.75rem">
+        <Fragment set:html={bulletChart} />
+      </div>
+      <p class="panel" style={`margin:0 0 1.5rem;border:none;${paceRatio >= 1 ? "background:var(--brand-tint);color:var(--brand)" : "background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806)"}`}>
+        {paceRatio >= 1 ? "✓ " : "⚠ "}{paceLabel}.
+      </p>
+    </>
+  )}
+
+  {/* ---- Per-product table ---- */}
+  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:1rem">
+    <thead>
+      <tr style="text-align:left;border-bottom:2px solid var(--border)">
+        <th style="padding:0.5rem">Product</th>
+        <th style="padding:0.5rem;text-align:right">Price</th>
+        <th style="padding:0.5rem;text-align:right">Target units</th>
+        <th style="padding:0.5rem;text-align:right">Target $</th>
+        <th style="padding:0.5rem;text-align:right">Actual units</th>
+        <th style="padding:0.5rem;text-align:right">Actual $</th>
+      </tr>
+    </thead>
+    <tbody>
+      {lineRows.map((r) => (
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:0.5rem;color:var(--text)">
+            {r.label}
+            {r.recurring && <span class="muted" title="Recurring annual CE" style="font-size:0.78rem"> ↻</span>}
+            {!r.livePrice && !r.synthetic && <span title="No catalog price yet — using the model's fallback price" style="font-size:0.74rem;color:var(--warning-ink,#633806)"> (planned)</span>}
+            {r.synthetic && <span title="Blended seat value — no single catalog price" class="muted" style="font-size:0.74rem"> (blended)</span>}
+          </td>
+          <td style="padding:0.5rem;text-align:right">{fmtUsd(r.priceCents)}</td>
+          <td style="padding:0.5rem;text-align:right">{r.projUnits}</td>
+          <td style="padding:0.5rem;text-align:right">{fmtUsd(r.projRev)}</td>
+          <td style="padding:0.5rem;text-align:right;color:var(--text)">{r.actUnits}</td>
+          <td style="padding:0.5rem;text-align:right;color:var(--text)">{fmtUsd(r.actRev)}</td>
+        </tr>
+      ))}
+      {other && (other.units !== 0 || other.revenueCents !== 0) && (
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:0.5rem;color:var(--muted)">Other / unmapped SKUs</td>
+          <td style="padding:0.5rem;text-align:right">—</td>
+          <td style="padding:0.5rem;text-align:right">—</td>
+          <td style="padding:0.5rem;text-align:right">—</td>
+          <td style="padding:0.5rem;text-align:right;color:var(--text)">{other.units}</td>
+          <td style="padding:0.5rem;text-align:right;color:var(--text)">{fmtUsd(other.revenueCents)}</td>
+        </tr>
+      )}
+      <tr style="border-top:2px solid var(--border);font-weight:700">
+        <td style="padding:0.5rem;color:var(--text)">Total</td>
+        <td style="padding:0.5rem"></td>
+        <td style="padding:0.5rem"></td>
+        <td style="padding:0.5rem;text-align:right">{fmtUsd(proj.currentYearBaseRevenueCents)}</td>
+        <td style="padding:0.5rem;text-align:right">{proj.actualTotal.units}</td>
+        <td style="padding:0.5rem;text-align:right">{fmtUsd(actualRev)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted" style="font-size:0.82rem;margin-top:0">
+    ↻ recurring annual CE · "Target" = the Base case for {cur.label}, full year. Edit the forecast in
+    <code>src/config/revenue-model.ts</code>.
+  </p>
+
+  <div class="panel" style="margin:0.5rem 0 0">
+    <strong style="font-size:0.92rem">{cur.label} — target vs. actual by product</strong>
+    <p class="muted" style="font-size:0.8rem;margin:0.1rem 0 0.5rem">Light bar = target · solid = actual to date</p>
+    <Fragment set:html={productChart} />
+  </div>
+
+  {/* ---- Manual entry + backfill ---- */}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:1rem;margin:1.5rem 0">
+    <form method="POST" action="/api/admin/sales/record" class="panel" style="display:flex;flex-direction:column;gap:0.5rem">
+      <strong>Record a sale / refund / adjustment</strong>
+      <span class="muted" style="font-size:0.82rem">For off-platform or legacy sales (Stripe purchases record automatically).</span>
+      <label style="font-size:0.85rem">Type
+        <select name="kind" style="width:100%;padding:0.4rem">
+          <option value="sale">Sale</option>
+          <option value="refund">Refund</option>
+          <option value="adjustment">Adjustment</option>
+        </select>
+      </label>
+      <label style="font-size:0.85rem">Product (optional)
+        <select name="courseId" style="width:100%;padding:0.4rem">
+          <option value="">— none / general —</option>
+          {courses.map((c) => (
+            <option value={c.id}>{c.title}{c.status !== "published" ? ` (${c.status})` : ""}</option>
+          ))}
+        </select>
+      </label>
+      <div style="display:flex;gap:0.5rem">
+        <label style="font-size:0.85rem;flex:1">Qty
+          <input type="number" name="quantity" value="1" min="1" style="width:100%;padding:0.4rem" />
+        </label>
+        <label style="font-size:0.85rem;flex:1">Unit price ($)
+          <input type="number" name="unitDollars" step="0.01" min="0" placeholder="99.00" style="width:100%;padding:0.4rem" />
+        </label>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <label style="font-size:0.85rem;flex:1">Date
+          <input type="date" name="occurredAt" style="width:100%;padding:0.4rem" />
+        </label>
+        <label style="font-size:0.85rem;flex:1">Channel
+          <select name="channel" style="width:100%;padding:0.4rem">
+            <option value="direct">Direct (B2C)</option>
+            <option value="clinic">Clinic (B2B)</option>
+          </select>
+        </label>
+      </div>
+      <input type="text" name="note" placeholder="Note (optional)" style="padding:0.4rem" />
+      <button type="submit" class="btn-primary" style="padding:0.45rem 1rem">Add to ledger</button>
+    </form>
+
+    <form method="POST" action="/api/admin/sales/backfill" class="panel" style="display:flex;flex-direction:column;gap:0.6rem;justify-content:center">
+      <strong>Import past sales</strong>
+      <span class="muted" style="font-size:0.85rem">
+        One-time, idempotent import of existing <strong>paid enrollments</strong> into the
+        ledger so the tracker has history. Safe to run more than once. Bundle
+        constituents (enrolled at $0) are skipped — enter bundle revenue manually.
+      </span>
+      <button type="submit" class="btn" style="padding:0.45rem 1rem;align-self:flex-start">↺ Backfill from enrollments</button>
+    </form>
+  </div>
+
+  {/* ---- Recent ledger ---- */}
+  <h2 style="margin-bottom:0.5rem">Recent ledger entries</h2>
+  {recent.length === 0 ? (
+    <p class="muted">No sales recorded yet. Stripe purchases land here automatically; use the form above for past sales.</p>
+  ) : (
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+      <thead>
+        <tr style="text-align:left;border-bottom:2px solid var(--border)">
+          <th style="padding:0.45rem">Date</th>
+          <th style="padding:0.45rem">Product</th>
+          <th style="padding:0.45rem">Type</th>
+          <th style="padding:0.45rem">Source</th>
+          <th style="padding:0.45rem;text-align:right">Qty</th>
+          <th style="padding:0.45rem;text-align:right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {recent.map((s) => (
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.45rem;white-space:nowrap">{fmtDay(s.occurredAt)}</td>
+            <td style="padding:0.45rem;color:var(--text)">{s.skuLabel ?? "—"}{s.channel === "clinic" ? " · clinic" : ""}</td>
+            <td style="padding:0.45rem;color:var(--muted)">{s.kind}</td>
+            <td style="padding:0.45rem;color:var(--muted)">{s.source}</td>
+            <td style="padding:0.45rem;text-align:right">{s.quantity}</td>
+            <td style={`padding:0.45rem;text-align:right;${s.amountCents < 0 ? "color:var(--danger,#b3261e)" : "color:var(--text)"}`}>{fmtUsd(s.amountCents)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Layout>

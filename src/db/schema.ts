@@ -805,6 +805,64 @@ export const marketingLeads = sqliteTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Sales ledger — APPEND-ONLY record of actual cash, for revenue tracking.
+// ---------------------------------------------------------------------------
+// Why a dedicated ledger instead of summing `enrollments.amountCents`: a bundle
+// purchase fulfils its CONSTITUENT courses (each enrolled at amountCents=0) while
+// the bundle's own enrollment stays `pending`, and clinic seat pools never create
+// per-student enrollments at all — so enrollment amounts under-count real revenue.
+// Each row is one immutable money event recorded at the PURCHASED-SKU level (a
+// bundle stays a bundle), so revenue reconciles cleanly and can be bucketed by
+// SKU against the projection model. Refunds are appended as separate negative
+// rows (never edited in place), matching the append-only compliance ethos.
+export const sales = sqliteTable(
+  "sales",
+  {
+    id: text("id").primaryKey(),
+    // `sale` = money in; `refund` = money out (negative amount); `adjustment` =
+    // manual correction / off-platform or legacy baseline entry.
+    kind: text("kind", { enum: ["sale", "refund", "adjustment"] })
+      .notNull()
+      .default("sale"),
+    // How the money moved: real Stripe charge, dev/admin comp (no cash),
+    // clinic seat-pool purchase, free grant, or a hand-entered manual row.
+    source: text("source", {
+      enum: ["stripe", "comp", "clinic_seat", "free", "manual"],
+    })
+      .notNull()
+      .default("stripe"),
+    // Acquisition channel for bucketing against the model (B2C vs clinic B2B).
+    channel: text("channel", { enum: ["direct", "clinic"] })
+      .notNull()
+      .default("direct"),
+    userId: text("user_id").references(() => users.id),
+    clinicId: text("clinic_id").references(() => clinics.id),
+    // The SKU actually purchased (bundle id stays the bundle, not its children).
+    courseId: text("course_id").references(() => courses.id),
+    // Snapshots so historical rows survive catalog/price/title changes.
+    skuSlug: text("sku_slug"),
+    skuLabel: text("sku_label"),
+    quantity: integer("quantity").notNull().default(1),
+    unitPriceCents: integer("unit_price_cents").notNull().default(0),
+    // Actual cash for this row (quantity × unit price; negative for refunds;
+    // 0 for comps/free). The single figure summed for revenue.
+    amountCents: integer("amount_cents").notNull().default(0),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    // For refund rows: the sale row they reverse (when resolvable).
+    reversesSaleId: text("reverses_sale_id"),
+    note: text("note"),
+    occurredAt: text("occurred_at").notNull().default(nowUtc),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("sales_occurred_idx").on(t.occurredAt),
+    index("sales_course_idx").on(t.courseId),
+    index("sales_pi_idx").on(t.stripePaymentIntentId),
+  ],
+);
+
 // Semantic-search vectors for transcript chunks (M6 tutor). Each row holds one
 // chunk's normalized embedding (Float32 bytes) for a given model, so the tutor
 // can rank by cosine similarity instead of keyword overlap. Decoupled from

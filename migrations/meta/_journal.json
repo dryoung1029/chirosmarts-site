@@ -141,6 +141,13 @@
       "when": 1782784252636,
       "tag": "0019_pink_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1782827573782,
+      "tag": "0020_tearful_stardust",
+      "breakpoints": true
     }
   ]
 }

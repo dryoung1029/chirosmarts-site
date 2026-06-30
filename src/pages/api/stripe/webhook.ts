@@ -19,6 +19,13 @@ import {
   revokeEnrollmentByPaymentIntent,
 } from "@/lib/enrollment";
 import { grantPoolSeats } from "@/lib/seat-pools";
+import {
+  recordCoursePurchase,
+  recordSeatPurchase,
+  recordRefundByPaymentIntent,
+  hasSaleForCheckoutSession,
+  hasRefundForPaymentIntent,
+} from "@/lib/sales";
 import { logEvent } from "@/lib/events";
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -68,6 +75,27 @@ export const POST: APIRoute = async ({ request, locals }) => {
           });
         }
       }
+      // Revenue ledger: one row per PURCHASED SKU (bundles stay bundles). Guard
+      // against Stripe redelivering the event so revenue is never double-counted.
+      // Wrapped so a ledger failure can never break fulfilment (or wedge Stripe
+      // retries) — access has already been granted above.
+      try {
+        if (session.id && !(await hasSaleForCheckoutSession(db, session.id))) {
+          await recordCoursePurchase(db, {
+            userId: meta.userId,
+            courseIds,
+            source: "stripe",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent ?? null,
+          });
+        }
+      } catch (e) {
+        await logEvent(db, {
+          userId: meta.userId,
+          type: "sales_ledger_error",
+          payload: { where: "course", message: String((e as Error)?.message ?? e) },
+        }).catch(() => {});
+      }
     } else if (
       meta.kind === "seats" &&
       meta.clinicId &&
@@ -88,11 +116,39 @@ export const POST: APIRoute = async ({ request, locals }) => {
           courseId: meta.courseId,
           payload: { clinicId: clinic.id, count, method: "stripe" },
         });
+        try {
+          if (session.id && !(await hasSaleForCheckoutSession(db, session.id))) {
+            await recordSeatPurchase(db, {
+              clinicId: clinic.id,
+              courseId: meta.courseId,
+              count,
+              source: "stripe",
+              stripeCheckoutSessionId: session.id,
+              stripePaymentIntentId: session.payment_intent ?? null,
+            });
+          }
+        } catch (e) {
+          await logEvent(db, {
+            type: "sales_ledger_error",
+            payload: { where: "seats", message: String((e as Error)?.message ?? e) },
+          }).catch(() => {});
+        }
       }
     }
   } else if (event.type === "charge.refunded") {
     const charge = event.data.object as { payment_intent?: string | null };
     if (charge.payment_intent) {
+      // Revenue ledger: append offsetting refund rows (idempotent, non-blocking).
+      try {
+        if (!(await hasRefundForPaymentIntent(db, charge.payment_intent))) {
+          await recordRefundByPaymentIntent(db, charge.payment_intent);
+        }
+      } catch (e) {
+        await logEvent(db, {
+          type: "sales_ledger_error",
+          payload: { where: "refund", message: String((e as Error)?.message ?? e) },
+        }).catch(() => {});
+      }
       // Student-level course refund → revoke that enrollment (PLAN #9).
       const revoked = await revokeEnrollmentByPaymentIntent(
         db,
