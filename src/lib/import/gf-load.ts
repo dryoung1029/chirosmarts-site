@@ -14,15 +14,34 @@ import { newId } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
 import { isPaid, isRefunded, type GfRecord } from "@/lib/import/gf-import";
 
-const CHUNK = 40; // rows per multi-row insert (keeps under SQLite var limits)
+// Cloudflare D1 caps a single query at 100 BOUND PARAMETERS. Each row is ~14
+// params, so keep multi-row inserts tiny (6 rows ≈ 84 params), and group many
+// such statements into one db.batch() call so we still make few round-trips
+// (a batch counts as a single subrequest).
+const ROWS_PER_STMT = 6;
+const STMTS_PER_BATCH = 20;
 
-async function insertChunks<T>(
-  insert: (rows: T[]) => Promise<unknown>,
-  rows: T[],
-): Promise<void> {
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    await insert(rows.slice(i, i + CHUNK));
+/** Run an array of drizzle statement builders in batched round-trips. */
+async function runInBatches(db: Db, statements: unknown[]): Promise<void> {
+  for (let i = 0; i < statements.length; i += STMTS_PER_BATCH) {
+    const slice = statements.slice(i, i + STMTS_PER_BATCH);
+    if (slice.length === 0) continue;
+    if (slice.length === 1) {
+      await (slice[0] as Promise<unknown>);
+      continue;
+    }
+    // db.batch wants a non-empty tuple; a runtime array is fine.
+    await (db as unknown as { batch: (s: unknown[]) => Promise<unknown> }).batch(slice);
   }
+}
+
+/** Build chunked multi-row INSERT statements (un-awaited) for a table. */
+function insertStatements<T>(insert: (rows: T[]) => unknown, rows: T[]): unknown[] {
+  const stmts: unknown[] = [];
+  for (let i = 0; i < rows.length; i += ROWS_PER_STMT) {
+    stmts.push(insert(rows.slice(i, i + ROWS_PER_STMT)));
+  }
+  return stmts;
 }
 
 export interface SalesLoadResult {
@@ -92,7 +111,10 @@ export async function loadSales(
     else refundsCreated++;
   }
 
-  await insertChunks((chunk) => db.insert(schema.sales).values(chunk), rows);
+  await runInBatches(
+    db,
+    insertStatements((chunk) => db.insert(schema.sales).values(chunk), rows),
+  );
   return { salesCreated, refundsCreated, skipped };
 }
 
@@ -224,10 +246,16 @@ export async function loadContacts(
     if (changed) updates.push({ id: e.id, set });
   }
 
-  await insertChunks((chunk) => db.insert(schema.importedContacts).values(chunk), inserts);
+  const stmts = insertStatements(
+    (chunk) => db.insert(schema.importedContacts).values(chunk),
+    inserts,
+  );
   for (const u of updates) {
-    await db.update(schema.importedContacts).set(u.set).where(eq(schema.importedContacts.id, u.id));
+    stmts.push(
+      db.update(schema.importedContacts).set(u.set).where(eq(schema.importedContacts.id, u.id)),
+    );
   }
+  await runInBatches(db, stmts);
 
   return { inserted: inserts.length, updated: updates.length, skippedNoEmail };
 }
