@@ -202,6 +202,52 @@ export default defineDomainPack({
     highPriorityTags: ["getting-started", "compliance"],
   },
 
+  amplify: {
+    systemPreamble:
+      "You are the content-distribution editor for ChiroSmarts, an Oregon chiropractic-assistant (CA) training platform. You turn one published article into ready-to-post copy for each channel below. Audience: chiropractic assistants and the clinic owners who employ them. Keep Dr. Young's plain-spoken, no-hype voice; never fabricate Oregon regulatory specifics.",
+    channels: [
+      {
+        id: "facebook",
+        label: "Facebook post",
+        guidance:
+          "2–4 short sentences for a clinic/professional audience. Lead with the concrete takeaway, end with a soft nudge to read more. One tasteful emoji at most. Include the article link.",
+        fieldDescription: "Facebook post copy (with the article link).",
+        utm: "utm_source=facebook&utm_medium=social&utm_campaign=blog",
+      },
+      {
+        id: "linkedin",
+        label: "LinkedIn post",
+        guidance:
+          "Professional, first-person from Dr. Young where natural. 3–5 sentences, a credibility angle (Oregon CA compliance), and the article link. No hashtags soup — 1–3 relevant tags at the end.",
+        fieldDescription: "LinkedIn post copy (with the article link).",
+        utm: "utm_source=linkedin&utm_medium=social&utm_campaign=blog",
+      },
+      {
+        id: "instagram",
+        label: "Instagram caption",
+        guidance:
+          "Warm, scannable caption with line breaks; 3–6 relevant hashtags at the end. End with 'Link in bio.' Do NOT include a URL (Instagram captions aren't linkable).",
+        fieldDescription: "Instagram caption (no URL — 'link in bio').",
+        noUrl: true,
+      },
+      {
+        id: "x",
+        label: "X / Twitter post",
+        guidance:
+          "Under 280 characters. One punchy hook + the article link. At most one hashtag.",
+        fieldDescription: "X/Twitter post copy (with the article link).",
+        utm: "utm_source=x&utm_medium=social&utm_campaign=blog",
+      },
+    ],
+    newsletterGuidance:
+      "Write a subject line (≤ 60 chars, specific, no clickbait) and a short email body (~120–200 words) in Dr. Young's voice. Open with the single most useful point, give 2–3 concrete takeaways, and close with one link to the full article. Speak to CAs and clinic owners; keep it practical and compliance-aware.",
+    carouselSchemes: [
+      { id: "brand", label: "Brand teal", bg: "#0b6b63", fg: "#fafaf7", accent: "#c2410c" },
+    ],
+    carouselGuidance:
+      "Hook slide, 3–5 payoff slides, one CTA slide. Plain, useful, no hype. (Carousel rendering not wired in this site yet.)",
+  },
+
   schema: {
     orgType: ["Organization"], // online training org; not LocalBusiness
     org: {
@@ -228,7 +274,7 @@ export default defineDomainPack({
     drafting: true,
     heroImages: true,
     engagementAnalytics: true,
-    amplify: false, // Brevo groundwork only; flip on when wired
+    amplify: true, // social + newsletter kit generation (no auto-send)
     competitiveIntel: false,
     audio: false,
     entityPresence: false,

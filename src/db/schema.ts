@@ -740,6 +740,16 @@ export const aeoAuditStore = sqliteTable("aeo_audit_store", {
   updatedAt: text("updated_at").notNull().default(nowUtc),
 });
 
+// Generated amplification kit (social channels + newsletter) per blog post,
+// produced by @jeldon/amplify. One row per post; stored for review (not sent).
+export const amplifyKits = sqliteTable("amplify_kits", {
+  postId: text("post_id").primaryKey(),
+  kit: text("kit").notNull(), // JSON: per-channel copy { facebook, linkedin, ... }
+  newsletter: text("newsletter"), // JSON: { subject, body }
+  model: text("model"),
+  updatedAt: text("updated_at").notNull().default(nowUtc),
+});
+
 // A bundle is a single saleable `courses` row (one price, one purchase) whose
 // fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
 // maps a bundle course to its children; checkout/webhook fulfilment expands the

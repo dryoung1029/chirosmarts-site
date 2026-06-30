@@ -9,7 +9,7 @@ import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { hasVerifyFlags } from "@/lib/blog";
-import { scorePost } from "@/lib/jeldon";
+import { scorePost, jeldonConfig } from "@/lib/jeldon";
 
 const db = getDb(Astro.locals.runtime.env);
 const id = Astro.params.id!;
@@ -30,6 +30,18 @@ const md = post.bodyMarkdown ?? "";
 const { seo, geo } = scorePost(post);
 const verifyFlagged = hasVerifyFlags(md);
 const verifyCount = (md.match(/\[VERIFY\b/gi) ?? []).length;
+
+// Amplification kit (social + newsletter), generated on demand via @jeldon/amplify.
+const kitRow = await db
+  .select()
+  .from(schema.amplifyKits)
+  .where(eq(schema.amplifyKits.postId, id))
+  .get();
+const kit = kitRow?.kit ? (JSON.parse(kitRow.kit) as Record<string, string>) : null;
+const newsletter = kitRow?.newsletter
+  ? (JSON.parse(kitRow.newsletter) as { subject: string; body: string })
+  : null;
+const amplifyChannels = jeldonConfig.amplify?.channels ?? [];
 const fmtPt = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString("en-US", {
@@ -199,6 +211,48 @@ const dials = [
 
   <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
 
+  {/* Amplification kit — social copy + newsletter draft (generate on demand). */}
+  <section id="amplify">
+    <h2 style="margin:0 0 0.25rem;font-size:1.15rem">Amplification kit</h2>
+    <p class="muted" style="margin:0 0 0.9rem;font-size:0.9rem">
+      Turn this article into ready-to-post social copy and a newsletter draft (in
+      Dr. Young's voice, with UTM-tagged links). Generated on demand — nothing is
+      sent; copy each into Facebook, LinkedIn, your Brevo newsletter, etc.
+    </p>
+    <form method="POST" action={`/api/admin/blog/${post.id}/amplify`} data-busy="Writing your kit… (up to ~20s)" style="margin-bottom:1rem">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">
+        {kit ? "↻ Regenerate kit" : "✦ Generate amplification kit"}
+      </button>
+      {kitRow && <span class="muted" style="font-size:0.85rem;margin-left:0.6rem">Updated {fmtPt(kitRow.updatedAt)}</span>}
+    </form>
+
+    {newsletter && (
+      <div class="panel" style="margin:0 0 0.9rem">
+        <strong>📧 Newsletter</strong>
+        <label style="display:block;font-weight:600;font-size:0.85rem;margin:0.6rem 0 0.2rem">Subject</label>
+        <div style="display:flex;gap:0.5rem">
+          <input id="amp-nl-subject" type="text" readonly value={newsletter.subject} style="flex:1;padding:0.45rem" />
+          <button type="button" data-copy="amp-nl-subject" style="padding:0.35rem 0.8rem;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer">Copy</button>
+        </div>
+        <label style="display:block;font-weight:600;font-size:0.85rem;margin:0.6rem 0 0.2rem">Body</label>
+        <textarea id="amp-nl-body" readonly style="width:100%;height:9rem;padding:0.5rem">{newsletter.body}</textarea>
+        <button type="button" data-copy="amp-nl-body" style="margin-top:0.3rem;padding:0.35rem 0.8rem;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer">Copy body</button>
+      </div>
+    )}
+
+    {kit && amplifyChannels.filter((c) => kit[c.id]).map((c) => (
+      <div class="panel" style="margin:0 0 0.7rem">
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <strong>{c.label}</strong>
+          <button type="button" data-copy={`amp-${c.id}`} style="margin-left:auto;padding:0.3rem 0.75rem;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer">Copy</button>
+        </div>
+        <textarea id={`amp-${c.id}`} readonly style="width:100%;height:5.5rem;padding:0.5rem;margin-top:0.4rem">{kit[c.id]}</textarea>
+      </div>
+    ))}
+  </section>
+
+  <hr style="margin:1.6rem 0;border:none;border-top:1px solid var(--border)" />
+
   <section id="publish">
     {verifyFlagged && (
       <p class="panel" style="margin:0 0 1rem;background:var(--danger-tint);color:var(--danger);border:1px solid var(--danger)">
@@ -266,6 +320,22 @@ const dials = [
       const local = (document.getElementById("scheduledLocal") as HTMLInputElement)?.value;
       const iso = document.getElementById("scheduledAtIso") as HTMLInputElement;
       if (local && iso) iso.value = new Date(local).toISOString();
+    });
+
+    // Copy-to-clipboard for amplification-kit fields.
+    document.querySelectorAll("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = document.getElementById(btn.getAttribute("data-copy") || "") as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | null;
+        if (!target) return;
+        navigator.clipboard.writeText(target.value).then(() => {
+          const prev = btn.textContent;
+          btn.textContent = "Copied ✓";
+          setTimeout(() => (btn.textContent = prev), 1200);
+        });
+      });
     });
 
     // Jump to each [VERIFY] flag in the body: select it and scroll it into view,
