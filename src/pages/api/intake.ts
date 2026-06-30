@@ -10,6 +10,7 @@ import { logEvent } from "@/lib/events";
 import { nowIso } from "@/lib/time";
 import { LEGAL } from "@/config/legal";
 import { syncUserToBrevo } from "@/lib/brevo";
+import { sendWelcomeEmail } from "@/lib/email/flows";
 
 const intakeSchema = z
   .object({
@@ -103,6 +104,13 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     } catch {
       /* admin batch sync will pick it up */
     }
+  }
+
+  // Welcome email (lifecycle flow, step 1) — best-effort, never blocks signup.
+  try {
+    await sendWelcomeEmail(env, { to: user.email, name: (d.displayName || d.legalName || "").split(" ")[0] });
+  } catch {
+    /* non-blocking */
   }
 
   // Record agreement to the Terms + Privacy at account creation (PLAN.md Item 2).

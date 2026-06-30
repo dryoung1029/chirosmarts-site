@@ -40,10 +40,15 @@ function isPublic(pathname: string): boolean {
   if (
     pathname === "/clinics" ||
     pathname === "/renewal" ||
+    pathname === "/renewal/my-month" || // tokenized birth-month capture from emails
     pathname === "/about" ||
     pathname === "/sitemap.xml"
   )
     return true;
+  // Cron tick for lifecycle email flows (authorized by a shared secret, not a session).
+  if (pathname === "/api/cron/flows") return true;
+  // Testimonial collection from the review email (tokenized, no login).
+  if (pathname === "/review") return true;
   // Help Center (articles + contact form) is open to everyone, incl. prospects.
   if (pathname === "/help" || pathname.startsWith("/help/")) return true;
   if (pathname === "/api/help/contact") return true;
