@@ -223,7 +223,7 @@ const dials = [
       {post.status === "scheduled" && (
         <form method="POST" action={`/api/admin/blog/${post.id}/publish`}>
           <input type="hidden" name="action" value="unschedule" />
-          <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel)">Cancel schedule</button>
+          <button type="submit" style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text)">Cancel schedule</button>
         </form>
       )}
       {post.status === "published" && (
@@ -251,6 +251,7 @@ const dials = [
           style="padding:0.5rem 1.1rem;border-radius:8px;border:1px solid var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600">
           {post.status === "scheduled" ? "Reschedule" : "Schedule"}
         </button>
+        <a href="/admin/blog/calendar" style="align-self:center;font-size:0.9rem">📅 View content calendar →</a>
       </form>
     )}
   </section>
