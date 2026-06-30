@@ -12,6 +12,7 @@ import { schema } from "@/db/client";
 export interface ContactStats {
   total: number;
   buyers: number;
+  certified: number;
   withClinic: number;
   uniqueClinics: number;
   withAddress: number;
@@ -23,6 +24,7 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
     .select({
       clinic: schema.importedContacts.clinic,
       everBought: schema.importedContacts.everBought,
+      certified: schema.importedContacts.certified,
       street: schema.importedContacts.addressStreet,
       state: schema.importedContacts.addressState,
     })
@@ -30,11 +32,13 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
     .all();
   const clinics = new Set<string>();
   let buyers = 0,
+    certified = 0,
     withClinic = 0,
     withAddress = 0,
     oregon = 0;
   for (const r of rows) {
     if (r.everBought) buyers++;
+    if (r.certified) certified++;
     if (r.clinic && r.clinic.trim()) {
       withClinic++;
       clinics.add(normalizeClinic(r.clinic));
@@ -43,7 +47,7 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
     const st = (r.state ?? "").trim().toLowerCase();
     if (st === "or" || st === "oregon") oregon++;
   }
-  return { total: rows.length, buyers, withClinic, uniqueClinics: clinics.size, withAddress, oregon };
+  return { total: rows.length, buyers, certified, withClinic, uniqueClinics: clinics.size, withAddress, oregon };
 }
 
 const normalizeClinic = (s: string) =>

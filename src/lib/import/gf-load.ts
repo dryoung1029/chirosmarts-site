@@ -13,6 +13,7 @@ import { schema } from "@/db/client";
 import { newId } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
 import { isPaid, isRefunded, type GfRecord } from "@/lib/import/gf-import";
+import type { GradebookRecord } from "@/lib/import/gradebook-import";
 
 // Cloudflare D1 caps a single query at 100 BOUND PARAMETERS. Each row is ~14
 // params, so keep multi-row inserts tiny (6 rows ≈ 84 params), and group many
@@ -258,4 +259,91 @@ export async function loadContacts(
   await runInBatches(db, stmts);
 
   return { inserted: inserts.length, updated: updates.length, skippedNoEmail };
+}
+
+export interface GradebookLoadResult {
+  certifiedMarked: number;
+  inserted: number;
+  updated: number;
+  skippedNoEmail: number;
+}
+
+const splitName = (name: string): { first: string | null; last: string | null } => {
+  const t = name.trim().split(/\s+/).filter(Boolean);
+  if (t.length === 0) return { first: null, last: null };
+  if (t.length === 1) return { first: t[0], last: null };
+  return { first: t[0], last: t.slice(1).join(" ") };
+};
+
+/**
+ * Mark certified completers on the roster from a WP Courseware gradebook export.
+ * Matches by email; inserts a contact for completers we haven't seen. Sets the
+ * earliest completion date. Non-completers only seed a bare contact if new.
+ */
+export async function loadGradebook(
+  db: Db,
+  records: GradebookRecord[],
+): Promise<GradebookLoadResult> {
+  // Merge by email: certified if any row completed; earliest completion date.
+  const byEmail = new Map<string, { email: string; name: string; completed: boolean; completedAt: string | null }>();
+  let skippedNoEmail = 0;
+  for (const r of records) {
+    if (!r.email) {
+      skippedNoEmail++;
+      continue;
+    }
+    const cur = byEmail.get(r.email) ?? { email: r.email, name: "", completed: false, completedAt: null };
+    cur.name = cur.name || r.name;
+    cur.completed = cur.completed || r.completed;
+    cur.completedAt = minIso(cur.completedAt, r.completionDateIso);
+    byEmail.set(r.email, cur);
+  }
+
+  const existing = await db.select().from(schema.importedContacts).all();
+  const exByEmail = new Map(existing.map((e) => [e.email, e]));
+
+  type Ins = typeof schema.importedContacts.$inferInsert;
+  const inserts: Ins[] = [];
+  const updateStmts: unknown[] = [];
+  let certifiedMarked = 0;
+  let updated = 0;
+
+  for (const a of byEmail.values()) {
+    const e = exByEmail.get(a.email);
+    if (!e) {
+      // Only worth inserting a brand-new contact when they actually completed.
+      if (!a.completed) continue;
+      const { first, last } = splitName(a.name);
+      inserts.push({
+        id: newId("ctc"),
+        email: a.email,
+        firstName: first,
+        lastName: last,
+        firstSource: "gradebook",
+        certified: true,
+        completedAt: a.completedAt,
+      });
+      certifiedMarked++;
+      continue;
+    }
+    const newCertified = e.certified || a.completed;
+    const newCompletedAt = minIso(e.completedAt, a.completedAt);
+    if (newCertified !== e.certified || newCompletedAt !== e.completedAt) {
+      updateStmts.push(
+        db
+          .update(schema.importedContacts)
+          .set({ certified: newCertified, completedAt: newCompletedAt })
+          .where(eq(schema.importedContacts.id, e.id)),
+      );
+      updated++;
+      if (a.completed && !e.certified) certifiedMarked++;
+    }
+  }
+
+  await runInBatches(db, [
+    ...insertStatements((chunk) => db.insert(schema.importedContacts).values(chunk), inserts),
+    ...updateStmts,
+  ]);
+
+  return { certifiedMarked, inserted: inserts.length, updated, skippedNoEmail };
 }
