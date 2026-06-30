@@ -783,7 +783,7 @@ export const marketingLeads = sqliteTable(
     id: text("id").primaryKey(),
     email: text("email").notNull(), // normalized lowercase
     source: text("source", {
-      enum: ["renewal_checker", "checklist_pdf", "other"],
+      enum: ["renewal_checker", "checklist_pdf", "newsletter", "other"],
     })
       .notNull()
       .default("other"),

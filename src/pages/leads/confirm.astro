@@ -2,11 +2,29 @@
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb } from "@/db/client";
 import { confirmLead } from "@/lib/leads";
+import { syncLeadToBrevo } from "@/lib/brevo";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 const token = Astro.url.searchParams.get("token") ?? "";
 const lead = await confirmLead(db, token);
 const isChecklist = lead?.source === "checklist_pdf";
+const isNewsletter = lead?.source === "newsletter";
+
+// Newsletter subscribers land in Brevo immediately on confirm (real-time list
+// loading); other sources sync via the admin batch. Best-effort, never blocks.
+if (lead && isNewsletter) {
+  try {
+    await syncLeadToBrevo(env, db, {
+      id: lead.id,
+      email: lead.email,
+      source: lead.source,
+      birthMonth: lead.birthMonth,
+    });
+  } catch {
+    /* admin batch sync will pick it up */
+  }
+}
 ---
 
 <MarketingLayout
@@ -33,6 +51,12 @@ const isChecklist = lead?.source === "checklist_pdf";
                 <p style="color:var(--muted)">Your Oregon CA certification checklist is ready.</p>
                 <a class="btn-primary" href={`/api/leads/asset?lid=${lead.id}`}>Download the checklist (PDF)</a>
               </>
+            ) : isNewsletter ? (
+              <p style="color:var(--muted)">
+                You're subscribed to the ChiroSmarts newsletter — practical tips for
+                Oregon chiropractic assistants. You can unsubscribe anytime from any
+                email we send.
+              </p>
             ) : (
               <p style="color:var(--muted)">
                 We'll remind you before your Oregon CA renewal deadline. You can
