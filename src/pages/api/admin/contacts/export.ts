@@ -4,15 +4,19 @@
  */
 import type { APIRoute } from "astro";
 import { getDb } from "@/db/client";
-import { getContactsForExport, toCsv } from "@/lib/contacts";
+import { getContactsForExport, toCsv, type Segment } from "@/lib/contacts";
 import { getSiteUrl } from "@/lib/env";
 import { renewalSetupUrl } from "@/lib/contact-token";
 
-export const GET: APIRoute = async ({ locals }) => {
+const SEGMENTS = ["all", "certified", "buyers", "prospects", "oregon", "needs_month", "has_month"];
+
+export const GET: APIRoute = async ({ locals, request }) => {
   const env = locals.runtime.env;
   const db = getDb(env);
   const site = getSiteUrl(env);
-  const contacts = await getContactsForExport(db);
+  const segParam = new URL(request.url).searchParams.get("segment") ?? "all";
+  const segment = (SEGMENTS.includes(segParam) ? segParam : "all") as Segment;
+  const contacts = await getContactsForExport(db, segment);
   // Add a personalized birth-month-capture link per contact (Brevo merge field).
   const rows = await Promise.all(
     contacts.map(async (c) => ({
@@ -40,7 +44,7 @@ export const GET: APIRoute = async ({ locals }) => {
   return new Response(csv, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": 'attachment; filename="chirosmarts-contacts.csv"',
+      "content-disposition": `attachment; filename="chirosmarts-contacts-${segment}.csv"`,
     },
   });
 };

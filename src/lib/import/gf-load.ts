@@ -49,7 +49,11 @@ export interface SalesLoadResult {
   salesCreated: number;
   refundsCreated: number;
   skipped: number;
+  namesBackfilled: number;
 }
+
+const buyerNameOf = (r: GfRecord): string | null =>
+  `${r.firstName} ${r.lastName}`.trim().replace(/\s+/g, " ") || null;
 
 /** Insert paid/refunded rows as ledger entries, mapped to a course SKU slug. */
 export async function loadSales(
@@ -65,33 +69,46 @@ export async function loadSales(
   const courseId = course?.id ?? null;
   const skuLabel = course?.title ?? "Imported certification";
 
-  // Idempotency: skip markers already in the ledger (one read).
+  // Idempotency: existing markers (one read). Keep id + buyerName so a re-run can
+  // backfill the buyer name onto rows imported before names were captured.
   const existing = await db
-    .select({ note: schema.sales.note })
+    .select({ id: schema.sales.id, note: schema.sales.note, buyerName: schema.sales.buyerName })
     .from(schema.sales)
     .where(like(schema.sales.note, "gfimport%"))
     .all();
-  const seen = new Set(existing.map((r) => r.note ?? ""));
+  const byNote = new Map(existing.map((r) => [r.note ?? "", r]));
 
   const marker = (r: GfRecord, kind: "sale" | "refund") =>
     `gfimport${kind === "refund" ? "-refund" : ""}:${r.entryId || r.transactionId || `${r.email}|${r.paymentDateIso ?? r.entryDateIso ?? ""}`}`;
 
   type Row = typeof schema.sales.$inferInsert;
   const rows: Row[] = [];
+  const updateStmts: unknown[] = [];
   let salesCreated = 0,
     refundsCreated = 0,
-    skipped = 0;
+    skipped = 0,
+    namesBackfilled = 0;
 
   for (const r of records) {
     const paid = isPaid(r);
     const refund = isRefunded(r);
     if (!paid && !refund) continue;
     const note = marker(r, paid ? "sale" : "refund");
-    if (seen.has(note)) {
-      skipped++;
+    const name = buyerNameOf(r);
+    const found = byNote.get(note);
+    if (found) {
+      // Already imported — backfill the name if it's missing.
+      if (name && !found.buyerName) {
+        updateStmts.push(
+          db.update(schema.sales).set({ buyerName: name }).where(eq(schema.sales.id, found.id)),
+        );
+        namesBackfilled++;
+      } else {
+        skipped++;
+      }
       continue;
     }
-    seen.add(note);
+    byNote.set(note, { id: "", note, buyerName: name });
     const amt = r.paymentAmountCents ?? 0;
     rows.push({
       id: newId("sale"),
@@ -101,6 +118,7 @@ export async function loadSales(
       courseId,
       skuSlug: courseSlug,
       skuLabel,
+      buyerName: name,
       quantity: 1,
       unitPriceCents: amt,
       amountCents: paid ? amt : -Math.abs(amt),
@@ -112,11 +130,11 @@ export async function loadSales(
     else refundsCreated++;
   }
 
-  await runInBatches(
-    db,
-    insertStatements((chunk) => db.insert(schema.sales).values(chunk), rows),
-  );
-  return { salesCreated, refundsCreated, skipped };
+  await runInBatches(db, [
+    ...insertStatements((chunk) => db.insert(schema.sales).values(chunk), rows),
+    ...updateStmts,
+  ]);
+  return { salesCreated, refundsCreated, skipped, namesBackfilled };
 }
 
 export interface ContactsLoadResult {

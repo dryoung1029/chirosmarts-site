@@ -22,6 +22,7 @@ export interface RecordSaleInput {
   courseId?: string | null;
   skuSlug?: string | null;
   skuLabel?: string | null;
+  buyerName?: string | null;
   quantity?: number;
   unitPriceCents: number;
   /** Defaults to quantity × unitPriceCents (sign-flipped for refunds). */
@@ -56,6 +57,7 @@ export async function recordSale(db: Db, input: RecordSaleInput): Promise<string
     courseId: input.courseId ?? null,
     skuSlug: input.skuSlug ?? null,
     skuLabel: input.skuLabel ?? null,
+    buyerName: input.buyerName ?? null,
     quantity,
     unitPriceCents: unit,
     amountCents: amount,
@@ -84,6 +86,12 @@ export async function recordCoursePurchase(
     stripePaymentIntentId?: string | null;
   },
 ): Promise<void> {
+  const buyer = await db
+    .select({ displayName: schema.users.displayName, legalName: schema.users.legalName })
+    .from(schema.users)
+    .where(eq(schema.users.id, opts.userId))
+    .get();
+  const buyerName = (buyer?.displayName || buyer?.legalName || "").trim() || null;
   for (const courseId of opts.courseIds) {
     const course = await db
       .select({
@@ -105,6 +113,7 @@ export async function recordCoursePurchase(
       courseId: course.id,
       skuSlug: course.slug,
       skuLabel: course.title,
+      buyerName,
       quantity: 1,
       unitPriceCents: course.priceCents,
       amountCents: cash,
