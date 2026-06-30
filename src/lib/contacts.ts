@@ -13,6 +13,9 @@ export interface ContactStats {
   total: number;
   buyers: number;
   certified: number;
+  prospects: number;
+  needsMonth: number;
+  hasMonth: number;
   withClinic: number;
   uniqueClinics: number;
   withAddress: number;
@@ -25,6 +28,7 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
       clinic: schema.importedContacts.clinic,
       everBought: schema.importedContacts.everBought,
       certified: schema.importedContacts.certified,
+      birthMonth: schema.importedContacts.birthMonth,
       street: schema.importedContacts.addressStreet,
       state: schema.importedContacts.addressState,
     })
@@ -33,12 +37,18 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
   const clinics = new Set<string>();
   let buyers = 0,
     certified = 0,
+    prospects = 0,
+    needsMonth = 0,
+    hasMonth = 0,
     withClinic = 0,
     withAddress = 0,
     oregon = 0;
   for (const r of rows) {
     if (r.everBought) buyers++;
+    else prospects++;
     if (r.certified) certified++;
+    if (r.birthMonth != null) hasMonth++;
+    if (r.certified && r.birthMonth == null) needsMonth++;
     if (r.clinic && r.clinic.trim()) {
       withClinic++;
       clinics.add(normalizeClinic(r.clinic));
@@ -47,8 +57,10 @@ export async function getContactStats(db: Db): Promise<ContactStats> {
     const st = (r.state ?? "").trim().toLowerCase();
     if (st === "or" || st === "oregon") oregon++;
   }
-  return { total: rows.length, buyers, certified, withClinic, uniqueClinics: clinics.size, withAddress, oregon };
+  return { total: rows.length, buyers, certified, prospects, needsMonth, hasMonth, withClinic, uniqueClinics: clinics.size, withAddress, oregon };
 }
+
+export type Segment = "all" | "certified" | "buyers" | "prospects" | "oregon" | "needs_month" | "has_month";
 
 const normalizeClinic = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
@@ -122,29 +134,47 @@ export interface ContactRow {
   state: string;
   zip: string;
   everBought: boolean;
+  certified: boolean;
+  birthMonth: number | null;
   firstSeenAt: string;
 }
 
-/** Full roster for an individual-mail / list export. */
-export async function getContactsForExport(db: Db): Promise<ContactRow[]> {
+const inSegment = (r: ContactRow, seg: Segment): boolean => {
+  switch (seg) {
+    case "certified": return r.certified;
+    case "buyers": return r.everBought;
+    case "prospects": return !r.everBought;
+    case "oregon": return ["or", "oregon"].includes(r.state.trim().toLowerCase());
+    case "needs_month": return r.certified && r.birthMonth == null;
+    case "has_month": return r.birthMonth != null;
+    default: return true;
+  }
+};
+
+/** Full roster for an individual-mail / list export, optionally one segment. */
+export async function getContactsForExport(db: Db, segment: Segment = "all"): Promise<ContactRow[]> {
   const rows = await db
     .select()
     .from(schema.importedContacts)
     .orderBy(desc(schema.importedContacts.everBought))
     .all();
-  return rows.map((r) => ({
-    email: r.email,
-    firstName: r.firstName ?? "",
-    lastName: r.lastName ?? "",
-    clinic: r.clinic ?? "",
-    phone: r.phone ?? "",
-    street: r.addressStreet ?? "",
-    city: r.addressCity ?? "",
-    state: r.addressState ?? "",
-    zip: r.addressZip ?? "",
-    everBought: r.everBought,
-    firstSeenAt: r.firstSeenAt ?? "",
-  }));
+  return rows
+    .map((r) => ({
+      email: r.email,
+      firstName: r.firstName ?? "",
+      lastName: r.lastName ?? "",
+      clinic: r.clinic ?? "",
+      phone: r.phone ?? "",
+      street: r.addressStreet ?? "",
+      city: r.addressCity ?? "",
+      state: r.addressState ?? "",
+      zip: r.addressZip ?? "",
+      everBought: r.everBought,
+      certified: r.certified,
+      birthMonth: r.birthMonth,
+      firstSeenAt: r.firstSeenAt ?? "",
+    }))
+    .filter((r) => inSegment(r, segment));
 }
 
 /** Build a CSV string from a header list and row objects. */

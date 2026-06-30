@@ -223,7 +223,7 @@ if (Astro.request.method === "POST") {
 
               {result.committed ? (
                 <p class="panel" style="background:var(--brand-tint);color:var(--brand);border:none">
-                  {result.sales && `Ledger: +${result.sales.salesCreated} sales, +${result.sales.refundsCreated} refunds (${result.sales.skipped} already present). `}
+                  {result.sales && `Ledger: +${result.sales.salesCreated} sales, +${result.sales.refundsCreated} refunds (${result.sales.skipped} already present${result.sales.namesBackfilled ? `, ${result.sales.namesBackfilled} names added` : ""}). `}
                   {result.contacts && `Contacts: +${result.contacts.inserted} new, ${result.contacts.updated} merged. `}
                   Mapped to source “{result.sourceLabel}”, course “{result.courseSlug}”.
                 </p>

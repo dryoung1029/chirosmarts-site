@@ -879,6 +879,7 @@ export const sales = sqliteTable(
     // Snapshots so historical rows survive catalog/price/title changes.
     skuSlug: text("sku_slug"),
     skuLabel: text("sku_label"),
+    buyerName: text("buyer_name"), // display name of the purchaser (best-effort)
     quantity: integer("quantity").notNull().default(1),
     unitPriceCents: integer("unit_price_cents").notNull().default(0),
     // Actual cash for this row (quantity × unit price; negative for refunds;

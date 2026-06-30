@@ -27,7 +27,7 @@ const msg = Astro.url.searchParams.get("msg");
 const proj = await buildProjection(db);
 // Resilient if the ledger migration hasn't been applied yet.
 let ledgerReady = true;
-const recent = await getRecentSales(db, 40).catch(() => {
+const recent = await getRecentSales(db, 250).catch(() => {
   ledgerReady = false;
   return [] as Awaited<ReturnType<typeof getRecentSales>>;
 });
@@ -337,6 +337,7 @@ const historyTotalCents = salesByYear.reduce((a, y) => a + y.revenueCents, 0);
           </select>
         </label>
       </div>
+      <input type="text" name="buyerName" placeholder="Buyer name (optional)" style="padding:0.4rem" />
       <input type="text" name="note" placeholder="Note (optional)" style="padding:0.4rem" />
       <button type="submit" class="btn-primary" style="padding:0.45rem 1rem">Add to ledger</button>
     </form>
@@ -357,29 +358,33 @@ const historyTotalCents = salesByYear.reduce((a, y) => a + y.revenueCents, 0);
   {recent.length === 0 ? (
     <p class="muted">No sales recorded yet. Stripe purchases land here automatically; use the form above for past sales.</p>
   ) : (
-    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
-      <thead>
-        <tr style="text-align:left;border-bottom:2px solid var(--border)">
-          <th style="padding:0.45rem">Date</th>
-          <th style="padding:0.45rem">Product</th>
-          <th style="padding:0.45rem">Type</th>
-          <th style="padding:0.45rem">Source</th>
-          <th style="padding:0.45rem;text-align:right">Qty</th>
-          <th style="padding:0.45rem;text-align:right">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {recent.map((s) => (
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:0.45rem;white-space:nowrap">{fmtDay(s.occurredAt)}</td>
-            <td style="padding:0.45rem;color:var(--text)">{s.skuLabel ?? "—"}{s.channel === "clinic" ? " · clinic" : ""}</td>
-            <td style="padding:0.45rem;color:var(--muted)">{s.kind}</td>
-            <td style="padding:0.45rem;color:var(--muted)">{s.source}</td>
-            <td style="padding:0.45rem;text-align:right">{s.quantity}</td>
-            <td style={`padding:0.45rem;text-align:right;${s.amountCents < 0 ? "color:var(--danger,#b3261e)" : "color:var(--text)"}`}>{fmtUsd(s.amountCents)}</td>
+    <div style="max-height:24rem;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+        <thead>
+          <tr style="text-align:left;background:var(--panel-2)">
+            <th style="padding:0.45rem;position:sticky;top:0;background:var(--panel-2)">Date</th>
+            <th style="padding:0.45rem;position:sticky;top:0;background:var(--panel-2)">Buyer</th>
+            <th style="padding:0.45rem;position:sticky;top:0;background:var(--panel-2)">Product</th>
+            <th style="padding:0.45rem;position:sticky;top:0;background:var(--panel-2)">Type</th>
+            <th style="padding:0.45rem;position:sticky;top:0;background:var(--panel-2)">Source</th>
+            <th style="padding:0.45rem;text-align:right;position:sticky;top:0;background:var(--panel-2)">Qty</th>
+            <th style="padding:0.45rem;text-align:right;position:sticky;top:0;background:var(--panel-2)">Amount</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {recent.map((s) => (
+            <tr style="border-top:1px solid var(--border)">
+              <td style="padding:0.45rem;white-space:nowrap">{fmtDay(s.occurredAt)}</td>
+              <td style="padding:0.45rem;color:var(--text)">{s.buyerName ?? "—"}</td>
+              <td style="padding:0.45rem;color:var(--muted)">{s.skuLabel ?? "—"}{s.channel === "clinic" ? " · clinic" : ""}</td>
+              <td style="padding:0.45rem;color:var(--muted)">{s.kind}</td>
+              <td style="padding:0.45rem;color:var(--muted)">{s.source}</td>
+              <td style="padding:0.45rem;text-align:right">{s.quantity}</td>
+              <td style={`padding:0.45rem;text-align:right;${s.amountCents < 0 ? "color:var(--danger,#b3261e)" : "color:var(--text)"}`}>{fmtUsd(s.amountCents)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )}
 </Layout>

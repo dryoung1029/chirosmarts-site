@@ -1,7 +1,8 @@
 ---
 /**
- * Marketing roster + clinic mailer exports. Reads the imported_contacts table
- * (legacy roster). Admin-guarded by middleware.
+ * Marketing roster, organized by segment/campaign. Reads imported_contacts.
+ * Each segment card links to a filtered CSV export to feed Brevo / the mailer.
+ * Admin-guarded by middleware.
  */
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
@@ -14,17 +15,64 @@ let err = "";
 try {
   stats = await getContactStats(db);
 } catch {
-  err = "The imported_contacts table isn't created yet — run the migration, then import legacy data.";
+  err = "The contact roster isn't ready yet — apply the latest migration and import legacy data.";
 }
+
+const segments = stats
+  ? [
+      {
+        title: "Certified CAs",
+        count: stats.certified,
+        channel: "Renewal CE · Brevo",
+        blurb: "Completed a course → need annual CE. Primary target for the renewal pack.",
+        href: "/api/admin/contacts/export?segment=certified",
+      },
+      {
+        title: "Need renewal month",
+        count: stats.needsMonth,
+        channel: "Birth-month capture",
+        blurb: "Certified but no birth month yet. Send the re-permission email with the renewal-setup link to capture it and move them into precise reminders.",
+        href: "/api/admin/contacts/export?segment=needs_month",
+      },
+      {
+        title: "Renewal-ready",
+        count: stats.hasMonth,
+        channel: "Precise reminders",
+        blurb: "Birth month on file → already flow into 60-days-before reminders automatically.",
+        href: "/api/admin/contacts/export?segment=has_month",
+      },
+      {
+        title: "Past buyers",
+        count: stats.buyers,
+        channel: "Loyalty · Brevo",
+        blurb: "Strongest relationship. Lead the re-permission send here; warm them up first.",
+        href: "/api/admin/contacts/export?segment=buyers",
+      },
+      {
+        title: "Prospects (never bought)",
+        count: stats.prospects,
+        channel: "Upsell · Brevo",
+        blurb: "Free-CEU signups who never certified. Nurture toward the $149 initial cert.",
+        href: "/api/admin/contacts/export?segment=prospects",
+      },
+      {
+        title: "Oregon",
+        count: stats.oregon,
+        channel: "Geo-targeted",
+        blurb: "Contacts in Oregon — the core market for state-specific messaging.",
+        href: "/api/admin/contacts/export?segment=oregon",
+      },
+    ]
+  : [];
 ---
 
-<Layout title="Contacts & clinics · Admin" showNav={true}>
+<Layout title="Contacts & campaigns · Admin" showNav={true}>
   <AdminNav active="contacts" />
-  <h1 style="margin-bottom:0.25rem">Contacts &amp; clinics</h1>
+  <h1 style="margin-bottom:0.25rem">Contacts &amp; campaigns</h1>
   <p class="muted" style="margin-top:0;max-width:52rem">
-    Your imported marketing roster. Use these exports to seed Brevo (mailing list)
-    and to run the clinic postcard mailer. Sending guidance is below — warm up the
-    domain and re-permission old contacts before any big send.
+    Your imported marketing roster, grouped by segment. Each card exports a filtered
+    CSV to feed Brevo (mailing list) or the clinic postcard mailer. Warm up the domain
+    and re-permission old contacts before any big send (see the note at the bottom).
   </p>
 
   {err ? (
@@ -34,12 +82,10 @@ try {
       <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0 1.5rem">
         {[
           { label: "Contacts", v: stats!.total },
-          { label: "Past buyers", v: stats!.buyers },
           { label: "Certified", v: stats!.certified },
-          { label: "Unique clinics", v: stats!.uniqueClinics },
-          { label: "With clinic", v: stats!.withClinic },
-          { label: "With address", v: stats!.withAddress },
-          { label: "Oregon", v: stats!.oregon },
+          { label: "Buyers", v: stats!.buyers },
+          { label: "Clinics", v: stats!.uniqueClinics },
+          { label: "Renewal-ready", v: stats!.hasMonth },
         ].map((s) => (
           <div class="panel" style="flex:1;min-width:8rem;text-align:center">
             <div style="font-size:1.7rem;font-weight:700;color:var(--text)">{s.v}</div>
@@ -48,35 +94,49 @@ try {
         ))}
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:1rem">
-        <div class="panel">
-          <strong>📮 Clinic postcard list</strong>
-          <p class="muted" style="font-size:0.88rem;margin:0.3rem 0 0.7rem">
-            One row per clinic, busiest first, with a best-guess mailing address
-            (the most common address among that clinic's CAs — the legacy forms
-            captured each CA's address, not the clinic's, so spot-check before a print run).
+      <h2 style="margin-bottom:0.5rem">Segments &amp; campaigns</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:1rem">
+        {segments.map((seg) => (
+          <div class="panel" style="display:flex;flex-direction:column;gap:0.35rem">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem">
+              <strong>{seg.title}</strong>
+              <span style="font-size:1.3rem;font-weight:700;color:var(--text)">{seg.count}</span>
+            </div>
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--brand)">{seg.channel}</div>
+            <p class="muted" style="font-size:0.85rem;margin:0.1rem 0 0.5rem;flex:1">{seg.blurb}</p>
+            <a class="btn" href={seg.href} style="padding:0.4rem 0.9rem;align-self:flex-start;font-size:0.9rem">⬇ Export CSV</a>
+          </div>
+        ))}
+
+        {/* Clinics: B2B postcard mailer (own export). */}
+        <div class="panel" style="display:flex;flex-direction:column;gap:0.35rem">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem">
+            <strong>Clinics</strong>
+            <span style="font-size:1.3rem;font-weight:700;color:var(--text)">{stats!.uniqueClinics}</span>
+          </div>
+          <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--brand)">Postcard mailer · B2B</div>
+          <p class="muted" style="font-size:0.85rem;margin:0.1rem 0 0.5rem;flex:1">
+            One row per clinic, busiest first, with a best-guess mailing address. Spot-check
+            addresses before a print run (legacy forms stored each CA's address, not the clinic's).
           </p>
-          <a class="btn-primary" href="/api/admin/contacts/export-clinics" style="padding:0.45rem 1rem">⬇ Download clinics CSV</a>
-        </div>
-        <div class="panel">
-          <strong>📇 Full contact roster</strong>
-          <p class="muted" style="font-size:0.88rem;margin:0.3rem 0 0.7rem">
-            Everyone (name, email, clinic, address, phone, past-buyer flag). For an
-            individual direct-mail run or to import into Brevo.
-          </p>
-          <a class="btn" href="/api/admin/contacts/export" style="padding:0.45rem 1rem">⬇ Download contacts CSV</a>
+          <a class="btn-primary" href="/api/admin/contacts/export-clinics" style="padding:0.4rem 0.9rem;align-self:flex-start;font-size:0.9rem">📮 Clinics CSV</a>
         </div>
       </div>
+
+      <p class="muted" style="margin-top:1rem;font-size:0.88rem">
+        Need everyone in one file? <a href="/api/admin/contacts/export">Download the full roster CSV</a>
+        (includes the per-contact renewal-setup link for the Brevo email).
+      </p>
 
       <div class="panel" style="margin-top:1.25rem;background:var(--panel-2);border:none">
         <strong>Before you email this list — read this</strong>
         <ul class="muted" style="font-size:0.88rem;margin:0.5rem 0 0;padding-left:1.1rem;line-height:1.5">
-          <li>These contacts are warm but some are years old. <strong>Re-permission</strong> them: one
-            email asking them to confirm they want the newsletter + renewal reminders, with easy unsubscribe.
-            Stop emailing anyone who doesn't engage — that protects your sender reputation.</li>
-          <li><strong>Warm up the domain.</strong> Start with the most recent / past buyers, send in batches,
-            and grow volume gradually. Don't blast all {stats!.total} at once from a fresh domain.</li>
-          <li><strong>Past buyers</strong> ({stats!.buyers}) have the strongest relationship — email them first.</li>
+          <li><strong>Re-permission</strong> old contacts: one email asking them to confirm the newsletter +
+            renewal reminders, with easy unsubscribe. Drop anyone who doesn't engage — it protects your reputation.</li>
+          <li><strong>Warm up the domain.</strong> Start with <strong>Past buyers</strong>, send in batches, grow gradually.
+            Don't blast all {stats!.total} at once from a fresh domain.</li>
+          <li>The <strong>Need renewal month</strong> segment is the one to run the birth-month-capture email to —
+            it both re-permissions them and feeds the precise renewal flow.</li>
         </ul>
       </div>
     </>

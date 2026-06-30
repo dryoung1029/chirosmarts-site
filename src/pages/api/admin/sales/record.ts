@@ -21,6 +21,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const quantity = Math.max(1, Math.floor(Number(form.get("quantity")) || 1));
   const dollars = Number(form.get("unitDollars"));
   const occurredDate = String(form.get("occurredAt") ?? "").trim();
+  const buyerName = String(form.get("buyerName") ?? "").trim() || null;
   const note = String(form.get("note") ?? "").trim() || null;
   const channel = String(form.get("channel")) === "clinic" ? "clinic" : "direct";
 
@@ -54,6 +55,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     courseId,
     skuSlug,
     skuLabel: skuLabel ?? (channel === "clinic" ? "Clinic seats" : "Manual entry"),
+    buyerName,
     quantity,
     unitPriceCents,
     note,
