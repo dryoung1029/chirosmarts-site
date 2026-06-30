@@ -717,6 +717,7 @@ export const blogPosts = sqliteTable(
       .default("draft"),
     heroImage: text("hero_image"),
     heroPrompt: text("hero_prompt"), // editable image-gen prompt (two-step hero flow)
+    heroAlt: text("hero_alt"), // descriptive alt text for the hero (accessibility + SEO)
     seoDescription: text("seo_description"),
     model: text("model"), // AI generation provenance; null if hand-written
     scheduledAt: text("scheduled_at"), // UTC; status=scheduled auto-publishes at/after this

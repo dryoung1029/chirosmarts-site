@@ -27,6 +27,7 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const excerpt = String(form.get("excerpt") ?? "").trim();
   const seoDescription = String(form.get("seoDescription") ?? "").trim();
   const bodyMarkdown = String(form.get("bodyMarkdown") ?? "");
+  const heroAlt = String(form.get("heroAlt") ?? "").trim() || null;
   const tags = String(form.get("tags") ?? "")
     .split(",")
     .map((t) => t.trim())
@@ -44,7 +45,7 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
 
   await db
     .update(schema.blogPosts)
-    .set({ title, slug, excerpt, seoDescription, bodyMarkdown, tags, updatedAt: nowIso() })
+    .set({ title, slug, excerpt, seoDescription, bodyMarkdown, heroAlt, tags, updatedAt: nowIso() })
     .where(eq(schema.blogPosts.id, id));
 
   return redirect(`${back}?msg=Saved`, 303);

@@ -55,7 +55,7 @@ const fmt = (iso: string | null) =>
                 <a href={`/blog/${p.slug}`} style="flex:0 0 auto;line-height:0">
                   <img
                     src={p.heroImage}
-                    alt=""
+                    alt={p.heroAlt ?? ""}
                     width="112"
                     height="112"
                     loading="lazy"

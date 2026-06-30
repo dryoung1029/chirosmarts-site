@@ -73,6 +73,7 @@ const ld: unknown[] = [
     datePublished: post.publishedAt ?? undefined,
     dateModified: post.updatedAt,
     image: heroAbs,
+    heroAlt: post.heroAlt,
     wordCount: wc,
     section: (post.tags ?? [])[0],
     tags: post.tags ?? [],
@@ -110,7 +111,7 @@ if (faqLd) ld.push(faqLd);
       {post.heroImage && (
         <img
           src={post.heroImage}
-          alt=""
+          alt={post.heroAlt ?? ""}
           width="720"
           height="405"
           style="width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;border-radius:12px;border:1px solid var(--border);margin:0 0 1.5rem;background:var(--canvas)"

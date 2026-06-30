@@ -107,7 +107,11 @@ const dials = [
         <input type="text" name="slug" value={post.slug} style={inp} />
       </div>
       <div style="flex:1;min-width:14rem">
-        <label style="font-weight:600">Tags (comma-separated)</label>
+        <label style="font-weight:600;display:flex;align-items:center;gap:0.5rem">
+          Tags (comma-separated)
+          <button type="submit" formaction={`/api/admin/blog/${post.id}/tags`} data-busy="Suggesting tags…"
+            style="font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;border:1px solid var(--accent);background:var(--brand-tint);color:var(--brand);cursor:pointer">✦ Suggest</button>
+        </label>
         <input type="text" name="tags" value={tags} placeholder="compliance, front desk" style={inp} />
       </div>
     </div>
@@ -117,6 +121,9 @@ const dials = [
 
     <label style="font-weight:600">SEO meta description</label>
     <input type="text" name="seoDescription" value={post.seoDescription ?? ""} maxlength="180" style={inp} />
+
+    <label style="font-weight:600">Hero image alt text</label>
+    <input type="text" name="heroAlt" value={post.heroAlt ?? ""} maxlength="160" placeholder="Describes the hero illustration (auto-drafted when you generate an image)" style={inp} />
 
     <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
       <label style="font-weight:600">Body (Markdown)</label>
