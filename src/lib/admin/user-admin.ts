@@ -8,8 +8,68 @@
  * (CLAUDE.md §6). It is gated behind an explicit, typed-confirmation admin
  * action — never call it from automated flows.
  */
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+
+const HEARTBEAT = "lesson_heartbeat";
+
+/**
+ * Reset SEAT TIME for a single lesson (troubleshooting): delete this user's
+ * heartbeat events for the lesson + clear any playback lease, so they can
+ * re-watch and re-accrue. Leaves quiz attempts, certificates, and enrollment
+ * intact. Explicit admin action.
+ */
+export async function resetLessonProgress(
+  env: CloudflareEnv,
+  userId: string,
+  lessonId: string,
+): Promise<void> {
+  const db = getDb(env);
+  await db
+    .delete(schema.events)
+    .where(
+      and(
+        eq(schema.events.userId, userId),
+        eq(schema.events.lessonId, lessonId),
+        eq(schema.events.type, HEARTBEAT),
+      ),
+    );
+  await db
+    .delete(schema.playbackLeases)
+    .where(and(eq(schema.playbackLeases.userId, userId), eq(schema.playbackLeases.lessonId, lessonId)));
+}
+
+/**
+ * Reset SEAT TIME for every lesson in a module (troubleshooting). Same scope as
+ * resetLessonProgress, applied across the module's lessons. Quiz attempts and
+ * certificates are left intact.
+ */
+export async function resetModuleProgress(
+  env: CloudflareEnv,
+  userId: string,
+  moduleId: string,
+): Promise<void> {
+  const db = getDb(env);
+  const lessons = await db
+    .select({ id: schema.lessons.id })
+    .from(schema.lessons)
+    .where(eq(schema.lessons.moduleId, moduleId))
+    .all();
+  const lessonIds = lessons.map((l) => l.id);
+  if (lessonIds.length === 0) return;
+  await db
+    .delete(schema.events)
+    .where(
+      and(
+        eq(schema.events.userId, userId),
+        inArray(schema.events.lessonId, lessonIds),
+        eq(schema.events.type, HEARTBEAT),
+      ),
+    );
+  await db
+    .delete(schema.playbackLeases)
+    .where(and(eq(schema.playbackLeases.userId, userId), inArray(schema.playbackLeases.lessonId, lessonIds)));
+}
 
 async function deleteR2Objects(env: CloudflareEnv, keys: (string | null)[]): Promise<void> {
   const bucket = env.DOCS;
