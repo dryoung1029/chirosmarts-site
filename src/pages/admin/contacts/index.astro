@@ -1,0 +1,83 @@
+---
+/**
+ * Marketing roster + clinic mailer exports. Reads the imported_contacts table
+ * (legacy roster). Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb } from "@/db/client";
+import { getContactStats } from "@/lib/contacts";
+
+const db = getDb(Astro.locals.runtime.env);
+let stats = null;
+let err = "";
+try {
+  stats = await getContactStats(db);
+} catch {
+  err = "The imported_contacts table isn't created yet — run the migration, then import legacy data.";
+}
+---
+
+<Layout title="Contacts & clinics · Admin" showNav={true}>
+  <AdminNav active="contacts" />
+  <h1 style="margin-bottom:0.25rem">Contacts &amp; clinics</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Your imported marketing roster. Use these exports to seed Brevo (mailing list)
+    and to run the clinic postcard mailer. Sending guidance is below — warm up the
+    domain and re-permission old contacts before any big send.
+  </p>
+
+  {err ? (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">{err}</p>
+  ) : (
+    <>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0 1.5rem">
+        {[
+          { label: "Contacts", v: stats!.total },
+          { label: "Past buyers", v: stats!.buyers },
+          { label: "Unique clinics", v: stats!.uniqueClinics },
+          { label: "With clinic", v: stats!.withClinic },
+          { label: "With address", v: stats!.withAddress },
+          { label: "Oregon", v: stats!.oregon },
+        ].map((s) => (
+          <div class="panel" style="flex:1;min-width:8rem;text-align:center">
+            <div style="font-size:1.7rem;font-weight:700;color:var(--text)">{s.v}</div>
+            <div class="muted" style="font-size:0.82rem">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:1rem">
+        <div class="panel">
+          <strong>📮 Clinic postcard list</strong>
+          <p class="muted" style="font-size:0.88rem;margin:0.3rem 0 0.7rem">
+            One row per clinic, busiest first, with a best-guess mailing address
+            (the most common address among that clinic's CAs — the legacy forms
+            captured each CA's address, not the clinic's, so spot-check before a print run).
+          </p>
+          <a class="btn-primary" href="/api/admin/contacts/export-clinics" style="padding:0.45rem 1rem">⬇ Download clinics CSV</a>
+        </div>
+        <div class="panel">
+          <strong>📇 Full contact roster</strong>
+          <p class="muted" style="font-size:0.88rem;margin:0.3rem 0 0.7rem">
+            Everyone (name, email, clinic, address, phone, past-buyer flag). For an
+            individual direct-mail run or to import into Brevo.
+          </p>
+          <a class="btn" href="/api/admin/contacts/export" style="padding:0.45rem 1rem">⬇ Download contacts CSV</a>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:1.25rem;background:var(--panel-2);border:none">
+        <strong>Before you email this list — read this</strong>
+        <ul class="muted" style="font-size:0.88rem;margin:0.5rem 0 0;padding-left:1.1rem;line-height:1.5">
+          <li>These contacts are warm but some are years old. <strong>Re-permission</strong> them: one
+            email asking them to confirm they want the newsletter + renewal reminders, with easy unsubscribe.
+            Stop emailing anyone who doesn't engage — that protects your sender reputation.</li>
+          <li><strong>Warm up the domain.</strong> Start with the most recent / past buyers, send in batches,
+            and grow volume gradually. Don't blast all {stats!.total} at once from a fresh domain.</li>
+          <li><strong>Past buyers</strong> ({stats!.buyers}) have the strongest relationship — email them first.</li>
+        </ul>
+      </div>
+    </>
+  )}
+</Layout>
