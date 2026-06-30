@@ -64,7 +64,10 @@ const isActive = (prefix: string) =>
       .row { display: flex; gap: 1rem; }
       .row > div { flex: 1; }
       .check { display: flex; gap: 0.6rem; align-items: flex-start; margin-top: 1rem; }
-      .check input { width: auto; margin-top: 0.25rem; }
+      /* flex:0 0 auto keeps the radio/checkbox from being squeezed (and visibly
+         shrunk) when its label text wraps — otherwise longer options render a
+         smaller circle, which can hint at the answer. */
+      .check input { width: auto; flex: 0 0 auto; margin-top: 0.25rem; }
       /* Keep the in-content form-button spacing the app relied on. */
       .wrap button, .wrap .btn { margin-top: 1.25rem; }
       .wrap button.link { margin-top: 0; }
