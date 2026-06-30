@@ -9,6 +9,7 @@ import { createClinicForOwner } from "@/lib/clinic";
 import { logEvent } from "@/lib/events";
 import { nowIso } from "@/lib/time";
 import { LEGAL } from "@/config/legal";
+import { syncUserToBrevo } from "@/lib/brevo";
 
 const intakeSchema = z
   .object({
@@ -87,6 +88,22 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     type: "intake_completed",
     payload: { path: d.path, marketingConsent: consented },
   });
+
+  // Real-time marketing-list opt-in: push opted-in users straight to Brevo so
+  // they're on the list immediately (the admin batch sync is now a backstop).
+  // Best-effort — never block account creation on the marketing provider.
+  if (consented) {
+    try {
+      await syncUserToBrevo(env, {
+        email: user.email,
+        role: d.path === "clinic_owner" ? "clinic_admin" : "student",
+        birthMonth: d.birthMonth,
+        clinicName: d.clinicName || null,
+      });
+    } catch {
+      /* admin batch sync will pick it up */
+    }
+  }
 
   // Record agreement to the Terms + Privacy at account creation (PLAN.md Item 2).
   await logEvent(db, {

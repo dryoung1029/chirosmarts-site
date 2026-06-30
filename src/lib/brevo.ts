@@ -43,6 +43,26 @@ export async function syncLeadToBrevo(
   return ok;
 }
 
+/** Push ONE opted-in user to Brevo immediately (real-time on intake opt-in).
+ *  Best-effort; safe to call when Brevo is unconfigured (no-op). */
+export async function syncUserToBrevo(
+  env: CloudflareEnv,
+  user: { email: string; role: string; birthMonth: number | null; clinicName?: string | null },
+): Promise<boolean> {
+  if (!isBrevoConfigured(env)) return false;
+  const usersList = Number(env.BREVO_LIST_ID_USERS) || Number(env.BREVO_LIST_ID_LEADS) || 0;
+  return upsertContact(env, {
+    email: user.email,
+    attributes: {
+      ROLE: user.role,
+      BIRTH_MONTH: user.birthMonth ?? "",
+      CLINIC: user.clinicName ?? "",
+      SOURCE: "account",
+    },
+    listIds: usersList ? [usersList] : [],
+  });
+}
+
 async function upsertContact(
   env: CloudflareEnv,
   contact: {
