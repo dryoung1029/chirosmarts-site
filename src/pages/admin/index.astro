@@ -194,6 +194,21 @@ const stats = [
         </li>
       )}
     </ul>
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+    <p class="muted" style="margin:0 0 0.6rem;font-size:0.9rem">
+      <strong style="color:var(--text)">Course-specific coupons.</strong> Create
+      a Stripe Product for every course so you can make coupons that apply to
+      <em>one</em> course. Prices stay here in the app — this only registers the
+      products. Run it again whenever you add or rename a course.
+    </p>
+    <form method="POST" action="/api/admin/stripe/sync-products" style="margin:0">
+      <button type="submit" disabled={!stripeHasKey} style="margin:0">
+        Sync courses to Stripe
+      </button>
+      {!stripeHasKey && (
+        <span class="muted" style="margin-left:0.6rem;font-size:0.85rem">Set STRIPE_SECRET_KEY first.</span>
+      )}
+    </form>
   </div>
 
   <script is:inline>

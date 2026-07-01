@@ -98,7 +98,11 @@ export const POST: APIRoute = async ({ request, locals, redirect, cookies }) => 
 
   const site = getSiteUrl(env);
   const url = await createCourseCheckout(env, {
-    courses: buyable.map((c) => ({ title: c.title, priceCents: c.priceCents })),
+    courses: buyable.map((c) => ({
+      title: c.title,
+      priceCents: c.priceCents,
+      stripeProductId: c.stripeProductId,
+    })),
     customerEmail: user.email,
     clientReferenceId: user.id,
     metadata: {
