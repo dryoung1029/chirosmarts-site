@@ -86,3 +86,7 @@ Magic-link login + all lifecycle emails go via Resend. If the domain isn't verif
 4. Complete a lesson → seat time accrues; finish → certificate issues + verify link works.
 5. `curl ".../api/cron/flows?..."` via the Worker → `ok:true`.
 6. `/renewal/my-month?e=…&t=…` (grab a link from the contacts CSV) → sets a month, shows the deadline.
+7. **SEO:** open `https://chirosmarts.com/robots.txt` and `/sitemap.xml` — both now build from
+   `SITE_URL`, so every URL should read `chirosmarts.com` (no `pages.dev`). Then in **Google Search
+   Console**, add the `chirosmarts.com` property and **submit the sitemap** (`/sitemap.xml`).
+   Consider a 301 from the old site/URLs to preserve any existing search equity.

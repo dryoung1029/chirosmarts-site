@@ -42,7 +42,8 @@ function isPublic(pathname: string): boolean {
     pathname === "/renewal" ||
     pathname === "/renewal/my-month" || // tokenized birth-month capture from emails
     pathname === "/about" ||
-    pathname === "/sitemap.xml"
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt"
   )
     return true;
   // Cron tick for lifecycle email flows (authorized by a shared secret, not a session).
