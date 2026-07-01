@@ -31,7 +31,11 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     return back("Delete canceled — the confirmation email didn't match.");
   }
 
-  await deleteUser(env, id);
+  try {
+    await deleteUser(env, id);
+  } catch (e) {
+    return back(`Delete failed: ${(e as Error)?.message ?? String(e)}`);
+  }
   return redirect(
     `/admin/students?done=${encodeURIComponent(`Deleted ${user.email} and all their data.`)}`,
     303,
