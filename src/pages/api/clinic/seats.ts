@@ -40,6 +40,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       title: schema.courses.title,
       priceCents: schema.courses.priceCents,
       status: schema.courses.status,
+      stripeProductId: schema.courses.stripeProductId,
     })
     .from(schema.courses)
     .where(eq(schema.courses.id, courseId))
@@ -73,6 +74,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const url = await createSeatsCheckout(env, {
     unitPriceCents: course.priceCents,
     quantity: count,
+    stripeProductId: course.stripeProductId,
     customerEmail: owner?.email,
     clientReferenceId: locals.user!.id,
     metadata: {

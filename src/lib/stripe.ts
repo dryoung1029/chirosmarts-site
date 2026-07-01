@@ -38,18 +38,25 @@ export interface CheckoutArgs {
  */
 export async function createCourseCheckout(
   env: CloudflareEnv,
-  args: CheckoutArgs & { courses: { title: string; priceCents: number }[] },
+  args: CheckoutArgs & {
+    courses: { title: string; priceCents: number; stripeProductId?: string | null }[];
+  },
 ): Promise<string> {
   const stripe = getStripe(env);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     allow_promotion_codes: true,
+    // Bind the line item to the course's persistent Stripe Product when we have
+    // one (so course-restricted coupons apply); otherwise fall back to an inline
+    // ad-hoc product. Either way the PRICE is DB-driven (unit_amount).
     line_items: args.courses.map((c) => ({
       quantity: 1,
       price_data: {
         currency: "usd",
         unit_amount: c.priceCents,
-        product_data: { name: c.title },
+        ...(c.stripeProductId
+          ? { product: c.stripeProductId }
+          : { product_data: { name: c.title } }),
       },
     })),
     customer_email: args.customerEmail ?? undefined,
@@ -64,19 +71,27 @@ export async function createCourseCheckout(
 /** A Checkout session for N clinic training seats. */
 export async function createSeatsCheckout(
   env: CloudflareEnv,
-  args: CheckoutArgs & { unitPriceCents: number; quantity: number },
+  args: CheckoutArgs & {
+    unitPriceCents: number;
+    quantity: number;
+    stripeProductId?: string | null;
+  },
 ): Promise<string> {
   const stripe = getStripe(env);
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     allow_promotion_codes: true,
+    // Seats bind to the same course Product, so a course-restricted coupon also
+    // applies to clinic seat purchases of that course.
     line_items: [
       {
         quantity: args.quantity,
         price_data: {
           currency: "usd",
           unit_amount: args.unitPriceCents,
-          product_data: { name: "ChiroSmarts CA training seat" },
+          ...(args.stripeProductId
+            ? { product: args.stripeProductId }
+            : { product_data: { name: "ChiroSmarts CA training seat" } }),
         },
       },
     ],
@@ -100,6 +115,37 @@ export async function retrieveCheckoutSession(
 ): Promise<Stripe.Checkout.Session> {
   const stripe = getStripe(env);
   return stripe.checkout.sessions.retrieve(sessionId);
+}
+
+/**
+ * Ensure a persistent Stripe Product exists for a course and return its id.
+ * If `existingProductId` still resolves to a live product we reuse it (updating
+ * its name/metadata); otherwise we create a fresh one. Prices are NOT created —
+ * amounts stay DB-driven and are sent inline at checkout.
+ */
+export async function ensureStripeProduct(
+  env: CloudflareEnv,
+  course: { id: string; title: string; slug: string; existingProductId?: string | null },
+): Promise<{ productId: string; created: boolean }> {
+  const stripe = getStripe(env);
+  const metadata = { courseId: course.id, slug: course.slug };
+  if (course.existingProductId) {
+    try {
+      const p = await stripe.products.retrieve(course.existingProductId);
+      if (p && !p.deleted) {
+        await stripe.products.update(course.existingProductId, {
+          name: course.title,
+          active: true,
+          metadata,
+        });
+        return { productId: course.existingProductId, created: false };
+      }
+    } catch {
+      /* missing/invalid — fall through and create a new one */
+    }
+  }
+  const created = await stripe.products.create({ name: course.title, metadata });
+  return { productId: created.id, created: true };
 }
 
 /** Verify + parse a webhook event (async SubtleCrypto path for Workers). */

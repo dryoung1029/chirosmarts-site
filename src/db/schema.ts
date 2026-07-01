@@ -267,6 +267,11 @@ export const courses = sqliteTable("courses", {
   // read this). Default 0 so a row without an explicit price is obviously unset.
   priceCents: integer("price_cents").notNull().default(0),
   stripePriceId: text("stripe_price_id"),
+  // Persistent Stripe Product id for this course. Prices stay DB-driven (sent
+  // inline at checkout), but binding the line item to a real Product lets
+  // coupons be restricted to a specific course. Populated by the admin
+  // "Sync courses to Stripe" action (src/lib/stripe-sync.ts).
+  stripeProductId: text("stripe_product_id"),
   status: text("status", { enum: ["draft", "published", "archived"] })
     .notNull()
     .default("draft"),
