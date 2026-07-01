@@ -89,4 +89,7 @@ Magic-link login + all lifecycle emails go via Resend. If the domain isn't verif
 7. **SEO:** open `https://chirosmarts.com/robots.txt` and `/sitemap.xml` — both now build from
    `SITE_URL`, so every URL should read `chirosmarts.com` (no `pages.dev`). Then in **Google Search
    Console**, add the `chirosmarts.com` property and **submit the sitemap** (`/sitemap.xml`).
-   Consider a 301 from the old site/URLs to preserve any existing search equity.
+8. **Legacy 301s — already built in.** The old WordPress URLs (from its Yoast sitemap) 301 to the new
+   equivalents via `src/lib/legacy-redirects.ts` (handled in middleware). Spot-check a couple once live,
+   e.g. `…/course/ca-initial-certification-or-renewal-8-hour-ceus-with-certificate/` → `/courses/oregon-ca-initial`,
+   and `…/my-account/` → `/dashboard`. If Search Console later surfaces other old URLs, add them to that map.

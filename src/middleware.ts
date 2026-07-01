@@ -16,6 +16,7 @@ import {
   clearImpersonation,
 } from "@/lib/auth/impersonation";
 import { isAdmin } from "@/lib/admin";
+import { legacyRedirect } from "@/lib/legacy-redirects";
 
 // Routes reachable without a session.
 const PUBLIC_PATHS = new Set<string>([
@@ -68,6 +69,12 @@ function isPublic(pathname: string): boolean {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { locals, cookies, url, redirect } = context;
+
+  // Legacy 301s from the old WordPress site — resolve before any session/DB work
+  // so old inbound links and search results land on the right new page.
+  const legacy = legacyRedirect(url.pathname);
+  if (legacy) return redirect(legacy, 301);
+
   locals.user = null;
   locals.sessionId = null;
   locals.realUser = null;
