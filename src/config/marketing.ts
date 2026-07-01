@@ -11,9 +11,9 @@ export function ownerCopy(desc: string): string {
 
 export const OWNER = {
   hero: {
-    headline: "Become a certified Oregon CA — without the guesswork.",
+    headline: "The fastest, easiest way to become a certified Oregon CA.",
     subhead:
-      "The state-required training, your hands-on log, exam prep, and a verifiable certificate — every step in one place, with your renewal tracked automatically every year after. Built by an Oregon chiropractor who's been training CAs for over a decade. Module 1 is free — start tonight.",
+      "Everything Oregon requires — 8 hours of training, your hands-on log, exam prep, and a verifiable certificate — online and in one place, with your renewal tracked automatically every year after. Most students finish in a couple of evenings. Module 1 is free — start tonight.",
     demoCaption:
       "A real student dashboard — from first login to certified, and every renewal after.",
   },
