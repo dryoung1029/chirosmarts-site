@@ -6,8 +6,11 @@ const sent = params.get("sent") === "1";
 const error = params.get("error");
 const next = params.get("next") ?? "";
 // Dev convenience: when no Resend key is configured, request-link passes the
-// magic-link URL back so you can click it without checking email.
-const devLink = params.get("dev");
+// magic-link URL back so you can click it without checking email. Gate on the
+// server-side env so this NEVER renders in production (even via a crafted
+// ?dev= URL) once email is configured — closes a reflected-link phishing vector.
+const emailConfigured = !!Astro.locals.runtime?.env?.RESEND_API_KEY;
+const devLink = emailConfigured ? null : params.get("dev");
 ---
 
 <Layout title="Sign in">
