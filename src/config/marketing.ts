@@ -17,10 +17,15 @@ export const OWNER = {
     demoCaption:
       "A real student dashboard — from first login to certified, and every renewal after.",
   },
-  // Owner-supplied stats included [VERIFY] numbers (CA count, year). Per the
-  // owner's own note ("only real numbers can ship"), stats stay EMPTY until the
-  // confirmed figures are provided — the bar renders nothing rather than a flag.
-  stats: [] as { value: string; label: string }[],
+  // Social-proof stats — every figure is REAL, drawn from the imported 11-year
+  // Gravity Forms history (666 unique buyers / 691 paid certifications; a warm
+  // list of ~1,800 prior buyers + free-CEU signups; online CA training offered
+  // since 2015, owner-confirmed). Rounded DOWN so each claim is defensible.
+  stats: [
+    { value: "660+", label: "Oregon CAs trained" },
+    { value: "Since 2015", label: "Certifying Oregon chiropractic assistants" },
+    { value: "1,800+", label: "Chiropractic professionals reached" },
+  ] as { value: string; label: string }[],
   instructor: {
     name: "Jason Young, DC",
     credentials:
