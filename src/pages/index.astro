@@ -11,12 +11,20 @@ import { eq, asc } from "drizzle-orm";
 import { OWNER, ownerCopy } from "@/config/marketing";
 
 const db = getDb(Astro.locals.runtime.env);
-const courses = await db
+// The Oregon CA initial certification is the flagship — it always leads the
+// catalog teaser and gets a highlighted card, ahead of the cheaper CE add-ons.
+const FLAGSHIP_SLUG = "oregon-ca-initial";
+const publishedCourses = await db
   .select()
   .from(schema.courses)
   .where(eq(schema.courses.status, "published"))
   .orderBy(asc(schema.courses.priceCents))
   .all();
+const courses = [...publishedCourses].sort((a, b) => {
+  if (a.slug === FLAGSHIP_SLUG) return -1;
+  if (b.slug === FLAGSHIP_SLUG) return 1;
+  return a.priceCents - b.priceCents;
+});
 const usd = (c: number) => `$${(c / 100).toFixed(0)}`;
 
 const heroHeadline = OWNER.hero.headline ?? ownerCopy("hero headline");
@@ -127,13 +135,19 @@ const steps = [
     <div class="mk-container">
       <h2>Courses</h2>
       <div class="mk-grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
-        {courses.map((c) => (
-          <a class="mk-card" href={`/courses/${c.slug}`} style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.4rem">
-            <strong style="color:var(--text)">{c.title}</strong>
-            <span style="color:var(--muted);font-size:0.9rem">{c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} · {usd(c.priceCents)}</span>
-            <span style="color:var(--accent);font-size:0.9rem">View course →</span>
+        {courses.map((c) => {
+          const featured = c.slug === FLAGSHIP_SLUG;
+          return (
+          <a class={`mk-card${featured ? " course-featured" : ""}`} href={`/courses/${c.slug}`} style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:0.4rem">
+            {featured && (
+              <span style="align-self:flex-start;font-size:0.75rem;font-weight:700;letter-spacing:0.02em;padding:0.1rem 0.5rem;border-radius:6px;background:var(--accent);color:var(--accent-text)">★ Start here — required to certify</span>
+            )}
+            <strong style={`color:var(--text);${featured ? "font-size:1.3rem" : ""}`}>{c.title}</strong>
+            <span style={`font-size:0.9rem;${featured ? "color:var(--text);font-weight:600" : "color:var(--muted)"}`}>{c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} · {usd(c.priceCents)}{featured && <span class="muted" style="font-weight:400"> · Module 1 free</span>}</span>
+            <span style="color:var(--accent);font-size:0.9rem;font-weight:600">{featured ? "Start free — Module 1 is on us →" : "View course →"}</span>
           </a>
-        ))}
+        );
+        })}
       </div>
     </div>
   </section>
@@ -171,6 +185,14 @@ const steps = [
   <style>
     .hero-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
     .hero-trust { margin: 0.9rem 0 0; color: var(--muted); font-size: 0.9rem; }
+    /* Flagship course card leads the catalog teaser full-width with an accent
+       border + brand-tinted gradient so it doesn't blend with the CE add-ons. */
+    .course-featured {
+      grid-column: 1 / -1;
+      border: 2px solid var(--brand);
+      background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+      box-shadow: var(--shadow);
+    }
     .how-head { display: flex; gap: 2rem; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
     .how-head .how-illo { flex: 0 0 auto; }
     @media (max-width: 880px) {
