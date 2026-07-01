@@ -7,12 +7,21 @@ const env = Astro.locals.runtime.env;
 const db = getDb(env);
 const user = Astro.locals.user;
 
-const courses = await db
+// The Oregon CA initial certification is the flagship — it's why most people
+// come — so it ALWAYS leads the catalog and gets a featured treatment, ahead of
+// the cheaper CE add-ons. Everything else stays ordered by price ascending.
+const FLAGSHIP_SLUG = "oregon-ca-initial";
+const unsorted = await db
   .select()
   .from(schema.courses)
   .where(eq(schema.courses.status, "published"))
   .orderBy(asc(schema.courses.priceCents))
   .all();
+const courses = [...unsorted].sort((a, b) => {
+  if (a.slug === FLAGSHIP_SLUG) return -1;
+  if (b.slug === FLAGSHIP_SLUG) return 1;
+  return a.priceCents - b.priceCents;
+});
 
 // Which of these the signed-in user already has.
 const enrolled = new Set<string>();
@@ -44,19 +53,29 @@ const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:1.25rem">
     {
-      courses.map((c) => (
-        <div class="panel" style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
-          <span style="align-self:flex-start;font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;background:var(--brand-tint);color:var(--muted)">
-            {topicLabel[c.topicCategory] ?? c.topicCategory}
+      courses.map((c) => {
+        const featured = c.slug === FLAGSHIP_SLUG;
+        return (
+        <div class={`panel course-card${featured ? " course-featured" : ""}`} style="margin:0;display:flex;flex-direction:column;gap:0.5rem">
+          <span
+            class="course-tag"
+            style={`align-self:flex-start;font-size:0.75rem;padding:0.1rem 0.5rem;border-radius:6px;${
+              featured
+                ? "background:var(--brand);color:var(--accent-text);font-weight:700;letter-spacing:0.02em"
+                : "background:var(--brand-tint);color:var(--muted)"
+            }`}
+          >
+            {featured ? "★ Start here — required to certify" : topicLabel[c.topicCategory] ?? c.topicCategory}
           </span>
-          <a href={`/courses/${c.slug}`} style="font-weight:600;color:var(--text);text-decoration:none;font-size:1.05rem">
+          <a href={`/courses/${c.slug}`} class="course-title" style={`font-weight:700;color:var(--text);text-decoration:none;font-size:${featured ? "1.35rem" : "1.05rem"}`}>
             {c.title}
           </a>
           {c.description && (
-            <p class="muted" style="margin:0;font-size:0.9rem;flex:1">{c.description}</p>
+            <p class="muted" style={`margin:0;font-size:${featured ? "0.98rem" : "0.9rem"};flex:1`}>{c.description}</p>
           )}
-          <div class="muted" style="font-size:0.85rem">
+          <div style={`font-size:${featured ? "0.95rem" : "0.85rem"};${featured ? "color:var(--text);font-weight:600" : "color:var(--muted)"}`}>
             {c.creditHours} credit hour{c.creditHours === 1 ? "" : "s"} · {usd(c.priceCents)}
+            {featured && <span class="muted" style="font-weight:400"> · Module 1 free</span>}
           </div>
           {
             enrolled.has(c.id) ? (
@@ -64,16 +83,17 @@ const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
             ) : user ? (
               <form method="POST" action="/api/checkout/course" style="margin:0">
                 <input type="hidden" name="courseId" value={c.id} />
-                <button type="submit" style="margin:0;width:100%">Enroll — {usd(c.priceCents)}</button>
+                <button type="submit" style="margin:0;width:100%">{featured ? "Start free — Module 1 is on us" : `Enroll — ${usd(c.priceCents)}`}</button>
               </form>
             ) : (
-              <a class="btn" href={`/login?next=${encodeURIComponent(`/courses/${c.slug}`)}`} style="margin:0">
-                Sign in to enroll
+              <a class={featured ? "btn-primary" : "btn"} href={`/login?next=${encodeURIComponent(`/courses/${c.slug}`)}`} style="margin:0;text-align:center">
+                {featured ? "Start free — Module 1 is on us" : "Sign in to enroll"}
               </a>
             )
           }
         </div>
-      ))
+      );
+      })
     }
     {courses.length === 0 && <div class="panel"><p style="margin:0">No courses are available yet.</p></div>}
   </div>
@@ -81,4 +101,17 @@ const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
   <p class="muted" style="font-size:0.82rem;margin-top:1rem">
     By purchasing you agree to the <a href="/terms">Terms of Service</a>.
   </p>
+
+  <style>
+    /* The flagship card spans the full grid width and leads visually — accent
+       border, brand-tinted gradient, and a lift — so it never blends into the
+       cheaper CE add-ons around it. */
+    .course-featured {
+      grid-column: 1 / -1;
+      border: 2px solid var(--brand);
+      background: linear-gradient(135deg, var(--brand-tint), var(--surface));
+      box-shadow: var(--shadow);
+    }
+    .course-featured .course-title:hover { text-decoration: underline; }
+  </style>
 </Layout>
