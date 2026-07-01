@@ -49,6 +49,31 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   const db = getDb(env);
 
+  try {
+    await handleEvent(env, db, event);
+  } catch (e) {
+    // Surface the real cause: log it AND return it in the body so it's visible
+    // on the Stripe dashboard's delivery attempt (and triggers a retry in case
+    // the failure was transient — fulfilment is idempotent).
+    const message = (e as Error)?.stack ?? (e as Error)?.message ?? String(e);
+    await logEvent(db, {
+      type: "stripe_webhook_error",
+      payload: { eventType: event.type, message: String(message).slice(0, 900) },
+    }).catch(() => {});
+    return new Response(`fulfilment error: ${message}`, { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+};
+
+async function handleEvent(
+  env: CloudflareEnv,
+  db: ReturnType<typeof getDb>,
+  event: Awaited<ReturnType<typeof constructWebhookEvent>>,
+): Promise<void> {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as {
       metadata?: Record<string, string> | null;
@@ -59,6 +84,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const meta = session.metadata ?? {};
 
     if (meta.kind === "course" && meta.userId && (meta.courseIds || meta.courseId)) {
+      // The buyer may no longer exist (e.g. a test account deleted after a test
+      // purchase). Activating would fail the enrollment's user FK and 500 the
+      // webhook forever, so skip gracefully and log for reconciliation instead.
+      const buyer = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.id, meta.userId))
+        .get();
+      if (!buyer) {
+        await logEvent(db, {
+          type: "stripe_webhook_orphan_user",
+          payload: { userId: meta.userId, checkoutSessionId: session.id ?? null },
+        }).catch(() => {});
+        return;
+      }
       // `courseIds` (CSV) is the bundle-ready form; `courseId` kept for any
       // older in-flight session. Activate each course in the session.
       const courseIds = (meta.courseIds ?? meta.courseId ?? "")
@@ -166,9 +206,4 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
   }
-
-  return new Response(JSON.stringify({ received: true }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-};
+}
