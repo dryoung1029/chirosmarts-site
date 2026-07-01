@@ -95,7 +95,7 @@ export async function runDailyFlows(
 
   // ---- Renewal reminders (≤60 days before birth-month renewal) ----
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const renewalUrl = `${site}/courses/annual-renewal-bundle?utm_source=email&utm_campaign=renewal`;
+  const renewalUrl = `${site}/renewal?utm_source=email&utm_campaign=renewal`;
 
   type Cand = { email: string; name: string | null; birthMonth: number; userId: string | null };
   const cands = new Map<string, Cand>();

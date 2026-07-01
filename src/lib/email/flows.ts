@@ -76,15 +76,15 @@ export async function sendRenewalReminderEmail(
     text:
       `${hi}\n\nYour Oregon CA renewal deadline is ${args.deadlineLabel}. You need 6 CE hours ` +
       `to renew — including vitals and cultural competency.\n\n` +
-      `Knock it out in one sitting with the ChiroSmarts Renewal Pack:\n${args.renewalUrl}\n\n` +
+      `We offer the CE you need — here's what renewal requires and your options:\n${args.renewalUrl}\n\n` +
       `— The ChiroSmarts team\n\n` +
       emailFooterText(site, "you're a certified Oregon CA on our reminder list"),
     html: wrap(
       site,
       `<h2 style="color:#0B6B63">Renewal time is near</h2><p>${hi}</p>` +
         `<p>Your Oregon CA renewal deadline is <strong>${args.deadlineLabel}</strong>. You need <strong>6 CE hours</strong> to renew — including vitals and cultural competency.</p>` +
-        `<p>Knock it all out in one sitting with the ChiroSmarts <strong>Renewal Pack</strong>:</p>` +
-        btn(args.renewalUrl, "Get the Renewal Pack →") +
+        `<p>We offer the continuing education you need. Here's exactly what renewal requires and your options:</p>` +
+        btn(args.renewalUrl, "See your renewal CE →") +
         `<p style="color:#51646A;font-size:0.9rem">Already renewed? You can ignore this — we'll catch you next year.</p>`,
       "you're a certified Oregon CA on our reminder list",
     ),

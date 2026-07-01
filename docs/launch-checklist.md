@@ -40,22 +40,19 @@ Magic-link login + all lifecycle emails go via Resend. If the domain isn't verif
 
 ## B. Content / legal (in the repo — I can do these fast)
 
-### B1 ⛔ Legal effective date + venue
-- `src/config/legal.ts`, `src/content/legal/terms.md`, `privacy.md` all read `[EFFECTIVE DATE]`,
-  and terms has `[CONFIRM VENUE]`. Set the effective date (= launch date) and confirm venue
-  (currently drafted as Benton County, OR). Bump `termsVersion`/`privacyVersion` off `-draft`.
-- **Need from you:** the effective date and a "yes, Benton County" (or the correct county).
+### B1 ✅ Legal effective date + venue — DONE
+- Effective date **July 1, 2026**, versions **2026-07-01**, venue **Benton County, OR**;
+  all `[EFFECTIVE DATE]`/`[CONFIRM VENUE]` placeholders removed.
 
-### B2 ⚠️ Renewal bundle — publish or hold the renewal CTAs?
-- The renewal reminder email + the birth-month-capture success page link to
-  `/courses/annual-renewal-bundle` ($89) — but that course is **draft** (not sellable yet).
-- **Decision:** publish it for launch (its content — vitals + cultural competency — must be ready),
-  OR I soften the renewal-pack CTAs so they don't dead-link until it's live. (The campaign captures
-  birth months now; actual renewal *selling* happens over the coming weeks, so holding is fine.)
+### B2 ✅ Renewal CTAs softened — DONE
+- The renewal reminder email + birth-month success page no longer push the draft $89 Renewal Pack.
+  They now say CE is available for renewal and link to `/renewal`. Re-add the purchase CTA when the
+  bundle is published.
 
-### B3 Instructor photo
-- `public/instructor/jason-young.jpg` is referenced but the folder is **empty** → the homepage
-  instructor block will render without a photo. Drop the file in, or I'll confirm it degrades cleanly.
+### B3 ⚠️ Instructor photo (nulled to avoid a broken image)
+- The photo file was missing, so I set `marketing.ts` `instructor.photo` to `null` (clean fallback).
+- **To show your headshot (recommended):** add `public/instructor/jason-young.jpg` and change
+  `photo` back to `"/instructor/jason-young.jpg"`.
 
 ### B4 ✅ Marketing stats / testimonials — intentionally empty
 - Per your "only real numbers ship" rule, stats stay blank and testimonials populate from the

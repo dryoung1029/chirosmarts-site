@@ -1,7 +1,7 @@
 ---
 title: Terms of Service
-lastUpdated: "[EFFECTIVE DATE]"
-version: "2026-06-draft"
+lastUpdated: "July 1, 2026"
+version: "2026-07-01"
 ---
 
 <!--
@@ -16,10 +16,10 @@ version: "2026-06-draft"
     (3) governing law Oregon / venue Benton County.
   Placeholders (set the matching constants in src/config/legal.ts, and replace the
   bracketed text below when finalized):
-    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, [EFFECTIVE DATE].
+    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, July 1, 2026.
 -->
 
-**Effective date: [EFFECTIVE DATE]**
+**Effective date: July 1, 2026**
 
 These Terms of Service ("Terms") govern your use of ChiroSmarts.com (the "Service"), operated by Talisman Health Enterprise Management, LLC ("ChiroSmarts," "we," "us"). By creating an account or purchasing a course, you agree to these Terms.
 
@@ -79,6 +79,6 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW, OUR TOTAL LIABILITY ARISING FROM OR RELA
 
 ## 11. General
 
-These Terms are governed by the laws of the State of Oregon, without regard to conflict-of-law rules; venue for disputes lies in the state or federal courts located in Benton County, Oregon [CONFIRM VENUE]. We may update these Terms; material changes will be posted with a new effective date, and continued use after the effective date constitutes acceptance. If any provision is unenforceable, the remainder stays in effect. These Terms, together with the Privacy Policy, are the entire agreement between you and ChiroSmarts regarding the Service.
+These Terms are governed by the laws of the State of Oregon, without regard to conflict-of-law rules; venue for disputes lies in the state or federal courts located in Benton County, Oregon. We may update these Terms; material changes will be posted with a new effective date, and continued use after the effective date constitutes acceptance. If any provision is unenforceable, the remainder stays in effect. These Terms, together with the Privacy Policy, are the entire agreement between you and ChiroSmarts regarding the Service.
 
 **Contact:** Talisman Health Enterprise Management, LLC, 867 NW 23rd St, Corvallis, OR 97330, contact@chirosmarts.com
