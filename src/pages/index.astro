@@ -173,7 +173,13 @@ const steps = [
     .how-head .how-illo { flex: 0 0 auto; }
     @media (max-width: 880px) {
       .hero-wrap { grid-template-columns: 1fr; }
-      .hero-demo-col { order: -1; }
+      /* Lead with the message on mobile — headline, value prop, and CTA come
+         first, then the dashboard demo as supporting proof below. (Previously
+         the demo was force-ordered above the copy, so phone visitors landed on
+         a context-free mockup at the widest part of the funnel.) */
+      .hero-copy { text-align: center; }
+      .hero-copy > div { justify-content: center; }
+      .hero-demo-col { margin-top: 0.5rem; }
     }
     @media (max-width: 720px) {
       .how-head { flex-direction: column; align-items: flex-start; }
