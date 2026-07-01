@@ -14,7 +14,7 @@ pages_build_output_dir = "./dist"
 # (used for magic-link emails, Stripe redirects, certificate verification links).
 # This is the PRODUCTION value; local `astro dev` overrides it via `.dev.vars`.
 [vars]
-SITE_URL = "https://chirosmarts-site.pages.dev"
+SITE_URL = "https://chirosmarts.com"
 # Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
 ADMIN_EMAILS = "contact@chirosmarts.com"
 # Transactional "From" for ALL Resend mail (magic links, receipts, certs).
