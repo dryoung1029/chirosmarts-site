@@ -128,10 +128,50 @@ export async function deleteUser(env: CloudflareEnv, userId: string): Promise<bo
     .get();
   if (!user) return false;
 
-  // Progress + compliance data + their R2 objects.
+  // Collect ids of everything that references the user (or their clinics), so we
+  // can delete children before parents (D1 enforces foreign keys).
+  const myEnrollments = await db
+    .select({ id: schema.enrollments.id })
+    .from(schema.enrollments)
+    .where(eq(schema.enrollments.userId, userId))
+    .all();
+  const myMembers = await db
+    .select({ id: schema.clinicMembers.id })
+    .from(schema.clinicMembers)
+    .where(eq(schema.clinicMembers.userId, userId))
+    .all();
+  const ownedClinics = await db
+    .select({ id: schema.clinics.id })
+    .from(schema.clinics)
+    .where(eq(schema.clinics.ownerUserId, userId))
+    .all();
+  const clinicIds = ownedClinics.map((c) => c.id);
+  const ownedMembers = clinicIds.length
+    ? await db
+        .select({ id: schema.clinicMembers.id })
+        .from(schema.clinicMembers)
+        .where(inArray(schema.clinicMembers.clinicId, clinicIds))
+        .all()
+    : [];
+  const memberIds = [...new Set([...myMembers, ...ownedMembers].map((m) => m.id))];
+  const enrollmentIds = myEnrollments.map((e) => e.id);
+
+  // 1. seat_assignments reference members / enrollments / clinics — drop first.
+  if (memberIds.length)
+    await db.delete(schema.seatAssignments).where(inArray(schema.seatAssignments.memberId, memberIds));
+  if (enrollmentIds.length)
+    await db.delete(schema.seatAssignments).where(inArray(schema.seatAssignments.enrollmentId, enrollmentIds));
+  if (clinicIds.length)
+    await db.delete(schema.seatAssignments).where(inArray(schema.seatAssignments.clinicId, clinicIds));
+
+  // 2. Detach sales (keep the revenue ledger; buyer name is snapshotted on the row).
+  await db.update(schema.sales).set({ userId: null }).where(eq(schema.sales.userId, userId));
+
+  // 3. Progress + compliance data + their R2 objects (events, quiz attempts,
+  //    certificates, documents, leases, enrollments).
   await resetUserProgress(env, userId);
 
-  // Roadmap (user_steps → user_paths).
+  // 4. Roadmap (user_steps → user_paths).
   const paths = await db
     .select({ id: schema.userPaths.id })
     .from(schema.userPaths)
@@ -143,17 +183,12 @@ export async function deleteUser(env: CloudflareEnv, userId: string): Promise<bo
   }
   await db.delete(schema.userPaths).where(eq(schema.userPaths.userId, userId));
 
-  // Their CA membership rows.
+  // 5. Their CA membership rows.
   await db.delete(schema.clinicMembers).where(eq(schema.clinicMembers.userId, userId));
 
-  // Clinics they OWN → drop all members of those clinics, then the clinics.
-  const owned = await db
-    .select({ id: schema.clinics.id })
-    .from(schema.clinics)
-    .where(eq(schema.clinics.ownerUserId, userId))
-    .all();
-  const clinicIds = owned.map((c) => c.id);
+  // 6. Clinics they OWN → seat pools + members, then the clinics.
   if (clinicIds.length) {
+    await db.delete(schema.clinicSeatPools).where(inArray(schema.clinicSeatPools.clinicId, clinicIds));
     await db.delete(schema.clinicMembers).where(inArray(schema.clinicMembers.clinicId, clinicIds));
     await db.delete(schema.clinics).where(inArray(schema.clinics.id, clinicIds));
   }
