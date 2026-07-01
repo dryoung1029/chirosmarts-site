@@ -11,9 +11,12 @@ const lead = await confirmLead(db, token);
 const isChecklist = lead?.source === "checklist_pdf";
 const isNewsletter = lead?.source === "newsletter";
 
-// Newsletter subscribers land in Brevo immediately on confirm (real-time list
-// loading); other sources sync via the admin batch. Best-effort, never blocks.
-if (lead && isNewsletter) {
+// Newsletter subscribers AND free-checklist downloaders land in Brevo
+// immediately on confirm (real-time list loading — both go to the newsletter
+// list, tagged by SOURCE); other sources sync via the admin batch. The form
+// discloses ongoing email + unsubscribe, so this matches what they agreed to.
+// Best-effort — never blocks the confirmation / download.
+if (lead && (isNewsletter || isChecklist)) {
   try {
     await syncLeadToBrevo(env, db, {
       id: lead.id,

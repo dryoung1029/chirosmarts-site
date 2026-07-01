@@ -13,9 +13,13 @@ export function isBrevoConfigured(env: CloudflareEnv): boolean {
   return !!env.BREVO_API_KEY;
 }
 
-/** Brevo list id for a lead source — newsletter has its own list, else LEADS. */
+/**
+ * Brevo list id for a lead source. Newsletter signups and free-checklist
+ * downloaders both land on the main newsletter list (they're distinguishable
+ * later by their SOURCE contact attribute); other sources use LEADS.
+ */
 function listIdForSource(env: CloudflareEnv, source: string): number {
-  if (source === "newsletter")
+  if (source === "newsletter" || source === "checklist_pdf")
     return Number(env.BREVO_LIST_ID_NEWSLETTER) || Number(env.BREVO_LIST_ID_LEADS) || 0;
   return Number(env.BREVO_LIST_ID_LEADS) || 0;
 }
