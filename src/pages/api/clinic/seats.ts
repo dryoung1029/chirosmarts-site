@@ -28,7 +28,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const count = Number(form.get("count") ?? 0);
   if (!Number.isInteger(count) || count < 1 || count > 100) {
     return redirect(
-      `/dashboard?error=${encodeURIComponent("Enter a seat count between 1 and 100.")}`,
+      `/clinic?error=${encodeURIComponent("Enter a seat count between 1 and 100.")}`,
       303,
     );
   }
@@ -46,7 +46,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     .get();
   if (!course || course.status !== "published") {
     return redirect(
-      `/dashboard?error=${encodeURIComponent("Choose a course to buy seats for.")}`,
+      `/clinic?error=${encodeURIComponent("Choose a course to buy seats for.")}`,
       303,
     );
   }
@@ -60,7 +60,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       courseId: course.id,
       payload: { clinicId: clinic.id, count, method: "comp_test_mode" },
     });
-    return redirect(`/dashboard?seats=${count}`, 303);
+    return redirect(`/clinic?seats=${count}`, 303);
   }
 
   // Stripe Checkout for `count` seats of this course; the webhook grants them.
@@ -81,8 +81,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       courseId: course.id,
       count: String(count),
     },
-    successUrl: `${site}/dashboard?seats=${count}`,
-    cancelUrl: `${site}/dashboard?error=${encodeURIComponent("Seat purchase canceled.")}`,
+    successUrl: `${site}/clinic?seats=${count}`,
+    cancelUrl: `${site}/clinic?error=${encodeURIComponent("Seat purchase canceled.")}`,
   });
   return redirect(url, 303);
 };
