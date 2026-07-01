@@ -55,6 +55,21 @@ function emailBody(source: LeadSource, confirmUrl: string, site: string) {
   return { subject, text, html };
 }
 
+/** Delivery email re-sent when an ALREADY-confirmed checklist lead asks again —
+ *  gives them a fresh, reusable download link (the asset route is gated by the
+ *  lead's confirmed status, so this link keeps working). */
+function checklistResendBody(assetUrl: string, site: string) {
+  const subject = "Your Oregon CA certification checklist (download link)";
+  const text =
+    `Here's your Oregon CA certification checklist — download it any time:\n${assetUrl}\n\n` +
+    `Ready to start? Module 1 of the training is free: ${site}/courses`;
+  const html =
+    `<p>Here's your Oregon CA certification checklist — download it any time:</p>` +
+    `<p><a href="${assetUrl}">Download the checklist (PDF)</a></p>` +
+    `<p style="color:#666;font-size:13px">Ready to start? <a href="${site}/courses">Module 1 of the training is free</a>.</p>`;
+  return { subject, text, html };
+}
+
 export interface CaptureInput {
   email: string;
   source: LeadSource;
@@ -90,6 +105,20 @@ export async function captureLead(
     .get();
 
   if (existing && existing.status === "confirmed") {
+    // For the checklist, "already confirmed" must NOT be a dead end — the
+    // original confirm link is single-use, so re-send a reusable download link
+    // so they can get their PDF again.
+    if (source === "checklist_pdf") {
+      const site = getSiteUrl(env).replace(/\/$/, "");
+      const assetUrl = `${site}/api/leads/asset?lid=${existing.id}`;
+      const { subject, text, html } = checklistResendBody(assetUrl, site);
+      await sendEmail(env, { to: email, subject, html, text });
+      return {
+        ok: true,
+        alreadyConfirmed: true,
+        message: "You're already confirmed — we just emailed your checklist download link again. Check your inbox.",
+      };
+    }
     return {
       ok: true,
       alreadyConfirmed: true,
