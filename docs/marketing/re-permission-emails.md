@@ -52,6 +52,46 @@ protecting sender reputation. Send from **Brevo** (marketing), not Resend.
 
 ---
 
+## EMAIL 1B — Relaunch-framed variant (use the new platform as the reason for contact)
+
+Same audience and same single CTA as Email 1, but it leads with the rebuild as the
+news hook — best for the contacts who've been quiet longest (it answers "why am I
+hearing from ChiroSmarts now?"). A/B this against Email 1, or use it for the
+oldest cohort and Email 1 for recent buyers.
+
+**Subject A (recommended):** `{{ contact.FIRSTNAME }}, ChiroSmarts just got a big upgrade`
+**Subject B (A/B alt):** `We rebuilt ChiroSmarts — starting with your renewal`
+
+**Preheader:** `New platform, same mission — plus a 10-second way to never miss your CA renewal.`
+
+**Body:**
+
+> Hi {{ contact.FIRSTNAME }},
+>
+> It's Dr. Jason Young. It's been a while — partly because we've spent it rebuilding ChiroSmarts from the ground up for Oregon chiropractic assistants like you.
+>
+> A few things that are new and actually make your life easier:
+>
+> - **Renewal reminders**, so your birth-month deadline never sneaks up on you
+> - A **faster online course** with automatic, audit-ready hour tracking
+> - **Instant, verifiable certificates** — no waiting around
+> - **More CE courses**, so you can cover your annual hours in one place
+>
+> Let's start with the reminders — that's the one that saves you the most stress. **Tell me your birth month and I'll give you a heads-up before every Oregon CA renewal**, plus the fastest way to get your 6 CE hours.
+>
+> **[ Set my renewal reminders → ]**  ← button links to `{{ contact.RENEWAL_URL }}`
+>
+> Ten seconds, and it's handled. I only email a few times a year, and you can unsubscribe anytime.
+>
+> Welcome to the new ChiroSmarts.
+>
+> — Dr. Jason Young, DC
+> ChiroSmarts
+>
+> P.S. Curious what else changed? [Set your reminder]({{ contact.RENEWAL_URL }}) first — then have a look around next time you log in.
+
+---
+
 ## EMAIL 2 — Reminder to non-openers (send ~4 days later, ONLY to people who didn't open #1)
 
 **Subject A:** `Still worth 10 seconds, {{ contact.FIRSTNAME }}`
