@@ -9,9 +9,10 @@
  * the signature, not a session.
  */
 import type { APIRoute } from "astro";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
+import { notifyAdmins } from "@/lib/email/admin-notify";
 import { constructWebhookEvent } from "@/lib/stripe";
 import {
   activateEnrollment,
@@ -88,7 +89,7 @@ async function handleEvent(
       // purchase). Activating would fail the enrollment's user FK and 500 the
       // webhook forever, so skip gracefully and log for reconciliation instead.
       const buyer = await db
-        .select({ id: schema.users.id })
+        .select({ id: schema.users.id, email: schema.users.email })
         .from(schema.users)
         .where(eq(schema.users.id, meta.userId))
         .get();
@@ -136,6 +137,26 @@ async function handleEvent(
           payload: { where: "course", message: String((e as Error)?.message ?? e) },
         }).catch(() => {});
       }
+      // Operational alert: we made a sale. Best-effort.
+      const dollars =
+        session.amount_total != null ? `$${(session.amount_total / 100).toFixed(2)}` : "—";
+      const titles = courseIds.length
+        ? (
+            await db
+              .select({ title: schema.courses.title })
+              .from(schema.courses)
+              .where(inArray(schema.courses.id, courseIds))
+              .all()
+          ).map((t) => t.title)
+        : [];
+      await notifyAdmins(env, {
+        subject: `New purchase — ${dollars}`,
+        lines: [
+          `<strong>${buyer.email}</strong> purchased ${titles.join(", ") || "a course"}.`,
+          `Amount paid: ${dollars}`,
+        ],
+        ctaPath: "/admin/revenue",
+      });
     } else if (
       meta.kind === "seats" &&
       meta.clinicId &&
@@ -173,6 +194,17 @@ async function handleEvent(
             payload: { where: "seats", message: String((e as Error)?.message ?? e) },
           }).catch(() => {});
         }
+        // Operational alert: a clinic bought seats. Best-effort.
+        const dollars =
+          session.amount_total != null ? `$${(session.amount_total / 100).toFixed(2)}` : "—";
+        await notifyAdmins(env, {
+          subject: `New clinic seat purchase — ${count} seat(s)`,
+          lines: [
+            `Clinic <strong>${clinic.name}</strong> purchased <strong>${count}</strong> training seat(s).`,
+            `Amount paid: ${dollars}`,
+          ],
+          ctaPath: "/admin/revenue",
+        });
       }
     }
   } else if (event.type === "charge.refunded") {

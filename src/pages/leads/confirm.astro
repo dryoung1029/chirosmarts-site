@@ -3,6 +3,7 @@ import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb } from "@/db/client";
 import { confirmLead } from "@/lib/leads";
 import { syncLeadToBrevo } from "@/lib/brevo";
+import { notifyAdmins } from "@/lib/email/admin-notify";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
@@ -27,6 +28,18 @@ if (lead && (isNewsletter || isChecklist)) {
   } catch {
     /* admin batch sync will pick it up */
   }
+}
+
+// Operational alert: a mailing-list opt-in was confirmed. Best-effort.
+if (lead && (isNewsletter || isChecklist)) {
+  const kind = isChecklist ? "checklist download" : "newsletter";
+  await notifyAdmins(env, {
+    subject: `New mailing-list signup (${kind})`,
+    lines: [
+      `<strong>${lead.email}</strong> confirmed a ${kind} signup and joined the list.`,
+    ],
+    ctaPath: "/admin/contacts",
+  });
 }
 ---
 
