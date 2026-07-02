@@ -26,6 +26,21 @@ try {
 } catch (err) {
   loadError = err instanceof Error ? err.message : String(err);
 }
+
+// Background-audit progress. `run` redirects here with ?running=1&base=<the
+// latest timestamp at kickoff>. While the newest snapshot still equals that
+// baseline the audit is in flight → show a spinner and auto-refresh. When a
+// newer snapshot lands, we show "complete" and stop refreshing. `t` caps the
+// polling so a failed run doesn't refresh forever.
+const params = Astro.url.searchParams;
+const running = params.get("running") === "1";
+const base = params.get("base") ?? "";
+const pollTick = Number(params.get("t") ?? "0") || 0;
+const MAX_POLLS = 18; // ~4.5 min at 15s each
+const auditDone = running && (data.lastUpdated ?? "") !== base;
+const auditInProgress = running && !auditDone && pollTick < MAX_POLLS;
+const auditTimedOut = running && !auditDone && pollTick >= MAX_POLLS;
+const nextPollUrl = `/admin/aeo?running=1&base=${encodeURIComponent(base)}&t=${pollTick + 1}`;
 const agg = aggregate(data, {
   queries: jeldonConfig.aeo.querySet,
   highPriorityTags: jeldonConfig.aeo.highPriorityTags,
@@ -78,8 +93,8 @@ function classifyAction(a: { action: string; why: string }) {
 
   <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <h1 style="margin:0">Answer-engine presence (AEO)</h1>
-    <form method="POST" action="/api/admin/aeo/run" data-busy="Querying answer engines… (up to ~1 min)" style="margin-left:auto">
-      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem">✦ Run audit</button>
+    <form method="POST" action="/api/admin/aeo/run" data-busy="Starting audit…" style="margin-left:auto">
+      <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem" disabled={auditInProgress}>✦ Run audit</button>
     </form>
   </div>
   <p class="muted" style="margin-top:0.25rem;max-width:50rem">
@@ -88,8 +103,41 @@ function classifyAction(a: { action: string; why: string }) {
     you. Runs make paid API calls — run it on demand (e.g. weekly), not on every deploy.
   </p>
 
-  {msg && (
+  {auditInProgress && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none;display:flex;align-items:center;gap:0.6rem">
+      <span class="aeo-spinner" aria-hidden="true"></span>
+      <span>Audit in progress — querying the answer engines. This page refreshes automatically; results usually land within a minute or two.</span>
+    </p>
+  )}
+  {auditDone && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--success-tint);color:var(--success);border:none">
+      ✓ Audit complete — snapshot updated{data.lastUpdated ? ` (${new Date(data.lastUpdated).toLocaleString("en-US", { timeZone: "America/Los_Angeles" })})` : ""}.
+    </p>
+  )}
+  {auditTimedOut && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint);color:var(--warning-ink);border:none">
+      The audit is taking longer than expected. It may still finish — <a href="/admin/aeo">refresh</a> in a moment. If it never updates, check the engine API keys and try again.
+    </p>
+  )}
+  {msg && !running && (
     <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
+  )}
+
+  {auditInProgress && (
+    <>
+      <style is:inline>
+        .aeo-spinner {
+          width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
+          border: 2px solid var(--brand); border-top-color: transparent;
+          animation: aeo-spin 0.8s linear infinite;
+        }
+        @keyframes aeo-spin { to { transform: rotate(360deg); } }
+      </style>
+      <script is:inline define:vars={{ nextPollUrl }}>
+        // Poll for the finished snapshot without hammering the server.
+        setTimeout(() => { window.location.replace(nextPollUrl); }, 15000);
+      </script>
+    </>
   )}
 
   {loadError && (
