@@ -56,8 +56,15 @@ export const POST: APIRoute = async ({ locals, redirect }) => {
   const names = engines.map((e) => e.name).join(", ");
 
   // Production: fire-and-forget in the background so the browser doesn't wait
-  // (and hit a 524). The page shows the new snapshot once it lands.
+  // (and hit a 524). The page polls until a snapshot NEWER than this baseline
+  // appears, then shows "complete" — so pass the current latest timestamp.
   if (ctx?.waitUntil) {
+    let baseline = "";
+    try {
+      baseline = ((await new D1SnapshotStore(getDb(env), 1).read()) as { lastUpdated: string | null }).lastUpdated ?? "";
+    } catch {
+      /* no prior snapshot — baseline stays empty */
+    }
     ctx.waitUntil(
       runAndStore().catch(async (err) => {
         await logEvent(getDb(env), {
@@ -66,12 +73,7 @@ export const POST: APIRoute = async ({ locals, redirect }) => {
         }).catch(() => {});
       }),
     );
-    return redirect(
-      `${back}?msg=${encodeURIComponent(
-        `Audit started in the background (${jeldonConfig.aeo.querySet.length} queries × ${names}). Refresh this page in a minute or two to see the results.`,
-      )}`,
-      303,
-    );
+    return redirect(`${back}?running=1&base=${encodeURIComponent(baseline)}`, 303);
   }
 
   // Dev fallback: no execution context → run inline (no edge timeout locally).
