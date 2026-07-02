@@ -11,6 +11,7 @@ import { nowIso } from "@/lib/time";
 import { LEGAL } from "@/config/legal";
 import { syncUserToBrevo } from "@/lib/brevo";
 import { sendWelcomeEmail } from "@/lib/email/flows";
+import { notifyAdmins } from "@/lib/email/admin-notify";
 
 const intakeSchema = z
   .object({
@@ -82,12 +83,33 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       type: "clinic_created",
       payload: { clinicId: clinic.id, name: clinic.name },
     });
+    await notifyAdmins(env, {
+      subject: `New clinic: ${clinic.name}`,
+      lines: [
+        `<strong>${d.legalName}</strong> (${user.email}) created the clinic <strong>${clinic.name}</strong>.`,
+        "They can now buy training seats and invite their CAs.",
+      ],
+      ctaPath: "/admin/students",
+    });
   }
 
   await logEvent(db, {
     userId: user.id,
     type: "intake_completed",
     payload: { path: d.path, marketingConsent: consented },
+  });
+
+  // Operational alert: a real new person finished intake. Best-effort.
+  const pathLabel =
+    d.path === "clinic_owner" ? "Clinic owner" : d.path === "renewal" ? "Renewal" : "Initial certification";
+  await notifyAdmins(env, {
+    subject: `New student: ${d.legalName}`,
+    lines: [
+      `<strong>${d.legalName}</strong> just signed up (${user.email}).`,
+      `Path: ${pathLabel}${d.clinicName ? ` · Clinic: ${d.clinicName}` : ""}`,
+      consented ? "Opted in to marketing." : "Did not opt in to marketing.",
+    ],
+    ctaPath: "/admin/students",
   });
 
   // Real-time marketing-list opt-in: push opted-in users straight to Brevo so
