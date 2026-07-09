@@ -10,7 +10,12 @@ export const POST: APIRoute = async ({ locals, redirect }) => {
   await logEvent(db, {
     userId: locals.user!.id,
     type: "brevo_sync",
-    payload: { leadsSynced: result.leadsSynced, usersSynced: result.usersSynced, ok: result.ok },
+    payload: {
+      leadsSynced: result.leadsSynced,
+      usersSynced: result.usersSynced,
+      ok: result.ok,
+      contacts: result.details,
+    },
   });
   return redirect(`/admin?done=${encodeURIComponent(result.message)}`, 303);
 };

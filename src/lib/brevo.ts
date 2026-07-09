@@ -13,6 +13,11 @@ export function isBrevoConfigured(env: CloudflareEnv): boolean {
   return !!env.BREVO_API_KEY;
 }
 
+interface UpsertOutcome {
+  ok: boolean;
+  action: "created" | "updated" | "failed";
+}
+
 async function upsertContact(
   env: CloudflareEnv,
   contact: {
@@ -20,7 +25,7 @@ async function upsertContact(
     attributes: Record<string, unknown>;
     listIds: number[];
   },
-): Promise<boolean> {
+): Promise<UpsertOutcome> {
   const res = await fetch("https://api.brevo.com/v3/contacts", {
     method: "POST",
     headers: {
@@ -35,12 +40,22 @@ async function upsertContact(
       updateEnabled: true, // upsert
     }),
   });
-  // 201 created, 204 updated; treat 2xx as success.
+  // 201 created, 204 updated.
   if (!res.ok) {
     console.error(`[brevo] upsert ${contact.email} failed: ${res.status}`);
-    return false;
+    return { ok: false, action: "failed" };
   }
-  return true;
+  return { ok: true, action: res.status === 201 ? "created" : "updated" };
+}
+
+// One row per contact this run touched — the audit trail for "who did we just
+// push to Brevo," since the aggregate counts alone can't answer that question
+// (e.g. distinguish 4 new contacts from 4 already-existing ones re-upserted).
+export interface SyncContactDetail {
+  email: string;
+  kind: "lead" | "user";
+  ok: boolean;
+  action: "created" | "updated" | "failed";
 }
 
 export interface SyncResult {
@@ -48,11 +63,18 @@ export interface SyncResult {
   message: string;
   leadsSynced: number;
   usersSynced: number;
+  details: SyncContactDetail[];
 }
 
 export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResult> {
   if (!isBrevoConfigured(env)) {
-    return { ok: false, message: "Brevo is not configured (BREVO_API_KEY unset).", leadsSynced: 0, usersSynced: 0 };
+    return {
+      ok: false,
+      message: "Brevo is not configured (BREVO_API_KEY unset).",
+      leadsSynced: 0,
+      usersSynced: 0,
+      details: [],
+    };
   }
   const leadsList = Number(env.BREVO_LIST_ID_LEADS) || 0;
   const usersList = Number(env.BREVO_LIST_ID_USERS) || 0;
@@ -69,9 +91,11 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
     )
     .all();
 
+  const details: SyncContactDetail[] = [];
+
   let leadsSynced = 0;
   for (const lead of leads) {
-    const ok = await upsertContact(env, {
+    const outcome = await upsertContact(env, {
       email: lead.email,
       attributes: {
         SOURCE: lead.source,
@@ -80,7 +104,8 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
       },
       listIds: leadsList ? [leadsList] : [],
     });
-    if (ok) {
+    details.push({ email: lead.email, kind: "lead", ok: outcome.ok, action: outcome.action });
+    if (outcome.ok) {
       await db
         .update(schema.marketingLeads)
         .set({ syncedToBrevoAt: nowIso() })
@@ -98,7 +123,7 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
 
   let usersSynced = 0;
   for (const u of users) {
-    const ok = await upsertContact(env, {
+    const outcome = await upsertContact(env, {
       email: u.email,
       attributes: {
         ROLE: u.role,
@@ -107,7 +132,8 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
       },
       listIds: usersList ? [usersList] : [],
     });
-    if (ok) usersSynced++;
+    details.push({ email: u.email, kind: "user", ok: outcome.ok, action: outcome.action });
+    if (outcome.ok) usersSynced++;
   }
 
   return {
@@ -115,5 +141,6 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
     message: `Synced ${leadsSynced} lead(s) and ${usersSynced} opted-in user(s) to Brevo.`,
     leadsSynced,
     usersSynced,
+    details,
   };
 }

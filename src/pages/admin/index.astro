@@ -4,10 +4,23 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { sql, eq, desc } from "drizzle-orm";
 import { formatPacific } from "@/lib/time";
+import type { SyncContactDetail } from "@/lib/brevo";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
 const flash = Astro.url.searchParams.get("done");
+
+// Last Brevo sync detail — answers "who exactly did we just push?" from the
+// append-only events log, since the flash message above is only a count.
+const lastBrevoSync = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.type, "brevo_sync"))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(1)
+  .get();
+const lastBrevoSyncContacts =
+  (lastBrevoSync?.payload as { contacts?: SyncContactDetail[] } | null)?.contacts ?? [];
 
 // Email config snapshot for the diagnostics panel.
 const emailHasKey = !!env.RESEND_API_KEY;
@@ -129,6 +142,37 @@ const stats = [
     <form method="POST" action="/api/admin/brevo-sync" style="margin:0">
       <button type="submit">Sync to Brevo</button>
     </form>
+    {
+      lastBrevoSyncContacts.length > 0 && (
+        <details style="margin-top:0.8rem">
+          <summary style="cursor:pointer;font-size:0.9rem;color:var(--muted)">
+            Last sync — {lastBrevoSyncContacts.length} contact(s) touched, {formatPacific(lastBrevoSync!.occurredAt, { dateStyle: "medium", timeStyle: "short" })}
+          </summary>
+          <table style="width:100%;border-collapse:collapse;margin-top:0.5rem;font-size:0.85rem">
+            <thead>
+              <tr style="text-align:left">
+                <th style="padding:0.3rem 0.5rem">Email</th>
+                <th style="padding:0.3rem 0.5rem">Kind</th>
+                <th style="padding:0.3rem 0.5rem">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lastBrevoSyncContacts.map((c) => (
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:0.3rem 0.5rem">{c.email}</td>
+                  <td style="padding:0.3rem 0.5rem">{c.kind}</td>
+                  <td style="padding:0.3rem 0.5rem">
+                    {c.action === "created" && <span class="notice ok" style="padding:0.1rem 0.4rem">new</span>}
+                    {c.action === "updated" && <span class="muted">already in Brevo</span>}
+                    {c.action === "failed" && <span class="notice err" style="padding:0.1rem 0.4rem">failed</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )
+    }
   </div>
 
   <div class="panel">
