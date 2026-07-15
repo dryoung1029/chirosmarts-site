@@ -22,7 +22,7 @@ export async function createAndSendMagicLink(
   db: Db,
   env: CloudflareEnv,
   email: string,
-): Promise<{ url: string; delivered: boolean }> {
+): Promise<{ url: string; delivered: boolean; error?: string }> {
   const normalized = email.trim().toLowerCase();
 
   // intent is informational only (login vs signup) — flow is identical.
@@ -58,7 +58,7 @@ export async function createAndSendMagicLink(
     html: magicLinkHtml(url, emailFooterHtml(siteUrl, reason)),
   });
 
-  return { url, delivered: result.delivered };
+  return { url, delivered: result.delivered, error: result.error };
 }
 
 /**

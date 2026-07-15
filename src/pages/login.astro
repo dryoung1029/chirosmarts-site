@@ -4,6 +4,7 @@ import Layout from "@/layouts/Layout.astro";
 const params = Astro.url.searchParams;
 const sent = params.get("sent") === "1";
 const error = params.get("error");
+const sendError = params.get("senderror") === "1";
 const next = params.get("next") ?? "";
 // Dev convenience: when no Resend key is configured, request-link passes the
 // magic-link URL back so you can click it without checking email.
@@ -19,6 +20,14 @@ const devLink = params.get("dev");
     </p>
 
     {error && <div class="notice err">We couldn't sign you in: {error}. Please request a new link.</div>}
+    {
+      sendError && (
+        <div class="notice err">
+          We couldn't send that email just now. Please wait a minute and try
+          again — if it keeps happening, contact us so we can look into it.
+        </div>
+      )
+    }
 
     {
       sent ? (

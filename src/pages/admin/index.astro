@@ -28,6 +28,16 @@ const emailFrom = env.EMAIL_FROM || "onboarding@resend.dev (default sandbox)";
 const emailReplyTo = env.EMAIL_REPLY_TO || "(none)";
 const emailIsSandbox = /@resend\.dev/i.test(emailFrom) || !env.EMAIL_FROM;
 
+// Recent real (production) magic-link send failures — so "is Resend actually
+// failing right now?" is answerable without digging through Worker logs.
+const recentSendFailures = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.type, "magic_link_send_failed"))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(5)
+  .all();
+
 // Stripe config snapshot (mode inferred from the key prefix; key never exposed).
 const stripeHasKey = !!env.STRIPE_SECRET_KEY;
 const stripeMode = env.STRIPE_SECRET_KEY?.startsWith("sk_live_")
@@ -209,6 +219,36 @@ const stats = [
       <button type="button" id="email-test-btn">Send test email</button>
     </div>
     <p id="email-test-status" class="muted" style="font-size:0.85rem;margin:0.5rem 0 0;white-space:pre-wrap"></p>
+    {
+      recentSendFailures.length > 0 && (
+        <details style="margin-top:0.8rem" open>
+          <summary style="cursor:pointer;font-size:0.9rem;color:var(--warn)">
+            {recentSendFailures.length} recent sign-in email send failure(s)
+          </summary>
+          <table style="width:100%;border-collapse:collapse;margin-top:0.5rem;font-size:0.85rem">
+            <thead>
+              <tr style="text-align:left">
+                <th style="padding:0.3rem 0.5rem">When</th>
+                <th style="padding:0.3rem 0.5rem">Email</th>
+                <th style="padding:0.3rem 0.5rem">Resend error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentSendFailures.map((f) => {
+                const payload = f.payload as { email?: string; error?: string } | null;
+                return (
+                  <tr style="border-top:1px solid var(--border)">
+                    <td style="padding:0.3rem 0.5rem;white-space:nowrap">{formatPacific(f.occurredAt, { dateStyle: "medium", timeStyle: "short" })}</td>
+                    <td style="padding:0.3rem 0.5rem">{payload?.email ?? "?"}</td>
+                    <td style="padding:0.3rem 0.5rem">{payload?.error ?? "(no detail)"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
+      )
+    }
   </div>
 
   <div class="panel">
