@@ -1,0 +1,208 @@
+---
+/**
+ * Admin: Legacy certificates. Search the imported (old-system) roster and issue
+ * a new-system certificate for someone who completed training before the
+ * migration. Reads imported_contacts (certified + completed_at); issues via
+ * src/lib/admin/legacy-certs.ts. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb, schema } from "@/db/client";
+import { and, eq, like, or, inArray } from "drizzle-orm";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const params = Astro.url.searchParams;
+const q = (params.get("q") ?? "").trim();
+const done = params.get("done");
+
+// Default course = the Oregon CA initial certification (owner decision); all
+// published courses are selectable per person.
+const courses = await db
+  .select({ id: schema.courses.id, title: schema.courses.title, slug: schema.courses.slug })
+  .from(schema.courses)
+  .where(eq(schema.courses.status, "published"))
+  .all();
+const defaultCourse =
+  courses.find((c) => c.slug === "oregon-ca-initial") ?? courses[0] ?? null;
+
+// How many certified contacts exist (headline).
+let certifiedCount = 0;
+try {
+  const rows = await db
+    .select({ id: schema.importedContacts.id })
+    .from(schema.importedContacts)
+    .where(eq(schema.importedContacts.certified, true))
+    .all();
+  certifiedCount = rows.length;
+} catch {
+  /* table may not exist in some envs */
+}
+
+// Search matches (by email OR name). Empty query → no list (search-first).
+type Match = {
+  email: string;
+  name: string;
+  clinic: string | null;
+  certified: boolean;
+  completedAt: string | null;
+  existingCode: string | null;
+};
+let matches: Match[] = [];
+if (q) {
+  const wild = `%${q}%`;
+  const found = await db
+    .select()
+    .from(schema.importedContacts)
+    .where(
+      or(
+        like(schema.importedContacts.email, wild),
+        like(schema.importedContacts.firstName, wild),
+        like(schema.importedContacts.lastName, wild),
+      ),
+    )
+    .limit(50)
+    .all();
+
+  // Which of these already have a new-system cert for the default course?
+  const emails = found.map((c) => c.email);
+  const existingByEmail = new Map<string, string>();
+  if (emails.length && defaultCourse) {
+    const users = await db
+      .select({ id: schema.users.id, email: schema.users.email })
+      .from(schema.users)
+      .where(inArray(schema.users.email, emails))
+      .all();
+    const userIdToEmail = new Map(users.map((u) => [u.id, u.email]));
+    if (users.length) {
+      const certs = await db
+        .select({ userId: schema.certificates.userId, code: schema.certificates.verificationCode, status: schema.certificates.status, courseId: schema.certificates.courseId })
+        .from(schema.certificates)
+        .where(
+          and(
+            inArray(schema.certificates.userId, users.map((u) => u.id)),
+            eq(schema.certificates.courseId, defaultCourse.id),
+          ),
+        )
+        .all();
+      for (const c of certs) {
+        if (c.status === "issued") {
+          const em = userIdToEmail.get(c.userId);
+          if (em) existingByEmail.set(em, c.code);
+        }
+      }
+    }
+  }
+
+  matches = found.map((c) => ({
+    email: c.email,
+    name: [c.firstName, c.lastName].filter(Boolean).join(" ").trim(),
+    clinic: c.clinic,
+    certified: c.certified,
+    completedAt: c.completedAt,
+    existingCode: existingByEmail.get(c.email) ?? null,
+  }));
+}
+
+const dateInput = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
+---
+
+<Layout title="Legacy certificates · Admin" showNav={true}>
+  <AdminNav active="legacy-certs" />
+
+  <h1 style="margin-bottom:0.25rem">Legacy certificates</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Issue a real, verifiable certificate for someone who completed training in the
+    <strong>old system</strong>. Search the imported roster below, confirm their
+    legal name and completion date, and issue — the certificate is snapshotted,
+    stored, and publicly verifiable at <code>/verify</code>, exactly like a new one.
+    <strong>{certifiedCount}</strong> imported contact{certifiedCount === 1 ? "" : "s"}
+    {certifiedCount === 1 ? " is" : " are"} marked completed in the old gradebook.
+  </p>
+
+  {done && (
+    <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{done}</p>
+  )}
+
+  {!defaultCourse && (
+    <p class="panel" style="background:var(--danger-tint);color:var(--danger)">
+      No published courses found — publish a course before issuing certificates.
+    </p>
+  )}
+
+  <form method="GET" action="/admin/legacy-certs" class="row" style="margin:1rem 0">
+    <input
+      type="text"
+      name="q"
+      value={q}
+      placeholder="Search by name or email…"
+      style="flex:1;min-width:16rem"
+      autofocus
+    />
+    <button type="submit" style="margin-top:0">Search</button>
+  </form>
+
+  {q && matches.length === 0 && (
+    <p class="muted">No imported contacts match “{q}”.</p>
+  )}
+
+  {matches.map((m) => (
+    <div class="panel" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:baseline">
+        <div>
+          <strong style="color:var(--text)">{m.name || "(no name on file)"}</strong>
+          <span class="muted"> · {m.email}</span>
+          {m.clinic && <span class="muted"> · {m.clinic}</span>}
+        </div>
+        <div style="font-size:0.85rem">
+          {m.certified ? (
+            <span style="color:var(--success)">✓ Completed{m.completedAt ? ` ${m.completedAt.slice(0, 10)}` : ""}</span>
+          ) : (
+            <span style="color:var(--warning-ink)">Not marked completed in the gradebook</span>
+          )}
+        </div>
+      </div>
+
+      {m.existingCode ? (
+        <p style="margin:0.75rem 0 0;color:var(--success)">
+          Already has a new-system certificate —
+          <a href={`/verify/${m.existingCode}`} target="_blank" rel="noopener">verify {m.existingCode} →</a>
+        </p>
+      ) : (
+        <form method="POST" action="/api/admin/legacy-certs/issue" style="margin-top:0.75rem">
+          <input type="hidden" name="email" value={m.email} />
+          <input type="hidden" name="q" value={q} />
+          {!m.certified && (
+            <p class="muted" style="margin:0 0 0.5rem;color:var(--warning-ink)">
+              This person isn’t marked completed in the imported gradebook. Only issue if you’ve verified completion another way.
+            </p>
+          )}
+          <div class="row" style="flex-wrap:wrap;gap:0.75rem">
+            <label style="flex:2;min-width:14rem">
+              <span class="muted" style="font-size:0.8rem">Legal name (on the certificate)</span>
+              <input type="text" name="legalName" value={m.name} required style="width:100%" />
+            </label>
+            <label style="flex:1;min-width:9rem">
+              <span class="muted" style="font-size:0.8rem">Completion date</span>
+              <input type="date" name="completedAt" value={dateInput(m.completedAt)} required style="width:100%" />
+            </label>
+            <label style="flex:2;min-width:12rem">
+              <span class="muted" style="font-size:0.8rem">Course</span>
+              <select name="courseId" style="width:100%">
+                {courses.map((c) => (
+                  <option value={c.id} selected={defaultCourse?.id === c.id}>{c.title}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.6rem;font-size:0.9rem">
+            <input type="checkbox" name="sendEmail" />
+            Email the certificate PDF to {m.email} now
+          </label>
+          <button type="submit" style="margin-top:0.75rem">Issue certificate</button>
+        </form>
+      )}
+    </div>
+  ))}
+</Layout>
