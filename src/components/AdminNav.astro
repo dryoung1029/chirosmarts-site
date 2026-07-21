@@ -10,7 +10,8 @@ interface Props {
     | "aeo"
     | "analytics"
     | "revenue"
-    | "contacts";
+    | "contacts"
+    | "legacy-certs";
 }
 const { active } = Astro.props;
 const links: { key: string; href: string; label: string }[] = [
@@ -23,6 +24,7 @@ const links: { key: string; href: string; label: string }[] = [
   { key: "analytics", href: "/admin/analytics", label: "Analytics" },
   { key: "revenue", href: "/admin/revenue", label: "Revenue" },
   { key: "contacts", href: "/admin/contacts", label: "Contacts" },
+  { key: "legacy-certs", href: "/admin/legacy-certs", label: "Legacy certs" },
 ];
 ---
 
