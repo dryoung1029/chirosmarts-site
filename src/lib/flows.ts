@@ -22,6 +22,12 @@ import { sendReviewRequestEmail, sendRenewalReminderEmail } from "@/lib/email/fl
 const DAY = 86400000;
 const isoMinusDays = (now: Date, d: number) => new Date(now.getTime() - d * DAY).toISOString();
 
+// A certificate younger than this is still in its initial cycle — the next
+// birth-month is NOT a renewal yet, so renewal reminders are suppressed until
+// the cert is at least this old (~10 months, leaving room for the 60-day
+// pre-deadline window to land near the ~1-year mark).
+const RENEWAL_MIN_CERT_AGE_DAYS = 300;
+
 export interface FlowRunResult {
   reviewSent: number;
   renewalSent: number;
@@ -99,36 +105,52 @@ export async function runDailyFlows(
 
   type Cand = { email: string; name: string | null; birthMonth: number; userId: string | null };
   const cands = new Map<string, Cand>();
-  // Only CERTIFIED account holders get renewal reminders. Every student enters a
-  // birth month at intake, so gating on birth-month alone would email brand-new
-  // (and unfinished) students a "time to renew" notice — which is exactly the
-  // bug this guards against. A user is certified iff they hold an issued cert.
-  const certifiedUserIds = new Set(
-    (
-      await db
-        .select({ userId: schema.certificates.userId })
-        .from(schema.certificates)
-        .where(eq(schema.certificates.status, "issued"))
-        .all()
-    ).map((c) => c.userId),
-  );
-  // Account holders who gave their birth month AND are certified.
+
+  // A renewal reminder must only go to someone whose UPCOMING birth-month is a
+  // genuine annual renewal — not their initial cycle. Two guards:
+  //   1. They must be certified (every student enters a birth month at intake,
+  //      so birth-month alone would email brand-new/unfinished students).
+  //   2. Their certificate must be old enough that the next birth-month is a
+  //      real renewal. A freshly certified student whose birthday is soon isn't
+  //      due to renew yet — their first renewal is a cycle away.
+  const isFreshCert = (issuedAtIso: string | null): boolean => {
+    if (!issuedAtIso) return false; // unknown date → treat as historical (legacy)
+    const age = now.getTime() - new Date(issuedAtIso).getTime();
+    return age < RENEWAL_MIN_CERT_AGE_DAYS * DAY;
+  };
+
+  // userId -> most recent issued-certificate date.
+  const latestCertByUser = new Map<string, string>();
+  for (const c of await db
+    .select({ userId: schema.certificates.userId, issuedAt: schema.certificates.issuedAt })
+    .from(schema.certificates)
+    .where(eq(schema.certificates.status, "issued"))
+    .all()) {
+    const prev = latestCertByUser.get(c.userId);
+    if (!prev || c.issuedAt > prev) latestCertByUser.set(c.userId, c.issuedAt);
+  }
+
+  // Account holders who gave their birth month AND are certified long enough ago.
   for (const u of await db
     .select({ id: schema.users.id, email: schema.users.email, displayName: schema.users.displayName, legalName: schema.users.legalName, birthMonth: schema.users.birthMonth })
     .from(schema.users)
     .where(isNotNull(schema.users.birthMonth))
     .all()) {
     if (u.birthMonth == null) continue;
-    if (!certifiedUserIds.has(u.id)) continue; // never remind uncertified/new students
+    const certDate = latestCertByUser.get(u.id);
+    if (!certDate) continue; // never remind uncertified/new students
+    if (isFreshCert(certDate)) continue; // freshly certified — not due to renew yet
     cands.set(u.email, { email: u.email, name: u.displayName || u.legalName, birthMonth: u.birthMonth, userId: u.id });
   }
-  // Legacy certified contacts who set their month via the capture page.
+  // Legacy certified contacts who set their month via the capture page. Their
+  // completion date (from the old gradebook) applies the same freshness guard.
   for (const c of await db
-    .select({ email: schema.importedContacts.email, firstName: schema.importedContacts.firstName, birthMonth: schema.importedContacts.birthMonth })
+    .select({ email: schema.importedContacts.email, firstName: schema.importedContacts.firstName, birthMonth: schema.importedContacts.birthMonth, completedAt: schema.importedContacts.completedAt })
     .from(schema.importedContacts)
     .where(and(isNotNull(schema.importedContacts.birthMonth), eq(schema.importedContacts.certified, true)))
     .all()) {
     if (c.birthMonth == null || cands.has(c.email)) continue;
+    if (isFreshCert(c.completedAt)) continue; // recently completed — not due to renew yet
     cands.set(c.email, { email: c.email, name: c.firstName, birthMonth: c.birthMonth, userId: null });
   }
 
