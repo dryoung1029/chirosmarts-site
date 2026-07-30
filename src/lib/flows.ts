@@ -99,13 +99,27 @@ export async function runDailyFlows(
 
   type Cand = { email: string; name: string | null; birthMonth: number; userId: string | null };
   const cands = new Map<string, Cand>();
-  // Account holders who gave their birth month.
+  // Only CERTIFIED account holders get renewal reminders. Every student enters a
+  // birth month at intake, so gating on birth-month alone would email brand-new
+  // (and unfinished) students a "time to renew" notice — which is exactly the
+  // bug this guards against. A user is certified iff they hold an issued cert.
+  const certifiedUserIds = new Set(
+    (
+      await db
+        .select({ userId: schema.certificates.userId })
+        .from(schema.certificates)
+        .where(eq(schema.certificates.status, "issued"))
+        .all()
+    ).map((c) => c.userId),
+  );
+  // Account holders who gave their birth month AND are certified.
   for (const u of await db
     .select({ id: schema.users.id, email: schema.users.email, displayName: schema.users.displayName, legalName: schema.users.legalName, birthMonth: schema.users.birthMonth })
     .from(schema.users)
     .where(isNotNull(schema.users.birthMonth))
     .all()) {
     if (u.birthMonth == null) continue;
+    if (!certifiedUserIds.has(u.id)) continue; // never remind uncertified/new students
     cands.set(u.email, { email: u.email, name: u.displayName || u.legalName, birthMonth: u.birthMonth, userId: u.id });
   }
   // Legacy certified contacts who set their month via the capture page.
