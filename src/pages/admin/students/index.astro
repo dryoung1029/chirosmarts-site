@@ -84,11 +84,11 @@ const rows = users
                   </a>
                 </td>
                 <td class="cell-email">{r.user.email}</td>
-                <td><span class="role-badge">{r.user.role}</span></td>
-                <td class="num">{r.user.intakeCompletedAt ? "✓" : <span class="muted">–</span>}</td>
-                <td class="num">{r.enrolled}</td>
-                <td class="num">{r.completed}</td>
-                <td class="num">{r.certs}</td>
+                <td data-label="Role"><span class="role-badge">{r.user.role}</span></td>
+                <td class="num" data-label="Intake">{r.user.intakeCompletedAt ? "✓" : <span class="muted">–</span>}</td>
+                <td class="num" data-label="Courses">{r.enrolled}</td>
+                <td class="num" data-label="Done">{r.completed}</td>
+                <td class="num" data-label="Certs">{r.certs}</td>
               </tr>
             ))
           }
@@ -126,6 +126,34 @@ const rows = users
     .role-badge {
       font-size: 0.78rem; color: var(--muted); background: var(--brand-tint);
       border-radius: 6px; padding: 0.1rem 0.45rem; white-space: nowrap;
+    }
+
+    /* Phones: stack each student as a card (no sideways scroll). */
+    @media (max-width: 640px) {
+      .table-scroll { overflow-x: visible; }
+      .stu-table { min-width: 0; }
+      .stu-table thead { display: none; }
+      .stu-table, .stu-table tbody, .stu-table tr, .stu-table td { display: block; width: auto; }
+      .stu-table tbody tr {
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 0.85rem 1rem; margin: 0.75rem; background: var(--surface);
+      }
+      .stu-table td { padding: 0.28rem 0; border: 0; }
+      .cell-name { font-size: 1.1rem; }
+      .cell-email {
+        padding: 0 0 0.5rem; margin-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      /* metric rows become label ↔ value pairs */
+      .stu-table td[data-label] {
+        display: flex; justify-content: space-between; align-items: center;
+        text-align: right;
+      }
+      .stu-table td[data-label]::before {
+        content: attr(data-label); color: var(--muted); font-weight: 600;
+        text-align: left; margin-right: 1rem;
+      }
+      .stu-table .num { width: auto; }
     }
   </style>
 </Layout>
