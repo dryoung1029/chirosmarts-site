@@ -153,7 +153,15 @@ const dials = [
       id="bodyMarkdown"
       name="bodyMarkdown"
       spellcheck="true"
-      style="width:100%;height:26rem;padding:0.75rem;font-family:ui-monospace,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre">{post.bodyMarkdown}</textarea>
+      wrap="soft"
+      style="width:100%;height:26rem;padding:0.75rem;font-family:ui-monospace,Menlo,monospace;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word">{post.bodyMarkdown}</textarea>
+
+    <div style="display:flex;align-items:center;gap:0.6rem;margin:0.9rem 0 0.35rem">
+      <button type="button" id="preview-toggle" aria-expanded="true"
+        style="padding:0.35rem 0.8rem;border-radius:7px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-size:0.9rem">Hide preview</button>
+      <span class="muted" style="font-size:0.85rem">Live render of the Markdown above</span>
+    </div>
+    <div id="md-preview" class="md-preview"></div>
 
     <label style="display:block;font-weight:600;margin:1.1rem 0 0.25rem">Ask for an edit (optional)</label>
     <input type="text" name="instruction" placeholder="e.g. Make the intro punchier, add a section on documentation" style="width:100%;padding:0.5rem" />
@@ -372,5 +380,56 @@ const dials = [
         from = selEnd; // next click advances
       });
     })();
+  </script>
+
+  <style>
+    .md-preview {
+      border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem;
+      background: var(--surface); max-height: 26rem; overflow-y: auto; line-height: 1.6;
+    }
+    .md-preview > :first-child { margin-top: 0; }
+    .md-preview h1 { font-size: 1.6rem; margin: 1.2rem 0 0.5rem; }
+    .md-preview h2 { font-size: 1.3rem; margin: 1.2rem 0 0.5rem; }
+    .md-preview h3 { font-size: 1.1rem; margin: 1rem 0 0.4rem; }
+    .md-preview p { margin: 0 0 0.8rem; }
+    .md-preview ul, .md-preview ol { margin: 0 0 0.8rem; padding-left: 1.5rem; }
+    .md-preview li { margin: 0.2rem 0; }
+    .md-preview a { color: var(--brand); }
+    .md-preview code { background: var(--brand-tint); padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.9em; }
+    .md-preview pre { background: var(--brand-tint); padding: 0.75rem; border-radius: 8px; overflow-x: auto; }
+    .md-preview pre code { background: none; padding: 0; }
+    .md-preview blockquote { border-left: 3px solid var(--border); margin: 0 0 0.8rem; padding-left: 1rem; color: var(--muted); }
+    .md-preview table { border-collapse: collapse; width: 100%; margin: 0 0 0.8rem; }
+    .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+    .md-preview img { max-width: 100%; height: auto; }
+    .md-preview hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+  </style>
+
+  <script>
+    // Live Markdown preview — uses the SAME renderer/options as the public blog
+    // (marked, gfm on, breaks off), so what you see here is what readers get.
+    // Body is admin-authored and trusted (matches the SSR no-sanitizer model).
+    import { marked } from "marked";
+    marked.setOptions({ gfm: true, breaks: false });
+    const ta = document.getElementById("bodyMarkdown") as HTMLTextAreaElement | null;
+    const preview = document.getElementById("md-preview");
+    const toggle = document.getElementById("preview-toggle");
+    if (ta && preview) {
+      const render = () => {
+        preview.innerHTML = marked.parse(ta.value ?? "", { async: false }) as string;
+      };
+      let t: ReturnType<typeof setTimeout>;
+      ta.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(render, 120);
+      });
+      render();
+      toggle?.addEventListener("click", () => {
+        const showing = preview.style.display !== "none";
+        preview.style.display = showing ? "none" : "";
+        toggle.textContent = showing ? "Show preview" : "Hide preview";
+        toggle.setAttribute("aria-expanded", String(!showing));
+      });
+    }
   </script>
 </Layout>
