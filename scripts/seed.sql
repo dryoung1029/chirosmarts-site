@@ -167,8 +167,9 @@ VALUES
 -- ===========================================================================
 
 -- Vitals: short video, but credit includes off-video practice logged on paper,
--- so credit_hours (1.0) deliberately exceeds video runtime. required_seat_minutes
--- (5) is the exam floor and is decoupled from the certificate's credit figure.
+-- so credit_hours (2.0 — Oregon's required annual vitals hours) deliberately
+-- exceeds video runtime. required_seat_minutes (5) is the exam floor and is
+-- decoupled from the certificate's credit figure.
 INSERT OR REPLACE INTO courses
   (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
    state, audience, content_type, access_model, price_cents, status, pass_threshold,
@@ -176,8 +177,8 @@ INSERT OR REPLACE INTO courses
 VALUES
   ('crs_vitals', 'vitals-monitoring',
    'Taking & Recording Vital Signs',
-   'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
-   1, 5, 'vitals', 'oregon', 'ca',
+   'Meets Oregon''s 2-hour annual vitals-training requirement for Chiropractic Assistant renewal. Measure and document blood pressure, pulse, respiration, and temperature to clinical standard, with a downloadable practice log and a completion certificate for your records.',
+   2, 5, 'vitals', 'oregon', 'ca',
    'ce_course', 'one_time_purchase', 3900, 'published', 0.8, 2.0,
    'Jason Young, DC');
 

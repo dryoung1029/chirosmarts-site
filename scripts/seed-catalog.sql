@@ -11,8 +11,8 @@ INSERT OR IGNORE INTO courses
    max_playback_rate, instructor_name)
 VALUES
   ('crs_vitals', 'vitals-monitoring', 'Taking & Recording Vital Signs',
-   'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
-   1, 5, 'vitals', 'oregon', 'ca', 'ce_course', 'one_time_purchase', 3900, 'draft', 0.8, 2.0, 'Jason Young, DC'),
+   'Meets Oregon''s 2-hour annual vitals-training requirement for Chiropractic Assistant renewal. Measure and document blood pressure, pulse, respiration, and temperature to clinical standard, with a downloadable practice log and a completion certificate for your records.',
+   2, 5, 'vitals', 'oregon', 'ca', 'ce_course', 'one_time_purchase', 3900, 'draft', 0.8, 2.0, 'Jason Young, DC'),
 
   ('crs_hipaa', 'hipaa-essentials', 'HIPAA Essentials for Chiropractic Assistants',
    'A single-module HIPAA certification covering protected health information, the minimum-necessary rule, and front-desk privacy practices.',
