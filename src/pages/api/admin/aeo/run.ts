@@ -39,10 +39,27 @@ export const POST: APIRoute = async ({ locals, redirect }) => {
     const db = getDb(env);
     const max = jeldonConfig.aeo.maxSnapshots ?? 52;
     const brand = brandMatchFromPack(jeldonConfig);
-    const snapshot = await runAudit(jeldonConfig.aeo.querySet, engines, {
-      brand,
-      timezone: jeldonConfig.content.timezone,
-    });
+    const querySet = jeldonConfig.aeo.querySet;
+
+    // Run every query CONCURRENTLY. The vendored runAudit loops queries
+    // sequentially (awaiting each), which serializes N slow online-search LLM
+    // calls — with Anthropic's retry/backoff that easily runs 3+ minutes and
+    // overruns Cloudflare's execution budget, so no snapshot ever lands (the
+    // "timeout"). Each per-query call still fans out to its engines in parallel;
+    // we merge the single-query results into one snapshot. Sharing one `now`
+    // keeps every call on the same date key.
+    const opts = { brand, timezone: jeldonConfig.content.timezone, now: new Date() };
+    const perQuery = await Promise.all(
+      querySet.map((q) => runAudit([q], engines, opts)),
+    );
+    if (perQuery.length === 0) return; // nothing to record
+    const snapshot = {
+      ...perQuery[0], // date + engines shape from the library
+      engines: engines.map((e) => e.name),
+      queryCount: querySet.length,
+      results: perQuery.flatMap((s) => s.results),
+    };
+
     const store = new D1SnapshotStore(db, max);
     const current = await store.read();
     await store.write(upsertSnapshot({ ...current, maxSnapshots: max }, snapshot));
