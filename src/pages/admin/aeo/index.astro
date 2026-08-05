@@ -93,7 +93,7 @@ function classifyAction(a: { action: string; why: string }) {
 
   <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <h1 style="margin:0">Answer-engine presence (AEO)</h1>
-    <form method="POST" action="/api/admin/aeo/run" data-busy="Starting audit…" style="margin-left:auto">
+    <form method="POST" action="/api/admin/aeo/run" data-busy="Querying answer engines — up to a minute…" style="margin-left:auto">
       <button type="submit" class="btn-primary" style="padding:0.5rem 1.2rem" disabled={auditInProgress}>✦ Run audit</button>
     </form>
   </div>
@@ -190,8 +190,12 @@ function classifyAction(a: { action: string; why: string }) {
                 <td style="padding:0.4rem 0.6rem">{row.query}</td>
                 {engineCols.map((e) => {
                   const c = cell(row.engines[e]);
+                  const errMsg = row.engines[e]?.error;
                   return (
-                    <td style={`padding:0.4rem 0.6rem;color:${c.color};white-space:nowrap`}>
+                    <td
+                      title={errMsg ?? undefined}
+                      style={`padding:0.4rem 0.6rem;color:${c.color};white-space:nowrap${errMsg ? ";cursor:help;text-decoration:underline dotted" : ""}`}
+                    >
                       {c.text}{arrow(row.engines[e]?.delta)}
                     </td>
                   );
