@@ -8,14 +8,32 @@ import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb } from "@/db/client";
 import { getContactStats } from "@/lib/contacts";
+import { getSiteUrl } from "@/lib/env";
+import { renewalSetupUrl } from "@/lib/contact-token";
+import { isValidEmail } from "@/lib/leads";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 let stats = null;
 let err = "";
 try {
   stats = await getContactStats(db);
 } catch {
   err = "The contact roster isn't ready yet — apply the latest migration and import legacy data.";
+}
+
+// Renewal-link generator (testing / support): make a valid signed link for any
+// email — the same URL the CSV export produces, so you can test the campaign
+// button in your own inbox or hand a link to someone who lost theirs.
+const linkFor = (Astro.url.searchParams.get("linkfor") ?? "").trim().toLowerCase();
+let generatedLink = "";
+let linkError = "";
+if (linkFor) {
+  if (isValidEmail(linkFor)) {
+    generatedLink = await renewalSetupUrl(env, getSiteUrl(env), linkFor);
+  } else {
+    linkError = "Enter a valid email address.";
+  }
 }
 
 const segments = stats
@@ -74,6 +92,27 @@ const segments = stats
     CSV to feed Brevo (mailing list) or the clinic postcard mailer. Warm up the domain
     and re-permission old contacts before any big send (see the note at the bottom).
   </p>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Generate a renewal link<span class="muted" style="font-weight:400;font-size:0.9rem"> — for testing / support</span></h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Makes a valid signed birth-month-capture link for any email — the same URL the
+      CSV export produces. Use it to test the campaign button in your own inbox, or to
+      re-send someone their link.
+    </p>
+    <form method="get" action="/admin/contacts" class="row" style="flex-wrap:wrap">
+      <input type="email" name="linkfor" value={linkFor} placeholder="you@example.com" style="flex:1;min-width:14rem" required />
+      <button type="submit" style="margin-top:0">Generate link</button>
+    </form>
+    {linkError && <p style="color:var(--danger);margin:0.6rem 0 0">{linkError}</p>}
+    {generatedLink && (
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+        <input id="gen-link" type="text" readonly value={generatedLink} style="flex:1;min-width:16rem;font-size:0.85rem" onclick="this.select()" />
+        <button type="button" class="btn" style="padding:0.4rem 0.9rem" onclick="navigator.clipboard.writeText(document.getElementById('gen-link').value);this.textContent='Copied ✓'">Copy</button>
+        <a class="btn" href={generatedLink} target="_blank" rel="noopener" style="padding:0.4rem 0.9rem">Open</a>
+      </div>
+    )}
+  </div>
 
   {err ? (
     <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">{err}</p>
