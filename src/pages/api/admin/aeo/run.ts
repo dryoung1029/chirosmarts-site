@@ -24,6 +24,26 @@ import { D1SnapshotStore } from "@/lib/aeo";
 import { logEvent } from "@/lib/events";
 
 const ENGINE_TIMEOUT_MS = 40_000;
+// Run at most this many queries at once. Firing all queries simultaneously
+// bursts the providers (each query hits every engine), which rate-limits
+// Anthropic and trips the per-engine timeout on the slower queries. A small
+// concurrency keeps calls flowing without the burst — and 2 batches of a 40s
+// cap stays comfortably under Cloudflare's request limit for the inline run.
+const QUERY_CONCURRENCY = 3;
+
+/** Map with bounded concurrency, preserving input order. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 export const POST: APIRoute = async ({ locals, redirect }) => {
   const env = locals.runtime.env;
@@ -56,10 +76,12 @@ export const POST: APIRoute = async ({ locals, redirect }) => {
     const brand = brandMatchFromPack(jeldonConfig);
     const querySet = jeldonConfig.aeo.querySet;
 
-    // Queries run concurrently (each still fans out to its engines in parallel);
-    // merged into one snapshot. Shared `now` keeps a single date key.
+    // Queries run a few at a time (each still fans out to its engines in
+    // parallel); merged into one snapshot. Shared `now` keeps a single date key.
     const opts = { brand, timezone: jeldonConfig.content.timezone, now: new Date() };
-    const perQuery = await Promise.all(querySet.map((q) => runAudit([q], engines, opts)));
+    const perQuery = await mapLimit(querySet, QUERY_CONCURRENCY, (q) =>
+      runAudit([q], engines, opts),
+    );
     if (perQuery.length === 0) {
       return redirect(`${back}?msg=No+queries+configured`, 303);
     }
