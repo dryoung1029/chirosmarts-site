@@ -45,7 +45,12 @@ const topicLabel: Record<string, string> = {
 const usd = (cents: number) => `$${(cents / 100).toFixed(0)}`;
 ---
 
-<Layout title="Courses" showNav={true}>
+<Layout
+  title="Courses"
+  showNav={true}
+  description="Oregon Chiropractic Assistant course catalog — state-required initial certification, annual renewal CE, and HIPAA training, fully online."
+  canonicalPath="/courses"
+>
   <h1>Course catalog</h1>
   <p class="muted" style="margin-top:0">
     State-compliant continuing education for Oregon Chiropractic Assistants.

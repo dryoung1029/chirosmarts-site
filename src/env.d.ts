@@ -20,6 +20,7 @@ interface CloudflareEnv {
   SITE_URL: string;
   ADMIN_EMAILS?: string; // comma-separated emails auto-promoted to site_admin
   CF_WEB_ANALYTICS_TOKEN?: string; // Cloudflare Web Analytics beacon (cookieless)
+  GOOGLE_SITE_VERIFICATION?: string; // Search Console ownership meta tag content
 
   // Secrets (set via .dev.vars locally, wrangler secrets in prod)
   RESEND_API_KEY?: string;

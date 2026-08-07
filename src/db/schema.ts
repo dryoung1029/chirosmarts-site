@@ -929,3 +929,37 @@ export const transcriptEmbeddings = sqliteTable(
     index("transcript_emb_lesson_idx").on(t.lessonId, t.model),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// First-party page metrics (SEO/traffic — NOT compliance data)
+// ---------------------------------------------------------------------------
+
+/**
+ * Privacy-first pageview log for the public marketing/SEO surface. One row per
+ * view; no user id, no IP, no cookie — just path, traffic channel, coarse
+ * device, and country (from the Cloudflare request). Kept separate from the
+ * append-only compliance `events` table on purpose: this is operational
+ * marketing data, prunable at will, never part of the audit trail.
+ * `channel` is derived server-side: organic (search-engine referrer, no UTM),
+ * paid (utm_medium cpc/ppc/paid), referral, internal, or direct.
+ */
+export const pageMetrics = sqliteTable(
+  "page_metrics",
+  {
+    id: text("id").primaryKey(),
+    path: text("path").notNull(),
+    channel: text("channel").notNull(), // organic | paid | referral | internal | direct
+    referrerHost: text("referrer_host"), // e.g. "www.google.com"; null = direct
+    utmSource: text("utm_source"),
+    utmMedium: text("utm_medium"),
+    utmCampaign: text("utm_campaign"),
+    country: text("country"), // ISO-3166 alpha-2 from request.cf
+    device: text("device"), // mobile | desktop (coarse UA sniff, no fingerprinting)
+    occurredAt: text("occurred_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("page_metrics_time_idx").on(t.occurredAt),
+    index("page_metrics_path_idx").on(t.path, t.occurredAt),
+    index("page_metrics_channel_idx").on(t.channel, t.occurredAt),
+  ],
+);

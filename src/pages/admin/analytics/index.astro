@@ -60,6 +60,80 @@ const totals = {
   enrollments: await countType("enrollment_activated"),
 };
 const analyticsOn = !!env.CF_WEB_ANALYTICS_TOKEN;
+
+// ---- First-party traffic (page_metrics, last 30 days) ----------------------
+const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+const pm = schema.pageMetrics;
+
+const trafficTotal = Number(
+  (
+    await db
+      .select({ c: sql<number>`count(*)` })
+      .from(pm)
+      .where(sql`${pm.occurredAt} >= ${since}`)
+      .get()
+  )?.c ?? 0,
+);
+
+const byChannel = await db
+  .select({ channel: pm.channel, views: sql<number>`count(*)` })
+  .from(pm)
+  .where(sql`${pm.occurredAt} >= ${since}`)
+  .groupBy(pm.channel)
+  .orderBy(sql`count(*) desc`)
+  .all();
+
+// The SEO scoreboard: which pages win ORGANIC SEARCH entries.
+const organicLandings = await db
+  .select({ path: pm.path, views: sql<number>`count(*)` })
+  .from(pm)
+  .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} = 'organic'`)
+  .groupBy(pm.path)
+  .orderBy(sql`count(*) desc`)
+  .limit(15)
+  .all();
+
+const organicEngines = await db
+  .select({ host: pm.referrerHost, views: sql<number>`count(*)` })
+  .from(pm)
+  .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} = 'organic'`)
+  .groupBy(pm.referrerHost)
+  .orderBy(sql`count(*) desc`)
+  .limit(10)
+  .all();
+
+const topPages = await db
+  .select({ path: pm.path, views: sql<number>`count(*)` })
+  .from(pm)
+  .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} != 'internal'`)
+  .groupBy(pm.path)
+  .orderBy(sql`count(*) desc`)
+  .limit(15)
+  .all();
+
+const topReferrers = await db
+  .select({ host: pm.referrerHost, views: sql<number>`count(*)` })
+  .from(pm)
+  .where(
+    sql`${pm.occurredAt} >= ${since} AND ${pm.channel} = 'referral' AND ${pm.referrerHost} IS NOT NULL`,
+  )
+  .groupBy(pm.referrerHost)
+  .orderBy(sql`count(*) desc`)
+  .limit(10)
+  .all();
+
+const byDay = await db
+  .select({
+    day: sql<string>`substr(${pm.occurredAt}, 1, 10)`,
+    views: sql<number>`count(*)`,
+    organic: sql<number>`sum(case when ${pm.channel} = 'organic' then 1 else 0 end)`,
+  })
+  .from(pm)
+  .where(sql`${pm.occurredAt} >= ${since}`)
+  .groupBy(sql`substr(${pm.occurredAt}, 1, 10)`)
+  .orderBy(sql`substr(${pm.occurredAt}, 1, 10) desc`)
+  .limit(30)
+  .all();
 ---
 
 <Layout title="Analytics · Admin" showNav={true}>
@@ -93,6 +167,97 @@ const analyticsOn = !!env.CF_WEB_ANALYTICS_TOKEN;
       </div>
     ))}
   </div>
+
+  <h2 style="margin-bottom:0.25rem">Search &amp; traffic — last 30 days</h2>
+  <p class="muted" style="margin-top:0;max-width:50rem">
+    First-party pageviews (no cookies, no IDs) across the public site.
+    <strong>Organic</strong> = arrived from a search or answer engine — the
+    number to grow to win "chiropractic assistant oregon".
+  </p>
+
+  {trafficTotal === 0 ? (
+    <p class="panel muted">
+      No traffic recorded yet — the beacon starts counting on the next deploy.
+      Check back in a day.
+    </p>
+  ) : (
+    <>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0 1.5rem">
+        <div class="panel" style="flex:1;min-width:9rem;text-align:center;margin:0">
+          <div style="font-size:1.9rem;font-weight:700;color:var(--text)">{trafficTotal}</div>
+          <div class="muted" style="font-size:0.85rem">Pageviews (30d)</div>
+        </div>
+        {byChannel.map((c) => (
+          <div class="panel" style="flex:1;min-width:9rem;text-align:center;margin:0">
+            <div style={`font-size:1.9rem;font-weight:700;color:${c.channel === "organic" ? "var(--ok)" : "var(--text)"}`}>{c.views}</div>
+            <div class="muted" style="font-size:0.85rem;text-transform:capitalize">{c.channel}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;margin-bottom:1.5rem">
+        <div class="panel" style="margin:0">
+          <h3 style="margin:0 0 0.5rem;font-size:1rem">🔍 Organic search landings</h3>
+          {organicLandings.length === 0 ? (
+            <p class="muted" style="margin:0">None yet — this fills in as Google sends visitors.</p>
+          ) : (
+            <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+              {organicLandings.map((r) => (
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:0.35rem 0.25rem;color:var(--text);word-break:break-all">{r.path}</td>
+                  <td style="padding:0.35rem 0.25rem;text-align:right;font-weight:600">{r.views}</td>
+                </tr>
+              ))}
+            </table>
+          )}
+          {organicEngines.length > 0 && (
+            <p class="muted" style="margin:0.6rem 0 0;font-size:0.82rem">
+              Engines: {organicEngines.map((e) => `${e.host} (${e.views})`).join(" · ")}
+            </p>
+          )}
+        </div>
+
+        <div class="panel" style="margin:0">
+          <h3 style="margin:0 0 0.5rem;font-size:1rem">Top pages (external entries)</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+            {topPages.map((r) => (
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:0.35rem 0.25rem;color:var(--text);word-break:break-all">{r.path}</td>
+                <td style="padding:0.35rem 0.25rem;text-align:right;font-weight:600">{r.views}</td>
+              </tr>
+            ))}
+          </table>
+          {topReferrers.length > 0 && (
+            <p class="muted" style="margin:0.6rem 0 0;font-size:0.82rem">
+              Referrers: {topReferrers.map((e) => `${e.host} (${e.views})`).join(" · ")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <details style="margin-bottom:1.5rem">
+        <summary class="muted" style="cursor:pointer">Daily views (30d)</summary>
+        <table style="width:100%;max-width:26rem;border-collapse:collapse;font-size:0.88rem;margin-top:0.5rem">
+          <thead>
+            <tr style="text-align:left;border-bottom:2px solid var(--border)">
+              <th style="padding:0.35rem 0.25rem">Day</th>
+              <th style="padding:0.35rem 0.25rem;text-align:right">Views</th>
+              <th style="padding:0.35rem 0.25rem;text-align:right">Organic</th>
+            </tr>
+          </thead>
+          <tbody>
+            {byDay.map((d) => (
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:0.35rem 0.25rem;color:var(--text)">{d.day}</td>
+                <td style="padding:0.35rem 0.25rem;text-align:right">{d.views}</td>
+                <td style="padding:0.35rem 0.25rem;text-align:right;color:var(--ok)">{d.organic}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </>
+  )}
 
   <h2 style="margin-bottom:0.5rem">Conversions by campaign</h2>
   {rows.length === 0 ? (
