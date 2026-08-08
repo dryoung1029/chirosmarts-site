@@ -62,20 +62,31 @@ const totals = {
 const analyticsOn = !!env.CF_WEB_ANALYTICS_TOKEN;
 
 // ---- First-party traffic (page_metrics, last 30 days) ----------------------
+// The page must survive the deploy-before-migrate window: when the table isn't
+// in D1 yet, render a "run the migration" notice instead of a 500.
 const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
 const pm = schema.pageMetrics;
 
-const trafficTotal = Number(
-  (
-    await db
-      .select({ c: sql<number>`count(*)` })
-      .from(pm)
-      .where(sql`${pm.occurredAt} >= ${since}`)
-      .get()
-  )?.c ?? 0,
-);
+let metricsTableMissing = false;
+let trafficTotal = 0;
+let byChannel: { channel: string; views: number }[] = [];
+let organicLandings: { path: string; views: number }[] = [];
+let organicEngines: { host: string | null; views: number }[] = [];
+let topPages: { path: string; views: number }[] = [];
+let topReferrers: { host: string | null; views: number }[] = [];
+let byDay: { day: string; views: number; organic: number }[] = [];
+try {
+  trafficTotal = Number(
+    (
+      await db
+        .select({ c: sql<number>`count(*)` })
+        .from(pm)
+        .where(sql`${pm.occurredAt} >= ${since}`)
+        .get()
+    )?.c ?? 0,
+  );
 
-const byChannel = await db
+  byChannel = await db
   .select({ channel: pm.channel, views: sql<number>`count(*)` })
   .from(pm)
   .where(sql`${pm.occurredAt} >= ${since}`)
@@ -84,7 +95,7 @@ const byChannel = await db
   .all();
 
 // The SEO scoreboard: which pages win ORGANIC SEARCH entries.
-const organicLandings = await db
+organicLandings = await db
   .select({ path: pm.path, views: sql<number>`count(*)` })
   .from(pm)
   .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} = 'organic'`)
@@ -93,7 +104,7 @@ const organicLandings = await db
   .limit(15)
   .all();
 
-const organicEngines = await db
+organicEngines = await db
   .select({ host: pm.referrerHost, views: sql<number>`count(*)` })
   .from(pm)
   .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} = 'organic'`)
@@ -102,7 +113,7 @@ const organicEngines = await db
   .limit(10)
   .all();
 
-const topPages = await db
+topPages = await db
   .select({ path: pm.path, views: sql<number>`count(*)` })
   .from(pm)
   .where(sql`${pm.occurredAt} >= ${since} AND ${pm.channel} != 'internal'`)
@@ -111,7 +122,7 @@ const topPages = await db
   .limit(15)
   .all();
 
-const topReferrers = await db
+topReferrers = await db
   .select({ host: pm.referrerHost, views: sql<number>`count(*)` })
   .from(pm)
   .where(
@@ -122,7 +133,7 @@ const topReferrers = await db
   .limit(10)
   .all();
 
-const byDay = await db
+byDay = await db
   .select({
     day: sql<string>`substr(${pm.occurredAt}, 1, 10)`,
     views: sql<number>`count(*)`,
@@ -132,8 +143,13 @@ const byDay = await db
   .where(sql`${pm.occurredAt} >= ${since}`)
   .groupBy(sql`substr(${pm.occurredAt}, 1, 10)`)
   .orderBy(sql`substr(${pm.occurredAt}, 1, 10) desc`)
-  .limit(30)
-  .all();
+    .limit(30)
+    .all();
+} catch (e) {
+  // "no such table: page_metrics" until `npm run db:migrate:remote` runs.
+  metricsTableMissing = true;
+  console.error("[admin/analytics] page_metrics unavailable:", e);
+}
 ---
 
 <Layout title="Analytics · Admin" showNav={true}>
@@ -175,10 +191,16 @@ const byDay = await db
     number to grow to win "chiropractic assistant oregon".
   </p>
 
-  {trafficTotal === 0 ? (
+  {metricsTableMissing ? (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+      ⚠️ The <code>page_metrics</code> table isn't in the production database yet.
+      Run <code>npm run db:migrate:remote</code> from the repo, then reload —
+      traffic starts recording immediately.
+    </p>
+  ) : trafficTotal === 0 ? (
     <p class="panel muted">
-      No traffic recorded yet — the beacon starts counting on the next deploy.
-      Check back in a day.
+      No traffic recorded yet — the beacon starts counting now that the table
+      exists. Check back in a day.
     </p>
   ) : (
     <>
