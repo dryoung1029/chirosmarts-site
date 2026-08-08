@@ -12,6 +12,7 @@ import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import { newId } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
+import { OBCE } from "@/config/obce";
 
 /** Map an intake path choice to a published template slug (or null). */
 export const PATH_CHOICE_TO_SLUG: Record<string, string | null> = {
@@ -152,8 +153,12 @@ export async function getUserRoadmap(db: Db, userId: string) {
       .orderBy(asc(schema.userSteps.position))
       .all();
 
-    // Walk in order, deriving status and re-opening the linear gate as each
-    // step completes. `priorComplete` gates the next step.
+    // Walk in order, deriving status. OFFLINE steps (hands-on log, OBCE
+    // application, fingerprinting, state exam, BLS) are a **pure checklist**:
+    // they happen with the student's supervising DC and the Board, not on this
+    // platform, so we never gate or verify them — they stay open as guidance.
+    // Only what we can actually observe (account, course/certificate) is
+    // tracked as real progress.
     const steps = [];
     let priorComplete = true;
     for (const step of rows) {
@@ -179,13 +184,23 @@ export async function getUserRoadmap(db: Db, userId: string) {
         // Offline step an admin marked done — the platform can't observe these.
         status = "complete";
       } else {
-        status = priorComplete ? "available" : "locked";
+        // Pure checklist: always open, never "Locked".
+        status = "available";
       }
-      // "waived" counts as satisfied for gating; in_progress does not.
+      // Gating only matters for course steps; "waived" counts as satisfied.
       priorComplete = status === "complete" || status === "waived";
 
       let href: string | null = null;
-      if (tstep?.stepType === "course" && tstep.courseId && status !== "locked") {
+      if (tstep?.stepType === "upload_log") {
+        // Hands-on step: send them straight to the Board's signable training log.
+        href = OBCE.trainingLog;
+      } else if (
+        tstep?.stepType === "external_action" ||
+        tstep?.stepType === "exam"
+      ) {
+        // Application / fingerprinting / state exam all happen at the Board.
+        href = OBCE.home;
+      } else if (tstep?.stepType === "course" && tstep.courseId && status !== "locked") {
         const course = await db
           .select({ slug: schema.courses.slug })
           .from(schema.courses)
@@ -201,7 +216,17 @@ export async function getUserRoadmap(db: Db, userId: string) {
       ) {
         href = "/clinic";
       }
-      steps.push({ ...step, status, href });
+      steps.push({
+        ...step,
+        status,
+        href,
+        stepType: tstep?.stepType ?? "custom",
+        external: !!href && href.startsWith("http"),
+        // Offline steps are guidance the student does elsewhere — the UI labels
+        // them "To do" rather than implying the platform is waiting on us.
+        offline:
+          tstep?.stepType !== "account" && tstep?.stepType !== "course",
+      });
     }
     result.push({ path: p, template, steps });
   }
