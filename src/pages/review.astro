@@ -18,7 +18,11 @@ const url = Astro.url;
 const email = (url.searchParams.get("e") ?? "").trim().toLowerCase();
 const token = (url.searchParams.get("t") ?? "").trim();
 const valid = !!email && (await verifyContactToken(env, email, token));
+// Off-site review nudge shown AFTER they've submitted. Trustpilot is the
+// primary ask (ChiroSmarts is online-only, so it can't have a Google Business
+// Profile of its own); GOOGLE_REVIEW_URL stays supported if ever applicable.
 const googleUrl = env.GOOGLE_REVIEW_URL || "";
+const trustpilotUrl = env.TRUSTPILOT_REVIEW_URL || "";
 
 let saved = false;
 let error = "";
@@ -54,6 +58,18 @@ if (Astro.request.method === "POST" && valid) {
         <div style="text-align:center">
           <h1>Thank you 🙏</h1>
           <p style="color:var(--muted)">We really appreciate you taking the time.</p>
+          {trustpilotUrl && (
+            <>
+              <p style="margin-top:1.25rem;color:var(--muted)">
+                One more thing that really helps other Oregon CAs find us:
+              </p>
+              <p style="margin-top:0.5rem">
+                <a class="btn-primary" href={trustpilotUrl} target="_blank" rel="noopener noreferrer">
+                  Post it on Trustpilot →
+                </a>
+              </p>
+            </>
+          )}
           {googleUrl && (
             <p style="margin-top:1.25rem"><a class="btn-primary" href={googleUrl} target="_blank" rel="noopener">Leave a Google review too →</a></p>
           )}

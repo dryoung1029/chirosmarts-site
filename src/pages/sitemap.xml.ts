@@ -38,6 +38,7 @@ export const GET: APIRoute = async ({ locals }) => {
     "/about",
     "/blog",
     "/help",
+    "/reviews",
     "/verify",
     "/terms",
     "/privacy",

@@ -51,6 +51,8 @@ function isPublic(pathname: string): boolean {
   if (pathname === "/api/cron/flows") return true;
   // Testimonial collection from the review email (tokenized, no login).
   if (pathname === "/review") return true;
+  // Public reviews page (brand query: "chirosmarts reviews").
+  if (pathname === "/reviews") return true;
   // Help Center (articles + contact form) is open to everyone, incl. prospects.
   if (pathname === "/help" || pathname.startsWith("/help/")) return true;
   if (pathname === "/api/help/contact") return true;

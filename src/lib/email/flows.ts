@@ -45,19 +45,27 @@ export async function sendReviewRequestEmail(
 ): Promise<SendEmailResult> {
   const site = getSiteUrl(env).replace(/\/$/, "");
   const hi = args.name ? `Hi ${args.name},` : "Hi there,";
+  // Secondary ask: an independent, publicly-indexed review. Only included once
+  // TRUSTPILOT_REVIEW_URL is configured, so the email never shows a dead link.
+  const tp = env.TRUSTPILOT_REVIEW_URL || "";
   return sendEmail(env, {
     to: args.to,
     subject: "Quick favor — how was your ChiroSmarts course?",
     text:
       `${hi}\n\nCongrats again on completing "${args.courseTitle}"!\n\n` +
       `Would you take 60 seconds to share how it went? Your words help other Oregon CAs ` +
-      `decide to get certified:\n${args.reviewUrl}\n\nThank you!\n— The ChiroSmarts team\n\n` +
+      `decide to get certified:\n${args.reviewUrl}\n\n` +
+      (tp ? `Prefer to post publicly? You can review us on Trustpilot:\n${tp}\n\n` : "") +
+      `Thank you!\n— The ChiroSmarts team\n\n` +
       emailFooterText(site, "you completed a ChiroSmarts course"),
     html: wrap(
       site,
       `<h2 style="color:#0B6B63">How was it?</h2><p>${hi}</p>` +
         `<p>Congrats again on completing <strong>${args.courseTitle}</strong>! Would you take 60 seconds to share how it went? Your words help other Oregon CAs decide to get certified.</p>` +
         btn(args.reviewUrl, "Leave a quick review") +
+        (tp
+          ? `<p style="color:#51646A;font-size:0.9rem">Prefer to post publicly? You can also <a href="${tp}" style="color:#0B6B63">review us on Trustpilot</a>.</p>`
+          : "") +
         `<p style="color:#51646A;font-size:0.9rem">Thank you — it genuinely helps.</p>`,
       "you completed a ChiroSmarts course",
     ),

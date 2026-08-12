@@ -51,6 +51,10 @@ interface CloudflareEnv {
   CONTACT_TOKEN_SECRET?: string;
   // Optional: if set, the review page also offers a "leave a Google review" link.
   GOOGLE_REVIEW_URL?: string;
+  // Trustpilot "evaluate" link (https://www.trustpilot.com/evaluate/<domain>).
+  // Independent, Google-indexed reviews — ChiroSmarts is online-only, so it is
+  // NOT eligible for a Google Business Profile of its own.
+  TRUSTPILOT_REVIEW_URL?: string;
 }
 
 type Runtime = import("@astrojs/cloudflare").Runtime<CloudflareEnv>;
