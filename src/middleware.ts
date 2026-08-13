@@ -49,6 +49,7 @@ function isPublic(pathname: string): boolean {
     return true;
   // Cron tick for lifecycle email flows (authorized by a shared secret, not a session).
   if (pathname === "/api/cron/flows") return true;
+  if (pathname === "/api/cron/support") return true;
   // Testimonial collection from the review email (tokenized, no login).
   if (pathname === "/review") return true;
   // Public reviews page (brand query: "chirosmarts reviews").

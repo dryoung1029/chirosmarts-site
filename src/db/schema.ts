@@ -963,3 +963,53 @@ export const pageMetrics = sqliteTable(
     index("page_metrics_channel_idx").on(t.channel, t.occurredAt),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// AI support triage (help-desk assistant)
+// ---------------------------------------------------------------------------
+
+/**
+ * Student questions from /help/contact, with the AI's classification and draft
+ * reply. Operational support data — mutable status, prunable — kept OUT of the
+ * append-only `events` audit trail (a `support_request` event is still logged
+ * there for the record).
+ *
+ * Lifecycle: new → drafted → (sent | escalated). `escalated` means the AI
+ * judged the question to need Dr. Young personally (regulatory, clinical,
+ * billing, complaint, or simply low confidence) and wrote no auto-reply.
+ */
+export const supportRequests = sqliteTable(
+  "support_requests",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id),
+    email: text("email").notNull(),
+    subject: text("subject").notNull(),
+    message: text("message").notNull(),
+    fromPage: text("from_page"),
+    status: text("status", {
+      enum: ["new", "drafted", "sent", "escalated", "closed"],
+    })
+      .notNull()
+      .default("new"),
+    // AI triage output
+    category: text("category"), // e.g. exam_gate | certificate | sign_in | clinic_seats | regulatory | billing | other
+    confidence: real("confidence"), // 0..1 self-reported by the classifier
+    autoSendable: integer("auto_sendable", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    escalationReason: text("escalation_reason"),
+    draftSubject: text("draft_subject"),
+    draftBody: text("draft_body"), // markdown-ish plain text, Dr. Young's voice
+    helpArticles: text("help_articles", { mode: "json" }), // slugs cited
+    model: text("model"),
+    sentAt: text("sent_at"),
+    sentBy: text("sent_by"), // "auto" | admin email
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("support_requests_status_idx").on(t.status, t.createdAt),
+    index("support_requests_email_idx").on(t.email),
+  ],
+);

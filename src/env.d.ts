@@ -35,6 +35,10 @@ interface CloudflareEnv {
   CF_STREAM_SIGNING_KEY_PEM?: string;
   CF_STREAM_SIGNING_KEY_JWK?: string; // base64-encoded JWK (RSA private key)
   ANTHROPIC_API_KEY?: string;
+  // AI support desk: "on" lets narrow, high-confidence how-it-works answers send
+  // automatically. Anything else (regulatory, clinical, billing, complaints,
+  // low confidence) always waits for the owner. Unset = every reply is reviewed.
+  SUPPORT_AUTOSEND?: string;
   GEMINI_API_KEY?: string; // Google Gemini / Imagen — blog hero image generation
   GEMINI_IMAGE_MODEL?: string; // override (default gemini-2.5-flash-image; imagen-* uses :predict, needs billing)
   PERPLEXITY_API_KEY?: string; // @jeldon/aeo-audit — answer-engine citation audit

@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
-import { getDb } from "@/db/client";
+import { getDb, schema as db_ } from "@/db/client";
+import { newId } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email/resend";
 import { adminEmails } from "@/lib/admin";
 import { logEvent } from "@/lib/events";
@@ -74,8 +75,23 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     replyTo: replyEmail,
   });
 
-  // Record the request in the audit trail regardless of delivery outcome.
+  // Queue it for AI triage (the cron picks up `new` rows and drafts a reply).
   const db = getDb(env);
+  try {
+    await db.insert(db_.supportRequests).values({
+      id: newId("sup"),
+      userId: locals.user?.id ?? null,
+      email: replyEmail,
+      subject: d.subject,
+      message: d.message,
+      fromPage: d.from ?? null,
+    });
+  } catch (e) {
+    // Triage is an enhancement — never fail the student's submission over it.
+    console.error("[support] could not queue for triage:", e);
+  }
+
+  // Record the request in the audit trail regardless of delivery outcome.
   await logEvent(db, {
     userId: locals.user?.id ?? null,
     type: "support_request",

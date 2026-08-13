@@ -1,0 +1,152 @@
+---
+/**
+ * Support queue — every student question, the AI's draft, and one place to
+ * edit and send. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { desc } from "drizzle-orm";
+import { getDb, schema } from "@/db/client";
+import { formatPacific } from "@/lib/time";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const msg = Astro.url.searchParams.get("msg");
+
+let tableMissing = false;
+let rows: (typeof schema.supportRequests.$inferSelect)[] = [];
+try {
+  rows = await db
+    .select()
+    .from(schema.supportRequests)
+    .orderBy(desc(schema.supportRequests.createdAt))
+    .limit(100)
+    .all();
+} catch {
+  tableMissing = true;
+}
+
+const autosendOn = env.SUPPORT_AUTOSEND === "on";
+const aiReady = !!env.ANTHROPIC_API_KEY;
+
+const open = rows.filter((r) => r.status === "new" || r.status === "drafted" || r.status === "escalated");
+const done = rows.filter((r) => r.status === "sent" || r.status === "closed");
+
+const statusStyle: Record<string, string> = {
+  new: "color:var(--muted)",
+  drafted: "color:var(--brand);font-weight:600",
+  escalated: "color:var(--warn);font-weight:600",
+  sent: "color:var(--ok)",
+  closed: "color:var(--muted)",
+};
+const statusLabel: Record<string, string> = {
+  new: "Awaiting triage",
+  drafted: "Draft ready",
+  escalated: "Needs you",
+  sent: "Sent",
+  closed: "Closed",
+};
+---
+
+<Layout title="Support · Admin" showNav={true}>
+  <AdminNav active="support" />
+  <h1 style="margin-bottom:0.25rem">Support queue</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Questions from the Help Center contact form. The assistant drafts a reply in
+    your voice from the Help Center articles, and flags anything needing your
+    judgement — regulatory, clinical, billing, complaints, or low confidence.
+  </p>
+
+  {msg && <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>}
+
+  {tableMissing && (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+      ⚠️ The <code>support_requests</code> table isn't in the database yet. Run
+      <code>npm run db:migrate:remote</code>, then reload.
+    </p>
+  )}
+
+  {!aiReady && (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
+      ⚠️ <code>ANTHROPIC_API_KEY</code> isn't set, so nothing can be drafted. Questions
+      still arrive here and still email you.
+    </p>
+  )}
+
+  <p class="panel" style="margin:0 0 1.25rem;border:none;background:var(--surface)">
+    <strong>Auto-send is {autosendOn ? "ON" : "OFF"}.</strong>{" "}
+    {autosendOn
+      ? "Straightforward how-it-works questions are answered automatically; everything else waits for you."
+      : "Every reply waits for your approval. Set SUPPORT_AUTOSEND=\"on\" once you trust the drafts."}
+  </p>
+
+  {open.length === 0 && !tableMissing && (
+    <div class="panel"><p style="margin:0" class="muted">Nothing waiting. 🎉</p></div>
+  )}
+
+  {open.map((r) => (
+    <div class="panel">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <h2 style="margin:0;font-size:1.05rem">{r.subject}</h2>
+        <span style={`font-size:0.8rem;${statusStyle[r.status]}`}>{statusLabel[r.status]}</span>
+      </div>
+      <p class="muted" style="margin:0.3rem 0 0.75rem;font-size:0.85rem">
+        {r.email} · {formatPacific(r.createdAt)}
+        {r.category && ` · ${r.category}`}
+        {r.confidence != null && ` · ${(r.confidence * 100).toFixed(0)}% confident`}
+        {r.fromPage && ` · from ${r.fromPage}`}
+      </p>
+
+      <blockquote style="margin:0 0 1rem;padding:0.7rem 0.9rem;background:var(--canvas);border-left:3px solid var(--border);white-space:pre-wrap;font-size:0.92rem">{r.message}</blockquote>
+
+      {r.escalationReason && (
+        <p style="margin:0 0 1rem;padding:0.6rem 0.8rem;border-radius:8px;background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);font-size:0.9rem">
+          <strong>Flagged for you:</strong> {r.escalationReason}
+        </p>
+      )}
+
+      {r.draftBody ? (
+        <form method="POST" action="/api/admin/support/send">
+          <input type="hidden" name="id" value={r.id} />
+          <label for={`s-${r.id}`}>Subject</label>
+          <input id={`s-${r.id}`} type="text" name="subject" value={r.draftSubject ?? `Re: ${r.subject}`} style="width:100%" />
+          <label for={`b-${r.id}`}>Reply</label>
+          <textarea id={`b-${r.id}`} name="body" rows="12" style="width:100%;font:inherit;padding:0.6rem;border:1px solid var(--border);border-radius:8px">{r.draftBody}</textarea>
+          {Array.isArray(r.helpArticles) && (r.helpArticles as string[]).length > 0 && (
+            <p class="muted" style="margin:0.5rem 0 0;font-size:0.83rem">
+              Based on: {(r.helpArticles as string[]).map((s) => (
+                <a href={`/help/${s}`} target="_blank" rel="noopener" style="margin-right:0.5rem">{s}</a>
+              ))}
+            </p>
+          )}
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center">
+            <button type="submit">Send to student</button>
+            <button type="submit" name="action" value="close" class="link" style="color:var(--muted)">Close without replying</button>
+          </div>
+        </form>
+      ) : (
+        <p class="muted" style="margin:0">
+          No draft yet — the next triage run will write one.
+        </p>
+      )}
+    </div>
+  ))}
+
+  {done.length > 0 && (
+    <details style="margin-top:1.5rem">
+      <summary class="muted" style="cursor:pointer">Handled ({done.length})</summary>
+      <table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:0.75rem">
+        {done.map((r) => (
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:0.4rem 0.25rem;color:var(--text)">{r.subject}</td>
+            <td style="padding:0.4rem 0.25rem;color:var(--muted)">{r.email}</td>
+            <td style="padding:0.4rem 0.25rem;color:var(--muted)">{r.sentBy === "auto" ? "auto" : "you"}</td>
+            <td style="padding:0.4rem 0.25rem;text-align:right;color:var(--muted)">
+              {r.sentAt ? formatPacific(r.sentAt, { dateStyle: "medium" }) : "—"}
+            </td>
+          </tr>
+        ))}
+      </table>
+    </details>
+  )}
+</Layout>
