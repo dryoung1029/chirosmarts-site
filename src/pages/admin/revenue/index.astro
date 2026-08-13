@@ -19,6 +19,7 @@ import {
   pairedBarsSvg,
   CHART_COLORS,
 } from "@/lib/charts";
+import { getStripeMoneyView, stripeDashboardUrls } from "@/lib/stripe-payouts";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
@@ -136,13 +137,35 @@ const historyChart =
       })
     : "";
 const historyTotalCents = salesByYear.reduce((a, y) => a + y.revenueCents, 0);
+
+// Live money view straight from Stripe (balance + payouts on the way to the
+// bank). Never throws — renders a notice instead if Stripe is unreachable.
+const money = await getStripeMoneyView(env);
+const stripeUrls = stripeDashboardUrls(env, money.livemode);
+const payoutStatusLabel: Record<string, string> = {
+  paid: "Deposited",
+  in_transit: "On the way",
+  pending: "Pending",
+  failed: "Failed",
+  canceled: "Canceled",
+};
+const payoutStatusColor: Record<string, string> = {
+  paid: "var(--ok)",
+  in_transit: "var(--brand)",
+  pending: "var(--warn)",
+  failed: "var(--danger, #b42318)",
+  canceled: "var(--muted)",
+};
+const payoutDate = (isoStr: string | null) =>
+  isoStr ? formatPacific(isoStr, { dateStyle: "medium" }) : "—";
 ---
 
 <Layout title="Revenue · Admin" showNav={true}>
   <AdminNav active="revenue" />
   <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <h1 style="margin-bottom:0.25rem">Revenue projection &amp; tracking</h1>
-    <a href="/admin/revenue/import" style="margin-left:auto;padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">⬆ Import legacy data</a>
+    <a href={stripeUrls.home} target="_blank" rel="noopener noreferrer" style="margin-left:auto;padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">Stripe dashboard ↗</a>
+    <a href="/admin/revenue/import" style="padding:0.4rem 0.9rem;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text)">⬆ Import legacy data</a>
   </div>
   <p class="muted" style="margin-top:0;max-width:52rem">
     The 3-year forecast is stored as projected <strong>units</strong> per product
@@ -154,6 +177,85 @@ const historyTotalCents = salesByYear.reduce((a, y) => a + y.revenueCents, 0);
   {msg && (
     <p class="panel" style="margin:0 0 1rem;background:var(--brand-tint);color:var(--brand);border:none">{msg}</p>
   )}
+
+  {/* ---- Live Stripe balance & payouts ---- */}
+  <div class="panel" style="margin-bottom:1.25rem">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <h2 style="margin:0">
+        Your money{stripeUrls.isTest && (
+          <span style="margin-left:0.5rem;font-size:0.75rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:99px;background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806)">TEST MODE</span>
+        )}
+      </h2>
+      <a href={stripeUrls.balance} target="_blank" rel="noopener noreferrer" style="font-size:0.9rem">
+        Open in Stripe ↗
+      </a>
+    </div>
+
+    {!money.configured ? (
+      <p class="muted" style="margin:0.75rem 0 0">
+        Stripe isn't connected yet — set <code>STRIPE_SECRET_KEY</code> to see your
+        balance and upcoming deposits here.
+      </p>
+    ) : money.error ? (
+      <p class="muted" style="margin:0.75rem 0 0">
+        Couldn't reach Stripe just now ({money.error}). Your balance is always
+        available at <a href={stripeUrls.balance} target="_blank" rel="noopener noreferrer">dashboard.stripe.com</a>.
+      </p>
+    ) : (
+      <>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem">
+          <div style="flex:1;min-width:10rem;padding:0.9rem;border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:1.6rem;font-weight:700;color:var(--ok)">{fmtUsd(money.availableCents)}</div>
+            <div class="muted" style="font-size:0.85rem">Available to pay out</div>
+          </div>
+          <div style="flex:1;min-width:10rem;padding:0.9rem;border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:1.6rem;font-weight:700;color:var(--warn)">{fmtUsd(money.pendingCents)}</div>
+            <div class="muted" style="font-size:0.85rem">Pending (still settling)</div>
+          </div>
+          <div style="flex:1;min-width:10rem;padding:0.9rem;border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:1.6rem;font-weight:700;color:var(--brand)">{fmtUsd(money.inTransitCents)}</div>
+            <div class="muted" style="font-size:0.85rem">On the way to your bank</div>
+          </div>
+        </div>
+        <p class="muted" style="margin:0.75rem 0 0;font-size:0.85rem">
+          Card payments settle over a few days: they sit in <strong>Pending</strong>,
+          become <strong>Available</strong>, then Stripe deposits them to your bank.
+          This is money received — the ledger below tracks what was <em>sold</em>.
+        </p>
+
+        {money.recentPayouts.length > 0 && (
+          <>
+            <h3 style="font-size:0.95rem;margin:1.25rem 0 0.5rem">Recent deposits</h3>
+            <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+              <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border)">
+                  <th style="padding:0.4rem 0.25rem">Arrives</th>
+                  <th style="padding:0.4rem 0.25rem">Status</th>
+                  <th style="padding:0.4rem 0.25rem;text-align:right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {money.recentPayouts.map((p) => (
+                  <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:0.4rem 0.25rem;color:var(--text)">{payoutDate(p.arrivalDate)}</td>
+                    <td style={`padding:0.4rem 0.25rem;color:${payoutStatusColor[p.status] ?? "var(--muted)"}`}>
+                      {payoutStatusLabel[p.status] ?? p.status}
+                    </td>
+                    <td style="padding:0.4rem 0.25rem;text-align:right;font-weight:600">{fmtUsd(p.amountCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style="margin:0.75rem 0 0">
+              <a href={stripeUrls.payouts} target="_blank" rel="noopener noreferrer" style="font-size:0.9rem">
+                All payouts in Stripe ↗
+              </a>
+            </p>
+          </>
+        )}
+      </>
+    )}
+  </div>
 
   {!ledgerReady && (
     <p class="panel" style="margin:0 0 1rem;background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">
