@@ -1,0 +1,86 @@
+name: cron
+
+# Scheduler for the two server-side ticks. Cloudflare Pages has no native cron,
+# so each endpoint is a URL authorized by a shared secret (CRON_SECRET) rather
+# than a session — see src/pages/api/cron/*.ts.
+#
+#   support  — AI triage of Help Center questions (drafts a reply, emails it for
+#              approval, or auto-sends when SUPPORT_AUTOSEND=on). Frequent, so
+#              students get a timely answer.
+#   flows    — daily lifecycle email flows (review requests, renewal reminders).
+#
+# Setup (one time): add a repository secret named CRON_SECRET whose value is the
+# SAME string as the CRON_SECRET set in Cloudflare Pages. Optionally add a
+# repository variable SITE_URL to override the default below.
+#
+# Caveats worth knowing:
+#  - GitHub's scheduler is best-effort; a tick can be delayed by several minutes
+#    under load. Neither job is time-critical to the minute.
+#  - Scheduled workflows are auto-disabled after 60 days with no repo activity.
+#    If email flows ever go quiet, check that this workflow is still enabled.
+#  - Both jobs are safe to run more than once: triage only picks up `new` rows,
+#    and the flow engine de-duplicates on its own keys.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *" # support triage — every 20 minutes
+    - cron: "0 16 * * *" # daily flows — 16:00 UTC (9am PDT / 8am PST)
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which tick to run manually
+        type: choice
+        options: [support, flows, both]
+        default: both
+
+concurrency:
+  group: cron-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Support triage
+        # Runs on the 20-minute schedule, or when manually asked for.
+        if: >-
+          github.event.schedule == '*/20 * * * *' ||
+          (github.event_name == 'workflow_dispatch' &&
+           (inputs.target == 'support' || inputs.target == 'both'))
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://chirosmarts.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not set."
+            exit 1
+          fi
+          # Secret goes in a header, never the URL, so it stays out of logs.
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            -H "x-cron-key: $CRON_SECRET" \
+            "$SITE_URL/api/cron/support")
+          echo "HTTP $code"
+          cat /tmp/out.json
+          echo
+          [ "$code" = "200" ] || { echo "::error::support tick failed ($code)"; exit 1; }
+
+      - name: Daily flows
+        if: >-
+          github.event.schedule == '0 16 * * *' ||
+          (github.event_name == 'workflow_dispatch' &&
+           (inputs.target == 'flows' || inputs.target == 'both'))
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://chirosmarts.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not set."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            -H "x-cron-key: $CRON_SECRET" \
+            "$SITE_URL/api/cron/flows")
+          echo "HTTP $code"
+          cat /tmp/out.json
+          echo
+          [ "$code" = "200" ] || { echo "::error::flows tick failed ($code)"; exit 1; }
