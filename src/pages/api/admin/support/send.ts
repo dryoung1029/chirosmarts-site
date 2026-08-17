@@ -44,6 +44,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
     .get();
   if (!row) return back("That request no longer exists.");
 
+  if (d.action === "redraft") {
+    // Put it back in the queue so the next triage run rewrites it — used after
+    // the assistant misreads a question, or after a prompt/context improvement.
+    await db
+      .update(schema.supportRequests)
+      .set({
+        status: "new",
+        draftSubject: null,
+        draftBody: null,
+        category: null,
+        confidence: null,
+        escalationReason: null,
+        updatedAt: nowIso(),
+      })
+      .where(eq(schema.supportRequests.id, row.id));
+    return back("Queued for a fresh draft — press “Run triage now”.");
+  }
+
   if (d.action === "close") {
     await db
       .update(schema.supportRequests)

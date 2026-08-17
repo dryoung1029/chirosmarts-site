@@ -9,6 +9,8 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import { getUserRoadmap } from "@/lib/roadmap";
+import { getCourseSeatTime } from "@/lib/progress";
+import { unpassedQuizzes } from "@/lib/quiz";
 import { formatPacific } from "@/lib/time";
 
 export async function buildStudentContext(
@@ -35,6 +37,7 @@ export async function buildStudentContext(
 
   const enrollments = await db
     .select({
+      courseId: schema.courses.id,
       title: schema.courses.title,
       slug: schema.courses.slug,
       status: schema.enrollments.status,
@@ -43,11 +46,47 @@ export async function buildStudentContext(
     .innerJoin(schema.courses, eq(schema.enrollments.courseId, schema.courses.id))
     .where(eq(schema.enrollments.userId, user.id))
     .all();
-  lines.push(
-    enrollments.length
-      ? `Enrolled courses: ${enrollments.map((e) => `${e.title} (${e.status})`).join("; ")}`
-      : "Enrolled courses: none",
-  );
+
+  if (!enrollments.length) {
+    lines.push("Enrolled courses: none");
+  } else {
+    // Per-course PROGRESS is the thing support answers hinge on: students often
+    // believe they've "finished" when lessons are watched but knowledge checks
+    // or the final exam are outstanding. Spell out exactly what's left so the
+    // reply corrects the misunderstanding instead of repeating it back.
+    lines.push("COURSE PROGRESS (authoritative — trust this over what they say):");
+    for (const e of enrollments) {
+      const parts: string[] = [`- ${e.title} [${e.status}]`];
+      try {
+        const st = await getCourseSeatTime(db, user.id, e.courseId);
+        const done = st.perLesson.filter((p) => p.meetsThreshold).length;
+        parts.push(
+          `  Lessons watched to the 90% threshold: ${done} of ${st.perLesson.length}.`,
+        );
+        parts.push(
+          `  Content watched: ${Math.round(st.watchedFraction * 100)}% of the course video.`,
+        );
+        const unmet = st.perLesson
+          .filter((p) => !p.meetsThreshold)
+          .map((p) => `"${p.title}" (${Math.round(p.fraction * 100)}%)`);
+        if (unmet.length)
+          parts.push(`  Lessons still short of 90%: ${unmet.join(", ")}.`);
+        parts.push(
+          `  Final exam unlocked: ${st.examUnlocked ? "YES" : "NO — seat-time requirement not met yet"}.`,
+        );
+
+        const unpassed = await unpassedQuizzes(db, user.id, e.courseId);
+        parts.push(
+          unpassed.length
+            ? `  NOT YET PASSED: ${unpassed.map((q) => `"${q.title}"`).join(", ")}. A certificate CANNOT be issued until every one of these is passed.`
+            : `  All quizzes and the final exam are passed.`,
+        );
+      } catch {
+        parts.push("  (progress unavailable)");
+      }
+      lines.push(parts.join("\n"));
+    }
+  }
 
   const certs = await db
     .select({
