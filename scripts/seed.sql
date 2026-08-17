@@ -27,7 +27,7 @@ VALUES
    'Oregon Chiropractic Assistant — Initial Certification',
    'The complete online portion of Oregon''s required chiropractic assistant training — 8 hours of instruction you can finish in days, with automatic hour tracking, a final exam, and an instantly verifiable certificate. Includes prep materials and a signable log for your 4 hands-on clinic hours, plus a guided checklist for the state application and exam that come next.',
    8, 'general', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 14900, 'published', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 14900, 'published', 0.8, 2.0,
    'Jason Young, DC');
 
 -- Modules: Module 1 free preview; paywall begins at Module 2.
@@ -167,8 +167,9 @@ VALUES
 -- ===========================================================================
 
 -- Vitals: short video, but credit includes off-video practice logged on paper,
--- so credit_hours (1.0) deliberately exceeds video runtime. required_seat_minutes
--- (5) is the exam floor and is decoupled from the certificate's credit figure.
+-- so credit_hours (2.0 — Oregon's required annual vitals hours) deliberately
+-- exceeds video runtime. required_seat_minutes (5) is the exam floor and is
+-- decoupled from the certificate's credit figure.
 INSERT OR REPLACE INTO courses
   (id, slug, title, description, credit_hours, required_seat_minutes, topic_category,
    state, audience, content_type, access_model, price_cents, status, pass_threshold,
@@ -176,9 +177,9 @@ INSERT OR REPLACE INTO courses
 VALUES
   ('crs_vitals', 'vitals-monitoring',
    'Taking & Recording Vital Signs',
-   'A focused single-module course on measuring and documenting patient vital signs, with a downloadable practice log.',
-   1, 5, 'vitals', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 3900, 'published', 0.8, 1.5,
+   'Meets Oregon''s 2-hour annual vitals-training requirement for Chiropractic Assistant renewal. Measure and document blood pressure, pulse, respiration, and temperature to clinical standard, with a downloadable practice log and a completion certificate for your records.',
+   2, 5, 'vitals', 'oregon', 'ca',
+   'ce_course', 'one_time_purchase', 3900, 'published', 0.8, 2.0,
    'Jason Young, DC');
 
 INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
@@ -214,7 +215,7 @@ VALUES
    'HIPAA Essentials for Chiropractic Assistants',
    'A single-module HIPAA certification covering protected health information, the minimum-necessary rule, and front-desk privacy practices.',
    1, NULL, 'hipaa', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 3500, 'published', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 3500, 'published', 0.8, 2.0,
    'Jason Young, DC');
 
 INSERT OR REPLACE INTO modules (id, course_id, position, title, description, is_free_preview) VALUES
@@ -255,7 +256,7 @@ VALUES
    'Cultural Competency',
    'Standalone cultural competency CE for chiropractic assistants.',
    1, NULL, 'cultural_competency', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 2900, 'draft', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 2900, 'draft', 0.8, 2.0,
    'Jason Young, DC');
 
 -- CBT in Chiropractic Practice — $49
@@ -268,7 +269,7 @@ VALUES
    'CBT in Chiropractic Practice',
    'Cognitive behavioral techniques applied in the chiropractic setting.',
    1, NULL, 'general', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 4900, 'draft', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 4900, 'draft', 0.8, 2.0,
    'Jason Young, DC');
 
 -- Annual Renewal Bundle (6 hr, incl. vitals + cultural competency) — $89.
@@ -282,7 +283,7 @@ VALUES
    'Annual Renewal Bundle (6 hr)',
    'The annual CE bundle for renewing Oregon CAs — includes vitals and cultural competency.',
    6, NULL, 'general', 'oregon', 'ca',
-   'ce_course', 'one_time_purchase', 8900, 'draft', 0.8, 1.5,
+   'ce_course', 'one_time_purchase', 8900, 'draft', 0.8, 2.0,
    'Jason Young, DC');
 
 -- Bundle constituents: buying the bundle enrolls the student in these courses.

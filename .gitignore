@@ -19,3 +19,8 @@ node_modules/
 npm-debug.log*
 *.log
 .DS_Store
+
+# Vendored Jeldon engine ships its prebuilt dist (no registry yet — see
+# vendor/jeldon/README.md). Keep it tracked despite the global `dist/` rule.
+!vendor/jeldon/**/dist/
+!vendor/jeldon/**/dist/**

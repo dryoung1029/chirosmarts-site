@@ -5,7 +5,7 @@ import { getDb } from "@/db/client";
 import { captureLead, type LeadSource } from "@/lib/leads";
 import { recordAttribution } from "@/lib/attribution";
 
-const SOURCES: LeadSource[] = ["renewal_checker", "checklist_pdf", "other"];
+const SOURCES: LeadSource[] = ["renewal_checker", "checklist_pdf", "newsletter", "other"];
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = getDb(locals.runtime.env);

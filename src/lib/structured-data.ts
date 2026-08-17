@@ -49,6 +49,7 @@ export function articleLd(input: {
   datePublished?: string;
   dateModified?: string;
   image?: string | null;
+  heroAlt?: string | null;
   wordCount?: number;
   section?: string;
   tags?: string[];
@@ -69,7 +70,7 @@ export function articleLd(input: {
       authorSlug: author.slug, // matches a config author → links by @id
       tags: input.tags ?? [],
       heroImage: input.image ?? undefined,
-      heroImageAlt: "",
+      heroImageAlt: input.heroAlt ?? "",
     },
     jeldonConfig.authors.map((a) => ({ slug: a.slug, name: a.name, schemaId: a.schemaId })),
     {

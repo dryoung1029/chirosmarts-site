@@ -14,14 +14,20 @@ pages_build_output_dir = "./dist"
 # (used for magic-link emails, Stripe redirects, certificate verification links).
 # This is the PRODUCTION value; local `astro dev` overrides it via `.dev.vars`.
 [vars]
-SITE_URL = "https://chirosmarts-site.pages.dev"
+SITE_URL = "https://chirosmarts.com"
 # Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
 ADMIN_EMAILS = "contact@chirosmarts.com"
 # Transactional "From" for ALL Resend mail (magic links, receipts, certs).
-# REQUIRES chirosmarts.com to be a VERIFIED domain in Resend before deploying —
-# sending from an unverified domain makes Resend reject every message.
-EMAIL_FROM = "ChiroSmarts <noreply@chirosmarts.com>"
+# Sends from the VERIFIED mail.chirosmarts.com subdomain (subdomain sending is
+# the recommended practice — it isolates the root domain's reputation). The
+# From domain must exactly match a domain marked "Verified" in Resend.
+EMAIL_FROM = "ChiroSmarts <noreply@mail.chirosmarts.com>"
 EMAIL_REPLY_TO = "contact@chirosmarts.com"
+# Independent, Google-indexed reviews. ChiroSmarts is online-only, so it is not
+# eligible for a Google Business Profile — Trustpilot is the public review
+# surface. Used by the post-certification review email and the /review and
+# /reviews pages (all omit the link entirely when this is unset).
+TRUSTPILOT_REVIEW_URL = "https://www.trustpilot.com/evaluate/chirosmarts.com"
 
 # --- D1 (database) ---
 [[d1_databases]]

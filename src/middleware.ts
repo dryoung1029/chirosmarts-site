@@ -16,6 +16,7 @@ import {
   clearImpersonation,
 } from "@/lib/auth/impersonation";
 import { isAdmin } from "@/lib/admin";
+import { legacyRedirect } from "@/lib/legacy-redirects";
 
 // Routes reachable without a session.
 const PUBLIC_PATHS = new Set<string>([
@@ -40,13 +41,24 @@ function isPublic(pathname: string): boolean {
   if (
     pathname === "/clinics" ||
     pathname === "/renewal" ||
+    pathname === "/renewal/my-month" || // tokenized birth-month capture from emails
     pathname === "/about" ||
-    pathname === "/sitemap.xml"
+    pathname === "/sitemap.xml" ||
+    pathname === "/robots.txt"
   )
     return true;
+  // Cron tick for lifecycle email flows (authorized by a shared secret, not a session).
+  if (pathname === "/api/cron/flows") return true;
+  if (pathname === "/api/cron/support") return true;
+  // Testimonial collection from the review email (tokenized, no login).
+  if (pathname === "/review") return true;
+  // Public reviews page (brand query: "chirosmarts reviews").
+  if (pathname === "/reviews") return true;
   // Help Center (articles + contact form) is open to everyone, incl. prospects.
   if (pathname === "/help" || pathname.startsWith("/help/")) return true;
   if (pathname === "/api/help/contact") return true;
+  // First-party pageview beacon (fire-and-forget, privacy-first).
+  if (pathname === "/api/metrics/view") return true;
   // Funnel: lead capture, double-opt-in confirm, and gated asset download.
   if (pathname === "/api/leads/capture") return true;
   if (pathname === "/leads/confirm") return true;
@@ -62,6 +74,12 @@ function isPublic(pathname: string): boolean {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { locals, cookies, url, redirect } = context;
+
+  // Legacy 301s from the old WordPress site — resolve before any session/DB work
+  // so old inbound links and search results land on the right new page.
+  const legacy = legacyRedirect(url.pathname);
+  if (legacy) return redirect(legacy, 301);
+
   locals.user = null;
   locals.sessionId = null;
   locals.realUser = null;

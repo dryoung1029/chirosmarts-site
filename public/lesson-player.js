@@ -54,6 +54,7 @@ function renderProgress(p) {
 let runStart = null; // start of the current contiguous coverage run
 let runEnd = null; // latest sampled position in the run
 let lastBeatAt = 0;
+let lastPollAt = 0; // wall time of the previous tick (for jitter-robust seek detection)
 let leaseOk = true;
 
 async function acquireLease() {
@@ -130,6 +131,12 @@ async function tick() {
   const focused = document.visibilityState === "visible";
   const rate = adapter.getRate();
   const pos = adapter.getCurrentTime();
+  // Actual wall time since the last poll — setInterval drifts and the Stream
+  // iframe can stall the main thread, so we measure real elapsed instead of
+  // assuming POLL_MS. This keeps the seek detector honest at any rate.
+  const now = Date.now();
+  const elapsedSec = lastPollAt ? (now - lastPollAt) / 1000 : POLL_MS / 1000;
+  lastPollAt = now;
 
   if (!playing || !focused) {
     // Idle or backgrounded — bank whatever run we have and stop accruing.
@@ -151,7 +158,7 @@ async function tick() {
     runStart = pos;
     runEnd = pos;
     lastBeatAt = Date.now();
-  } else if (pos < runEnd - SEEK_EPS || pos > runEnd + maxStep(rate)) {
+  } else if (pos < runEnd - SEEK_EPS || pos > runEnd + maxStep(rate, elapsedSec)) {
     // Seek (back, or a forward jump bigger than playback could produce): break
     // the run so the skipped span is not credited.
     flushRun(rate);
@@ -172,9 +179,11 @@ async function tick() {
   }
 }
 
-function maxStep(rate) {
-  // Largest plausible forward move between polls at this rate, plus slack.
-  return (POLL_MS / 1000) * (rate || 1) * 3 + SEEK_EPS;
+function maxStep(rate, elapsedSec) {
+  // Largest plausible forward move SINCE THE LAST POLL at this rate, plus slack.
+  // Uses actual elapsed wall time (not a fixed POLL_MS) so tick jitter or a
+  // faster-than-reported rate can't be misread as a seek and drop coverage.
+  return (elapsedSec || POLL_MS / 1000) * (rate || 1) * 2 + SEEK_EPS;
 }
 
 // Flush on tab hide / unload so the last partial segment is recorded.
@@ -298,6 +307,15 @@ function StreamAdapter(mount, iframeUrl) {
         }
         if (player.playbackRate > cfg.maxPlaybackRate) {
           player.playbackRate = cfg.maxPlaybackRate;
+        }
+      });
+      // Enforce the per-course speed cap for REAL — clamp every time the viewer
+      // changes speed (the native controls allow 2x; we don't). Without this the
+      // video plays faster than the seat-time engine expects and credit is lost.
+      player.addEventListener("ratechange", () => {
+        if (player.playbackRate > cfg.maxPlaybackRate + 0.01) {
+          player.playbackRate = cfg.maxPlaybackRate;
+          showStatus(`Max playback speed for this course is ${cfg.maxPlaybackRate}×.`, "");
         }
       });
       player.addEventListener("play", acquireLease);

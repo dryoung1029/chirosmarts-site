@@ -17,6 +17,7 @@ export interface PostLike {
   bodyMarkdown?: string | null;
   slug?: string | null;
   heroImage?: string | null;
+  heroAlt?: string | null;
 }
 
 /** Score a post with the engine, fed by the Domain Pack's scoring config. */
@@ -28,7 +29,7 @@ export function scorePost(p: PostLike): { seo: ScoreResult; geo: ScoreResult } {
     body: p.bodyMarkdown ?? "",
     slug: p.slug ?? "",
     heroImage: p.heroImage ?? undefined,
-    heroImageAlt: "", // heroes are decorative (alt="") per the house image rules
+    heroImageAlt: p.heroAlt ?? "",
   };
   return scoreArticle(input, jeldonConfig.scoring);
 }

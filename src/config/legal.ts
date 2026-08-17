@@ -12,8 +12,7 @@ export const LEGAL = {
   entityName: "Talisman Health Enterprise Management, LLC",
   contactEmail: "contact@chirosmarts.com",
   mailingAddress: "867 NW 23rd St, Corvallis, OR 97330",
-  // Still pending: set once the attorney finalizes and the policy takes effect.
-  effectiveDate: "[EFFECTIVE DATE]",
-  termsVersion: "2026-06-draft",
-  privacyVersion: "2026-06-draft",
+  effectiveDate: "July 1, 2026",
+  termsVersion: "2026-07-01",
+  privacyVersion: "2026-07-01",
 } as const;

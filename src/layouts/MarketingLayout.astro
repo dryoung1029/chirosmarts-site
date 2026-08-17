@@ -1,6 +1,7 @@
 ---
 import "@/styles/tokens.css";
 import Logo from "@/components/Logo.astro";
+import LeadCapture from "@/components/marketing/LeadCapture.astro";
 import { getSiteUrl } from "@/lib/env";
 import { LEGAL } from "@/config/legal";
 import { organizationLd } from "@/lib/structured-data";
@@ -77,6 +78,15 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         {(articleMeta.tags ?? []).map((t) => <meta property="article:tag" content={t} />)}
       </>
     )}
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="ChiroSmarts Blog"
+      href={`${siteUrl}/blog/rss.xml`}
+    />
+    {env.GOOGLE_SITE_VERIFICATION && (
+      <meta name="google-site-verification" content={env.GOOGLE_SITE_VERIFICATION} />
+    )}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
@@ -91,6 +101,26 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
         data-cf-beacon={`{"token": "${analyticsToken}"}`}
       />
     )}
+    {/* First-party pageview beacon → /api/metrics/view (privacy-first: no
+        cookie, no id; the server derives the traffic channel and drops bots,
+        admins, and anything off the public surface). */}
+    <script is:inline>
+      (function () {
+        try {
+          var p = new URLSearchParams(location.search);
+          navigator.sendBeacon(
+            "/api/metrics/view",
+            JSON.stringify({
+              path: location.pathname,
+              referrer: document.referrer || "",
+              utm_source: p.get("utm_source") || undefined,
+              utm_medium: p.get("utm_medium") || undefined,
+              utm_campaign: p.get("utm_campaign") || undefined,
+            }),
+          );
+        } catch (e) {}
+      })();
+    </script>
     {/* First-touch campaign attribution: store UTM tags in a first-party cookie
         (no third-party tracking) so conversions can be tied to ad campaigns. */}
     <script is:inline>
@@ -173,10 +203,24 @@ const ld = [organizationLd(siteUrl), ...jsonLd].filter(Boolean);
       <slot />
     </main>
 
+    {!path.startsWith("/blog") && (
+      <section class="mk-section" style="padding:2.25rem 0;background:var(--brand-tint)">
+        <div class="mk-container" style="max-width:620px">
+          <LeadCapture
+            source="newsletter"
+            heading="Get the ChiroSmarts newsletter"
+            blurb="Practical tips for Oregon chiropractic assistants and the clinics that employ them — new guides and compliance reminders, no spam."
+            buttonLabel="Subscribe"
+          />
+        </div>
+      </section>
+    )}
+
     <footer class="mk-footer">
       <div class="mk-container">
         <span>© {new Date().getFullYear()} {LEGAL.entityName}</span>
         <a href="/courses">Courses</a>
+        <a href="/reviews">Reviews</a>
         <a href="/verify">Verify a certificate</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>

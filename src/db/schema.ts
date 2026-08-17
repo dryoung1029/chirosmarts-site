@@ -267,6 +267,11 @@ export const courses = sqliteTable("courses", {
   // read this). Default 0 so a row without an explicit price is obviously unset.
   priceCents: integer("price_cents").notNull().default(0),
   stripePriceId: text("stripe_price_id"),
+  // Persistent Stripe Product id for this course. Prices stay DB-driven (sent
+  // inline at checkout), but binding the line item to a real Product lets
+  // coupons be restricted to a specific course. Populated by the admin
+  // "Sync courses to Stripe" action (src/lib/stripe-sync.ts).
+  stripeProductId: text("stripe_product_id"),
   status: text("status", { enum: ["draft", "published", "archived"] })
     .notNull()
     .default("draft"),
@@ -717,6 +722,7 @@ export const blogPosts = sqliteTable(
       .default("draft"),
     heroImage: text("hero_image"),
     heroPrompt: text("hero_prompt"), // editable image-gen prompt (two-step hero flow)
+    heroAlt: text("hero_alt"), // descriptive alt text for the hero (accessibility + SEO)
     seoDescription: text("seo_description"),
     model: text("model"), // AI generation provenance; null if hand-written
     scheduledAt: text("scheduled_at"), // UTC; status=scheduled auto-publishes at/after this
@@ -729,6 +735,25 @@ export const blogPosts = sqliteTable(
     index("blog_posts_status_idx").on(t.status, t.publishedAt),
   ],
 );
+
+// AEO citation-presence audit snapshots (@jeldon/aeo-audit). The engine operates
+// on the whole rolling SnapshotStoreData object, so we persist it as one JSON
+// blob (single row, id='default') — the D1 analogue of its FsSnapshotStore.
+export const aeoAuditStore = sqliteTable("aeo_audit_store", {
+  id: text("id").primaryKey(),
+  data: text("data").notNull(), // JSON.stringify(SnapshotStoreData)
+  updatedAt: text("updated_at").notNull().default(nowUtc),
+});
+
+// Generated amplification kit (social channels + newsletter) per blog post,
+// produced by @jeldon/amplify. One row per post; stored for review (not sent).
+export const amplifyKits = sqliteTable("amplify_kits", {
+  postId: text("post_id").primaryKey(),
+  kit: text("kit").notNull(), // JSON: per-channel copy { facebook, linkedin, ... }
+  newsletter: text("newsletter"), // JSON: { subject, body }
+  model: text("model"),
+  updatedAt: text("updated_at").notNull().default(nowUtc),
+});
 
 // A bundle is a single saleable `courses` row (one price, one purchase) whose
 // fulfilment activates enrollments in its CONSTITUENT courses. `bundle_items`
@@ -763,7 +788,7 @@ export const marketingLeads = sqliteTable(
     id: text("id").primaryKey(),
     email: text("email").notNull(), // normalized lowercase
     source: text("source", {
-      enum: ["renewal_checker", "checklist_pdf", "other"],
+      enum: ["renewal_checker", "checklist_pdf", "newsletter", "other"],
     })
       .notNull()
       .default("other"),
@@ -782,6 +807,101 @@ export const marketingLeads = sqliteTable(
   (t) => [
     uniqueIndex("marketing_leads_email_source_idx").on(t.email, t.source),
     index("marketing_leads_status_idx").on(t.status),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Imported contacts — roster from the legacy site's signup/purchase forms.
+// ---------------------------------------------------------------------------
+// One row per unique email (merged across forms). Richer than `marketing_leads`
+// (which only holds email + birth month for the new double-opt-in funnel) so we
+// keep name / clinic / mailing address / phone for the renewal list and the
+// clinic B2B postcard mailer. `everBought` flags prior paying customers.
+export const importedContacts = sqliteTable(
+  "imported_contacts",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(), // normalized lowercase
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    clinic: text("clinic"),
+    phone: text("phone"),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressZip: text("address_zip"),
+    birthMonth: integer("birth_month"),
+    // Where we first saw them: a form label like "paid_cert" / "free_ceu".
+    firstSource: text("first_source"),
+    everBought: integer("ever_bought", { mode: "boolean" }).notNull().default(false),
+    // Completed a course (from the WP Courseware gradebook): certified status +
+    // the (earliest) completion date. Drives the "certified CA" marketing segment.
+    certified: integer("certified", { mode: "boolean" }).notNull().default(false),
+    completedAt: text("completed_at"),
+    // Earliest signup/purchase date seen (UTC ISO) — proxy for renewal timing.
+    firstSeenAt: text("first_seen_at"),
+    lastSeenAt: text("last_seen_at"),
+    importedAt: text("imported_at").notNull().default(nowUtc),
+  },
+  (t) => [uniqueIndex("imported_contacts_email_idx").on(t.email)],
+);
+
+// ---------------------------------------------------------------------------
+// Sales ledger — APPEND-ONLY record of actual cash, for revenue tracking.
+// ---------------------------------------------------------------------------
+// Why a dedicated ledger instead of summing `enrollments.amountCents`: a bundle
+// purchase fulfils its CONSTITUENT courses (each enrolled at amountCents=0) while
+// the bundle's own enrollment stays `pending`, and clinic seat pools never create
+// per-student enrollments at all — so enrollment amounts under-count real revenue.
+// Each row is one immutable money event recorded at the PURCHASED-SKU level (a
+// bundle stays a bundle), so revenue reconciles cleanly and can be bucketed by
+// SKU against the projection model. Refunds are appended as separate negative
+// rows (never edited in place), matching the append-only compliance ethos.
+export const sales = sqliteTable(
+  "sales",
+  {
+    id: text("id").primaryKey(),
+    // `sale` = money in; `refund` = money out (negative amount); `adjustment` =
+    // manual correction / off-platform or legacy baseline entry.
+    kind: text("kind", { enum: ["sale", "refund", "adjustment"] })
+      .notNull()
+      .default("sale"),
+    // How the money moved: real Stripe charge, dev/admin comp (no cash),
+    // clinic seat-pool purchase, free grant, or a hand-entered manual row.
+    source: text("source", {
+      enum: ["stripe", "comp", "clinic_seat", "free", "manual"],
+    })
+      .notNull()
+      .default("stripe"),
+    // Acquisition channel for bucketing against the model (B2C vs clinic B2B).
+    channel: text("channel", { enum: ["direct", "clinic"] })
+      .notNull()
+      .default("direct"),
+    userId: text("user_id").references(() => users.id),
+    clinicId: text("clinic_id").references(() => clinics.id),
+    // The SKU actually purchased (bundle id stays the bundle, not its children).
+    courseId: text("course_id").references(() => courses.id),
+    // Snapshots so historical rows survive catalog/price/title changes.
+    skuSlug: text("sku_slug"),
+    skuLabel: text("sku_label"),
+    buyerName: text("buyer_name"), // display name of the purchaser (best-effort)
+    quantity: integer("quantity").notNull().default(1),
+    unitPriceCents: integer("unit_price_cents").notNull().default(0),
+    // Actual cash for this row (quantity × unit price; negative for refunds;
+    // 0 for comps/free). The single figure summed for revenue.
+    amountCents: integer("amount_cents").notNull().default(0),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    // For refund rows: the sale row they reverse (when resolvable).
+    reversesSaleId: text("reverses_sale_id"),
+    note: text("note"),
+    occurredAt: text("occurred_at").notNull().default(nowUtc),
+    createdAt: text("created_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("sales_occurred_idx").on(t.occurredAt),
+    index("sales_course_idx").on(t.courseId),
+    index("sales_pi_idx").on(t.stripePaymentIntentId),
   ],
 );
 
@@ -807,5 +927,89 @@ export const transcriptEmbeddings = sqliteTable(
   (t) => [
     uniqueIndex("transcript_emb_chunk_model_idx").on(t.lessonTranscriptId, t.model),
     index("transcript_emb_lesson_idx").on(t.lessonId, t.model),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// First-party page metrics (SEO/traffic — NOT compliance data)
+// ---------------------------------------------------------------------------
+
+/**
+ * Privacy-first pageview log for the public marketing/SEO surface. One row per
+ * view; no user id, no IP, no cookie — just path, traffic channel, coarse
+ * device, and country (from the Cloudflare request). Kept separate from the
+ * append-only compliance `events` table on purpose: this is operational
+ * marketing data, prunable at will, never part of the audit trail.
+ * `channel` is derived server-side: organic (search-engine referrer, no UTM),
+ * paid (utm_medium cpc/ppc/paid), referral, internal, or direct.
+ */
+export const pageMetrics = sqliteTable(
+  "page_metrics",
+  {
+    id: text("id").primaryKey(),
+    path: text("path").notNull(),
+    channel: text("channel").notNull(), // organic | paid | referral | internal | direct
+    referrerHost: text("referrer_host"), // e.g. "www.google.com"; null = direct
+    utmSource: text("utm_source"),
+    utmMedium: text("utm_medium"),
+    utmCampaign: text("utm_campaign"),
+    country: text("country"), // ISO-3166 alpha-2 from request.cf
+    device: text("device"), // mobile | desktop (coarse UA sniff, no fingerprinting)
+    occurredAt: text("occurred_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("page_metrics_time_idx").on(t.occurredAt),
+    index("page_metrics_path_idx").on(t.path, t.occurredAt),
+    index("page_metrics_channel_idx").on(t.channel, t.occurredAt),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// AI support triage (help-desk assistant)
+// ---------------------------------------------------------------------------
+
+/**
+ * Student questions from /help/contact, with the AI's classification and draft
+ * reply. Operational support data — mutable status, prunable — kept OUT of the
+ * append-only `events` audit trail (a `support_request` event is still logged
+ * there for the record).
+ *
+ * Lifecycle: new → drafted → (sent | escalated). `escalated` means the AI
+ * judged the question to need Dr. Young personally (regulatory, clinical,
+ * billing, complaint, or simply low confidence) and wrote no auto-reply.
+ */
+export const supportRequests = sqliteTable(
+  "support_requests",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id),
+    email: text("email").notNull(),
+    subject: text("subject").notNull(),
+    message: text("message").notNull(),
+    fromPage: text("from_page"),
+    status: text("status", {
+      enum: ["new", "drafted", "sent", "escalated", "closed"],
+    })
+      .notNull()
+      .default("new"),
+    // AI triage output
+    category: text("category"), // e.g. exam_gate | certificate | sign_in | clinic_seats | regulatory | billing | other
+    confidence: real("confidence"), // 0..1 self-reported by the classifier
+    autoSendable: integer("auto_sendable", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    escalationReason: text("escalation_reason"),
+    draftSubject: text("draft_subject"),
+    draftBody: text("draft_body"), // markdown-ish plain text, Dr. Young's voice
+    helpArticles: text("help_articles", { mode: "json" }), // slugs cited
+    model: text("model"),
+    sentAt: text("sent_at"),
+    sentBy: text("sent_by"), // "auto" | admin email
+    createdAt: text("created_at").notNull().default(nowUtc),
+    updatedAt: text("updated_at").notNull().default(nowUtc),
+  },
+  (t) => [
+    index("support_requests_status_idx").on(t.status, t.createdAt),
+    index("support_requests_email_idx").on(t.email),
   ],
 );

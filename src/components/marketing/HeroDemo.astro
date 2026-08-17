@@ -61,8 +61,13 @@ const caption = OWNER.hero.demoCaption;
 </figure>
 
 <style>
-  .hero-demo { margin: 0; }
+  .hero-demo { margin: 0; display: flex; flex-direction: column; }
   .caption { color: var(--muted); font-size: 0.85rem; text-align: center; margin: 0.75rem 0 0; }
+  /* On mobile the demo sits under the hero copy, so label it ABOVE the mockup —
+     otherwise the fictional "Maya R." dashboard can read as the visitor's own. */
+  @media (max-width: 880px) {
+    .caption { order: -1; margin: 0 0 0.6rem; }
+  }
   .browser {
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     overflow: hidden; box-shadow: var(--shadow);

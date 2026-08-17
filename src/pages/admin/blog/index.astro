@@ -19,6 +19,8 @@ const posts = await db
   .orderBy(desc(schema.blogPosts.updatedAt))
   .all();
 const msg = Astro.url.searchParams.get("msg");
+// Prefill the topic when arriving from an AEO action item ("Draft this").
+const prefillTopic = Astro.url.searchParams.get("topic") ?? "";
 
 const fmt = (iso: string | null) =>
   iso
@@ -61,6 +63,8 @@ const fmt = (iso: string | null) =>
       type="text"
       name="topic"
       required
+      value={prefillTopic}
+      autofocus={prefillTopic ? true : undefined}
       placeholder="Topic — e.g. How a CA should handle a difficult patient at check-in"
       style="padding:0.5rem"
     />

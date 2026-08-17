@@ -1,0 +1,67 @@
+<!--
+  ChiroSmarts — Email 2 (reminder to NON-OPENERS of Email 1, ~4 days later).
+  Deliberately lighter/shorter — reads like a quick personal nudge. Paste into
+  Brevo. Merge fields: {{ contact.FIRSTNAME }}, {{ contact.RENEWAL_URL }}.
+  Subjects (A/B):
+   A: Still worth 10 seconds, {{ contact.FIRSTNAME }}
+   B: Quick nudge — your CA renewal date
+-->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+  One tap and I'll make sure your Oregon CA renewal never sneaks up on you.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafaf7;margin:0;padding:0;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background-color:#ffffff;border:1px solid #e7e5df;border-radius:14px;overflow:hidden;">
+
+        <tr>
+          <td align="center" style="padding:28px 32px 8px 32px;">
+            <img src="https://chirosmarts.com/logo.png" alt="ChiroSmarts" width="150" style="display:block;width:150px;max-width:55%;height:auto;border:0;">
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:16px 34px 4px 34px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#13272b;font-size:16px;line-height:1.62;">
+            <p style="margin:0 0 16px 0;">Hi {{ contact.FIRSTNAME }},</p>
+            <p style="margin:0 0 16px 0;">Quick follow-up — I don't want your Oregon CA renewal to catch you off guard.</p>
+            <p style="margin:0 0 4px 0;">If you tell me your birth month, I'll remind you before your deadline each year and hand you the fastest way to get your 6 CE hours. That's the whole thing.</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:22px 34px 18px 34px;">
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ contact.RENEWAL_URL }}" style="height:50px;v-text-anchor:middle;width:300px;" arcsize="16%" strokecolor="#0b6b63" fillcolor="#0b6b63">
+              <w:anchorlock/>
+              <center style="color:#ffffff;font-family:sans-serif;font-size:16px;font-weight:bold;">Set my renewal reminders &#8594;</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-- -->
+            <a href="{{ contact.RENEWAL_URL }}" style="background-color:#0b6b63;color:#ffffff;display:inline-block;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700;line-height:50px;text-align:center;text-decoration:none;width:300px;border-radius:8px;">Set my renewal reminders &#8594;</a>
+            <!--<![endif]-->
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:0 34px 24px 34px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#13272b;font-size:16px;line-height:1.6;">
+            <p style="margin:0 0 18px 0;color:#51646a;font-size:14px;">Ten seconds and you're set. Not interested? No worries — you can unsubscribe below and I won't email again.</p>
+            <p style="margin:0;"><strong>— Dr. Jason Young, DC</strong><br><span style="color:#51646a;font-size:14px;">ChiroSmarts</span></p>
+          </td>
+        </tr>
+
+      </table>
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+        <tr>
+          <td align="center" style="padding:18px 24px 6px 24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#8a8a80;">
+            You're receiving this because you certified or signed up with ChiroSmarts.<br>
+            ChiroSmarts &middot; 867 NW 23rd St, Corvallis, OR 97330<br>
+            <a href="{{ unsubscribe }}" style="color:#8a8a80;text-decoration:underline;">Unsubscribe</a>
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>

@@ -1,0 +1,18 @@
+# Standalone cron Worker for ChiroSmarts lifecycle email flows.
+# Deploy from this directory: `npx wrangler deploy`
+name = "chirosmarts-cron"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Once a day at 16:00 UTC = 9:00am Pacific (PDT) / 8:00am (PST) — a good time for
+# the renewal/review batch to land in inboxes. Adjust the cron as you like.
+[triggers]
+crons = ["0 16 * * *"]
+
+[vars]
+# The Pages site to ping. Update if you attach a custom domain.
+TARGET_URL = "https://chirosmarts-site.pages.dev"
+
+# CRON_SECRET is a SECRET, not a var — set it after deploy with:
+#   npx wrangler secret put CRON_SECRET
+# and use the SAME value you set as CRON_SECRET in the Pages project env.

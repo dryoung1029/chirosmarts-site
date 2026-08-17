@@ -49,55 +49,111 @@ const rows = users
   <AdminNav active="students" />
   <h1>Students <span class="muted" style="font-size:1rem">({rows.length})</span></h1>
 
-  <form method="get" style="margin:0 0 1rem">
+  <form method="get" class="stu-search">
     <input
       type="text"
       name="q"
       value={q}
       placeholder="Search name or email…"
-      style="max-width:22rem;display:inline-block;width:auto"
     />
     <button type="submit" style="margin-top:0">Search</button>
-    {q && <a href="/admin/students" style="margin-left:0.75rem;font-size:0.9rem">Clear</a>}
+    {q && <a href="/admin/students" class="stu-clear">Clear</a>}
   </form>
 
-  <div class="panel">
-    <table style="width:100%;border-collapse:collapse;font-size:0.92rem">
-      <thead>
-        <tr style="text-align:left;color:var(--muted)">
-          <th style="padding:0.4rem 0.5rem">Name</th>
-          <th style="padding:0.4rem 0.5rem">Email</th>
-          <th style="padding:0.4rem 0.5rem">Role</th>
-          <th style="padding:0.4rem 0.5rem">Intake</th>
-          <th style="padding:0.4rem 0.5rem">Courses</th>
-          <th style="padding:0.4rem 0.5rem">Done</th>
-          <th style="padding:0.4rem 0.5rem">Certs</th>
-        </tr>
-      </thead>
-      <tbody>
-        {
-          rows.map((r) => (
-            <tr style="border-top:1px solid var(--border)">
-              <td style="padding:0.4rem 0.5rem">
-                <a href={`/admin/students/${r.user.id}`}>
-                  {r.user.legalName?.trim() || <span class="muted">— no name —</span>}
-                </a>
-              </td>
-              <td style="padding:0.4rem 0.5rem">{r.user.email}</td>
-              <td style="padding:0.4rem 0.5rem">{r.user.role}</td>
-              <td style="padding:0.4rem 0.5rem">{r.user.intakeCompletedAt ? "✓" : "–"}</td>
-              <td style="padding:0.4rem 0.5rem">{r.enrolled}</td>
-              <td style="padding:0.4rem 0.5rem">{r.completed}</td>
-              <td style="padding:0.4rem 0.5rem">{r.certs}</td>
-            </tr>
-          ))
-        }
-        {rows.length === 0 && (
+  <div class="panel" style="padding:0">
+    <div class="table-scroll">
+      <table class="stu-table">
+        <thead>
           <tr>
-            <td colspan="7" style="padding:0.75rem 0.5rem" class="muted">No students match.</td>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th class="num" title="Intake completed">Intake</th>
+            <th class="num" title="Active/completed course enrolments">Courses</th>
+            <th class="num" title="Courses completed">Done</th>
+            <th class="num" title="Certificates issued">Certs</th>
           </tr>
-        )}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {
+            rows.map((r) => (
+              <tr>
+                <td class="cell-name">
+                  <a href={`/admin/students/${r.user.id}`}>
+                    {r.user.legalName?.trim() || <span class="muted">— no name —</span>}
+                  </a>
+                </td>
+                <td class="cell-email">{r.user.email}</td>
+                <td data-label="Role"><span class="role-badge">{r.user.role}</span></td>
+                <td class="num" data-label="Intake">{r.user.intakeCompletedAt ? "✓" : <span class="muted">–</span>}</td>
+                <td class="num" data-label="Courses">{r.enrolled}</td>
+                <td class="num" data-label="Done">{r.completed}</td>
+                <td class="num" data-label="Certs">{r.certs}</td>
+              </tr>
+            ))
+          }
+          {rows.length === 0 && (
+            <tr>
+              <td colspan="7" style="padding:0.9rem 0.75rem" class="muted">No students match.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   </div>
+
+  <style>
+    .stu-search { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
+    .stu-search input { flex: 1; min-width: 12rem; max-width: 22rem; }
+    .stu-clear { font-size: 0.9rem; white-space: nowrap; }
+
+    /* Keep wide content scrolling INSIDE the panel — never overflow the page. */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .stu-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 640px; }
+    .stu-table th,
+    .stu-table td { padding: 0.55rem 0.75rem; vertical-align: middle; }
+    .stu-table thead th {
+      text-align: left; color: var(--muted); font-weight: 600; white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    .stu-table tbody tr { border-top: 1px solid var(--border); }
+    .stu-table tbody tr:first-child { border-top: 0; }
+    /* Numeric columns: centered, compact, never clipped. */
+    .stu-table .num { text-align: center; white-space: nowrap; width: 1%; font-variant-numeric: tabular-nums; }
+    .stu-table thead .num { text-align: center; }
+    .cell-name a { font-weight: 600; }
+    .cell-email { color: var(--muted); word-break: break-all; }
+    .role-badge {
+      font-size: 0.78rem; color: var(--muted); background: var(--brand-tint);
+      border-radius: 6px; padding: 0.1rem 0.45rem; white-space: nowrap;
+    }
+
+    /* Phones: stack each student as a card (no sideways scroll). */
+    @media (max-width: 640px) {
+      .table-scroll { overflow-x: visible; }
+      .stu-table { min-width: 0; }
+      .stu-table thead { display: none; }
+      .stu-table, .stu-table tbody, .stu-table tr, .stu-table td { display: block; width: auto; }
+      .stu-table tbody tr {
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 0.85rem 1rem; margin: 0.75rem; background: var(--surface);
+      }
+      .stu-table td { padding: 0.28rem 0; border: 0; }
+      .cell-name { font-size: 1.1rem; }
+      .cell-email {
+        padding: 0 0 0.5rem; margin-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      /* metric rows become label ↔ value pairs */
+      .stu-table td[data-label] {
+        display: flex; justify-content: space-between; align-items: center;
+        text-align: right;
+      }
+      .stu-table td[data-label]::before {
+        content: attr(data-label); color: var(--muted); font-weight: 600;
+        text-align: left; margin-right: 1rem;
+      }
+      .stu-table .num { width: auto; }
+    }
+  </style>
 </Layout>

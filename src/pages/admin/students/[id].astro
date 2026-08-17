@@ -4,6 +4,7 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { desc, eq } from "drizzle-orm";
 import { getCourseSeatTime } from "@/lib/progress";
+import { getCourseStructure } from "@/lib/courses";
 import { unpassedQuizzes } from "@/lib/quiz";
 import { listCertificates } from "@/lib/certificate";
 import { formatPacific } from "@/lib/time";
@@ -33,6 +34,7 @@ const courseAudits = await Promise.all(
     seat: await getCourseSeatTime(db, userId, c.id),
     certs: await listCertificates(db, userId, c.id),
     unpassed: await unpassedQuizzes(db, userId, c.id),
+    modules: await getCourseStructure(db, c.id),
   })),
 );
 
@@ -91,7 +93,7 @@ const flash = Astro.url.searchParams.get("done");
     courseAudits.length === 0 ? (
       <div class="panel"><p style="margin:0">No enrollments.</p></div>
     ) : (
-      courseAudits.map(({ enrollment, course, seat, certs, unpassed }) => (
+      courseAudits.map(({ enrollment, course, seat, certs, unpassed, modules }) => (
         <div class="panel">
           <h2 style="margin-bottom:0.25rem">{course.title}</h2>
           <p class="muted" style="margin-top:0;font-size:0.9rem">
@@ -117,6 +119,7 @@ const flash = Astro.url.searchParams.get("done");
                 <th style="padding:0.3rem 0.4rem">Length</th>
                 <th style="padding:0.3rem 0.4rem">%</th>
                 <th style="padding:0.3rem 0.4rem">≥90%</th>
+                <th style="padding:0.3rem 0.4rem"></th>
               </tr>
             </thead>
             <tbody>
@@ -127,10 +130,31 @@ const flash = Astro.url.searchParams.get("done");
                   <td style="padding:0.3rem 0.4rem">{fmtMin(p.durationSeconds)}m</td>
                   <td style="padding:0.3rem 0.4rem">{Math.round(p.fraction * 100)}%</td>
                   <td style="padding:0.3rem 0.4rem">{p.meetsThreshold ? "✓" : "–"}</td>
+                  <td style="padding:0.3rem 0.4rem;text-align:right">
+                    <form method="POST" action={`/api/admin/users/${userId}/reset-lesson`} class="seat-reset-form" style="margin:0;display:inline">
+                      <input type="hidden" name="lessonId" value={p.lessonId} />
+                      <button type="submit" title="Reset seat time for this lesson"
+                        style="font-size:0.78rem;padding:0.15rem 0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);cursor:pointer">Reset</button>
+                    </form>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* Per-module seat-time reset (troubleshooting) */}
+          <details style="margin-top:0.6rem">
+            <summary class="muted" style="cursor:pointer;font-size:0.85rem">Reset a whole module's seat time</summary>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">
+              {modules.map(({ module }) => (
+                <form method="POST" action={`/api/admin/users/${userId}/reset-module`} class="seat-reset-form" style="margin:0">
+                  <input type="hidden" name="moduleId" value={module.id} />
+                  <button type="submit"
+                    style="font-size:0.8rem;padding:0.25rem 0.6rem;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);cursor:pointer">↺ {module.title}</button>
+                </form>
+              ))}
+            </div>
+          </details>
 
           {/* Certificates for this course */}
           <div style="margin-top:1rem">
@@ -298,6 +322,11 @@ const flash = Astro.url.searchParams.get("done");
     });
     document.querySelector(".delete-form")?.addEventListener("submit", (e) => {
       if (!confirm("Permanently DELETE this user and all their data? This cannot be undone.")) e.preventDefault();
+    });
+    document.querySelectorAll(".seat-reset-form").forEach((f) => {
+      f.addEventListener("submit", (e) => {
+        if (!confirm("Reset seat time here? The student's watched-time for this lesson/module is cleared so they can re-watch. Quiz attempts and certificates are kept.")) e.preventDefault();
+      });
     });
   </script>
 </Layout>

@@ -20,6 +20,7 @@ interface CloudflareEnv {
   SITE_URL: string;
   ADMIN_EMAILS?: string; // comma-separated emails auto-promoted to site_admin
   CF_WEB_ANALYTICS_TOKEN?: string; // Cloudflare Web Analytics beacon (cookieless)
+  GOOGLE_SITE_VERIFICATION?: string; // Search Console ownership meta tag content
 
   // Secrets (set via .dev.vars locally, wrangler secrets in prod)
   RESEND_API_KEY?: string;
@@ -34,13 +35,30 @@ interface CloudflareEnv {
   CF_STREAM_SIGNING_KEY_PEM?: string;
   CF_STREAM_SIGNING_KEY_JWK?: string; // base64-encoded JWK (RSA private key)
   ANTHROPIC_API_KEY?: string;
+  // AI support desk: "on" lets narrow, high-confidence how-it-works answers send
+  // automatically. Anything else (regulatory, clinical, billing, complaints,
+  // low confidence) always waits for the owner. Unset = every reply is reviewed.
+  SUPPORT_AUTOSEND?: string;
   GEMINI_API_KEY?: string; // Google Gemini / Imagen — blog hero image generation
   GEMINI_IMAGE_MODEL?: string; // override (default gemini-2.5-flash-image; imagen-* uses :predict, needs billing)
+  PERPLEXITY_API_KEY?: string; // @jeldon/aeo-audit — answer-engine citation audit
+  SERPAPI_KEY?: string; // @jeldon/aeo-audit — Google AI Overview engine (optional)
   // Brevo (marketing email — groundwork only; no campaigns wired). Sync pushes
   // CONFIRMED leads + opted-in users; never non-consented contacts.
   BREVO_API_KEY?: string;
   BREVO_LIST_ID_LEADS?: string;
   BREVO_LIST_ID_USERS?: string;
+  BREVO_LIST_ID_NEWSLETTER?: string; // newsletter subscribers (falls back to LEADS)
+  // Lifecycle email flows (Resend): shared secret to authorize the daily cron
+  // tick endpoint, and an HMAC secret for stateless birth-month-capture links.
+  CRON_SECRET?: string;
+  CONTACT_TOKEN_SECRET?: string;
+  // Optional: if set, the review page also offers a "leave a Google review" link.
+  GOOGLE_REVIEW_URL?: string;
+  // Trustpilot "evaluate" link (https://www.trustpilot.com/evaluate/<domain>).
+  // Independent, Google-indexed reviews — ChiroSmarts is online-only, so it is
+  // NOT eligible for a Google Business Profile of its own.
+  TRUSTPILOT_REVIEW_URL?: string;
 }
 
 type Runtime = import("@astrojs/cloudflare").Runtime<CloudflareEnv>;
