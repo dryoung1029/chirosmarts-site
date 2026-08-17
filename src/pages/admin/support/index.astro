@@ -30,6 +30,7 @@ const autosendOn = env.SUPPORT_AUTOSEND === "on";
 const aiReady = !!env.ANTHROPIC_API_KEY;
 
 const open = rows.filter((r) => r.status === "new" || r.status === "drafted" || r.status === "escalated");
+const untriaged = rows.filter((r) => r.status === "new").length;
 const done = rows.filter((r) => r.status === "sent" || r.status === "closed");
 
 const statusStyle: Record<string, string> = {
@@ -50,7 +51,16 @@ const statusLabel: Record<string, string> = {
 
 <Layout title="Support · Admin" showNav={true}>
   <AdminNav active="support" />
-  <h1 style="margin-bottom:0.25rem">Support queue</h1>
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1 style="margin-bottom:0.25rem">Support queue</h1>
+    {untriaged > 0 && (
+      <form method="POST" action="/api/admin/support/run" style="margin-left:auto">
+        <button type="submit" style="margin-top:0;white-space:nowrap">
+          Run triage now ({untriaged})
+        </button>
+      </form>
+    )}
+  </div>
   <p class="muted" style="margin-top:0;max-width:52rem">
     Questions from the Help Center contact form. The assistant drafts a reply in
     your voice from the Help Center articles, and flags anything needing your
@@ -126,7 +136,8 @@ const statusLabel: Record<string, string> = {
         </form>
       ) : (
         <p class="muted" style="margin:0">
-          No draft yet — the next triage run will write one.
+          No draft yet — press <strong>Run triage now</strong> above, or wait for
+          the next scheduled run.
         </p>
       )}
     </div>
