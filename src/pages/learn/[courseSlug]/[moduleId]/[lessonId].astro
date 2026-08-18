@@ -3,7 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import TutorPanel from "@/components/TutorPanel.astro";
 import { getDb } from "@/db/client";
 import { getLessonContext } from "@/lib/courses";
-import { canAccessModule } from "@/lib/entitlement";
+import { canAccessModule, getModuleQuizGate } from "@/lib/entitlement";
 import { getLessonProgress } from "@/lib/progress";
 
 const user = Astro.locals.user!;
@@ -17,6 +17,17 @@ if (!ctx) return Astro.redirect("/dashboard", 302);
 // Entitlement: free-preview module or active enrollment.
 if (!(await canAccessModule(db, user.id, ctx.module))) {
   return Astro.redirect(`/learn/${courseSlug}`, 302);
+}
+
+// Sequential gate: an earlier module's knowledge check must be passed first.
+// Enforced here, not just in the UI, so a saved link can't skip it.
+const gate = await getModuleQuizGate(db, user.id, ctx.course.id);
+const blocked = gate.get(ctx.module.id);
+if (blocked) {
+  return Astro.redirect(
+    `/learn/${courseSlug}?blocked=${encodeURIComponent(String(blocked.blockedByModulePosition))}`,
+    302,
+  );
 }
 
 const progress = await getLessonProgress(
