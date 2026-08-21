@@ -1,5 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
+import HelpTip from "@/components/HelpTip.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
 
 const user = Astro.locals.user!; // middleware guarantees a signed-in user here
 const error = Astro.url.searchParams.get("error");
@@ -8,85 +11,414 @@ const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+const paths = [
+  {
+    value: "initial",
+    title: "Initial CA certification",
+    desc: "New to the role — build your Oregon certification path.",
+    illo: "becoming-ca" as const,
+  },
+  {
+    value: "renewal",
+    title: "Annual CA renewal",
+    desc: "Stay current — we’ll key reminders to your birth month.",
+    illo: "time-to-renew" as const,
+  },
+  {
+    value: "clinic_owner",
+    title: "Clinic owner / manager",
+    desc: "Buy seats, invite CAs, and track the team from one clinic.",
+    illo: "run-a-clinic" as const,
+  },
+];
+
+const errLower = (error ?? "").toLowerCase();
+const invalidLegal = errLower.includes("legal name");
+const invalidClinic = errLower.includes("clinic name");
+const invalidMonth = errLower.includes("birth");
 ---
 
 <Layout title="Welcome — tell us about you" showNav={true}>
-  <div class="panel">
-    <h1>Welcome to ChiroSmarts</h1>
-    <p>
-      A few details to set up your account and build your roadmap. Your
-      <strong>legal name</strong> is what appears on your certificate, so please
-      enter it exactly as it should be printed.
-    </p>
+  <BusyOverlay />
 
-    {error && <div class="notice err">{error}</div>}
+  <header class="intake-hero">
+    <div>
+      <p class="muted intake-kicker">Signed in as {user.email}</p>
+      <h1>Welcome to ChiroSmarts</h1>
+      <p>
+        A few details so we can print your certificate correctly and build the
+        right roadmap. This takes about a minute.
+      </p>
+    </div>
+    <Illustration name="certificate-moment" maxWidth={140} loading="eager" />
+  </header>
 
-    <form method="POST" action="/api/intake">
-      <label for="legalName">Legal name (as it should appear on your certificate)</label>
-      <input id="legalName" type="text" name="legalName" required autocomplete="name" />
-
-      <label for="displayName">Preferred name (optional)</label>
-      <input id="displayName" type="text" name="displayName" />
-
-      <div class="row">
-        <div>
-          <label for="path">What brings you here?</label>
-          <select id="path" name="path" required>
-            <option value="initial">Initial CA certification</option>
-            <option value="renewal">Annual CA renewal</option>
-            <option value="clinic_owner">Clinic owner / manager</option>
-          </select>
-        </div>
-        <div>
-          <label for="birthMonth">Birth month (sets your renewal date)</label>
-          <select id="birthMonth" name="birthMonth" required>
-            <option value="">Select…</option>
-            {months.map((m, i) => <option value={i + 1}>{m}</option>)}
-          </select>
-        </div>
+  <form
+    id="intake-form"
+    class="panel intake-form"
+    method="POST"
+    action="/api/intake"
+    data-busy="Saving your account…"
+  >
+    {error && (
+      <div class="notice err" role="alert" id="intake-error">
+        {error}
       </div>
+    )}
 
-      <label for="clinicName">Clinic name (optional)</label>
-      <input id="clinicName" type="text" name="clinicName" />
+    <fieldset class="intake-section">
+      <legend>Your name</legend>
+      <label for="legalName">
+        Legal name
+        <HelpTip label="Why we need your legal name" article="your-certificate">
+          This is printed on your certificate exactly as entered. Use the name
+          you use on OBCE paperwork.
+        </HelpTip>
+      </label>
+      <input
+        id="legalName"
+        type="text"
+        name="legalName"
+        required
+        autocomplete="name"
+        spellcheck="false"
+        value={user.legalName || ""}
+        aria-invalid={invalidLegal ? "true" : undefined}
+        aria-describedby="legalName-hint"
+        aria-errormessage={invalidLegal ? "intake-error" : undefined}
+      />
+      <p id="legalName-hint" class="muted intake-hint">
+        As it should appear on your certificate.
+      </p>
 
-      <label for="phone">Phone (optional)</label>
-      <input id="phone" type="text" name="phone" autocomplete="tel" />
+      <label for="displayName">Preferred name <span class="opt">(optional)</span></label>
+      <input
+        id="displayName"
+        type="text"
+        name="displayName"
+        autocomplete="nickname"
+        value={user.displayName || ""}
+      />
+    </fieldset>
 
-      <h2 style="margin-top:1.5rem">Supervising chiropractor (optional)</h2>
-      <p class="muted" style="margin-top:0">
-        Required later to sign off your 4 hands-on hours — you can add this now or
-        from your dashboard.
+    <fieldset class="intake-section">
+      <legend>What brings you here?</legend>
+      <div class="path-grid">
+        {paths.map((p, i) => (
+          <label class="path-card">
+            <input type="radio" name="path" value={p.value} required checked={i === 0} />
+            <Illustration name={p.illo} maxWidth={88} />
+            <span class="path-title">{p.title}</span>
+            <span class="muted path-desc">{p.desc}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+
+    <fieldset class="intake-section">
+      <legend class="visually-hidden">Oregon CA renewal month</legend>
+      <label for="birthMonth">
+        Birth month
+        <HelpTip label="Why birth month matters" article="renewal-and-your-birth-month">
+          Oregon CAs renew every year in their birth month. This is how we time
+          your deadline and reminders.
+        </HelpTip>
+      </label>
+      <select
+        id="birthMonth"
+        name="birthMonth"
+        required
+        aria-invalid={invalidMonth ? "true" : undefined}
+        aria-errormessage={invalidMonth ? "intake-error" : undefined}
+      >
+        <option value="">Select month…</option>
+        {months.map((m, i) => (
+          <option value={i + 1} selected={user.birthMonth === i + 1}>{m}</option>
+        ))}
+      </select>
+    </fieldset>
+
+    <fieldset class="intake-section" id="clinic-block">
+      <legend>
+        Clinic <span class="opt clinic-opt">(optional)</span>
+        <span class="clinic-req" hidden> — required for clinic accounts</span>
+      </legend>
+      <label for="clinicName">Clinic name</label>
+      <input
+        id="clinicName"
+        type="text"
+        name="clinicName"
+        autocomplete="organization"
+        value={user.clinicName || ""}
+        aria-invalid={invalidClinic ? "true" : undefined}
+        aria-describedby="clinicName-hint"
+        aria-errormessage={invalidClinic ? "intake-error" : undefined}
+      />
+      <p id="clinicName-hint" class="muted intake-hint">
+        Where you work or manage. Clinic owners need this so we can create the clinic.
+      </p>
+
+      <label for="phone">Phone <span class="opt">(optional)</span></label>
+      <input
+        id="phone"
+        type="tel"
+        name="phone"
+        autocomplete="tel"
+        inputmode="tel"
+        value={user.phone || ""}
+      />
+    </fieldset>
+
+    <details class="intake-section intake-details" id="dc-details">
+      <summary>
+        Supervising chiropractor
+        <span class="opt">optional — you can add this later</span>
+      </summary>
+      <p class="muted" style="margin:0.75rem 0 0">
+        Needed to sign off your 4 hands-on hours. Skip for now if you don’t have
+        a supervising DC yet.
+        <HelpTip label="Hands-on hours" article="hands-on-hours-and-training-log">
+          Oregon requires four hours of in-person training with a licensed DC,
+          logged on the OBCE form. We only store their contact details here.
+        </HelpTip>
       </p>
       <label for="dcName">Supervising DC name</label>
-      <input id="dcName" type="text" name="supervisingDcName" />
-      <div class="row">
+      <input
+        id="dcName"
+        type="text"
+        name="supervisingDcName"
+        autocomplete="off"
+        value={user.supervisingDcName || ""}
+      />
+      <div class="row intake-row">
         <div>
           <label for="dcLicense">DC license #</label>
-          <input id="dcLicense" type="text" name="supervisingDcLicense" />
+          <input
+            id="dcLicense"
+            type="text"
+            name="supervisingDcLicense"
+            autocomplete="off"
+            spellcheck="false"
+            value={user.supervisingDcLicense || ""}
+          />
         </div>
         <div>
           <label for="dcEmail">DC email</label>
-          <input id="dcEmail" type="text" name="supervisingDcEmail" />
+          <input
+            id="dcEmail"
+            type="email"
+            name="supervisingDcEmail"
+            autocomplete="off"
+            inputmode="email"
+            value={user.supervisingDcEmail || ""}
+          />
         </div>
       </div>
+    </details>
 
-      <div class="check">
-        <input id="marketing" type="checkbox" name="marketingConsent" value="yes" checked />
-        <label for="marketing" style="margin:0">
-          <strong>Yes — keep me current.</strong> Email me a heads-up before my Oregon CA
-          renewal is due, plus occasional free CE tips and updates. (You'll always get
-          account, receipt, and certificate emails regardless, and you can unsubscribe
-          from the rest anytime.)
-        </label>
-      </div>
+    <div class="check">
+      <input id="marketing" type="checkbox" name="marketingConsent" value="yes" checked />
+      <label for="marketing" style="margin:0">
+        <strong>Yes — keep me current.</strong> Email me a heads-up before my Oregon CA
+        renewal is due, plus occasional free CE tips and updates. (You'll always get
+        account, receipt, and certificate emails regardless, and you can unsubscribe
+        from the rest anytime.)
+      </label>
+    </div>
 
-      <p class="muted" style="font-size:0.85rem;margin:0 0 0.75rem">
-        By creating an account you agree to the
-        <a href="/terms">Terms of Service</a> and
-        <a href="/privacy">Privacy Policy</a>.
-      </p>
+    <p class="muted" style="font-size:0.85rem;margin:0.9rem 0 0">
+      By creating an account you agree to the
+      <a href="/terms">Terms of Service</a> and
+      <a href="/privacy">Privacy Policy</a>.
+    </p>
 
-      <button type="submit">Save and see my roadmap</button>
-    </form>
-  </div>
+    <button type="submit">Save and see my roadmap</button>
+  </form>
 </Layout>
+
+<style>
+  .intake-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+  }
+  .intake-kicker { margin: 0 0 0.35rem; font-size: 0.85rem; }
+  .intake-form { padding-top: 1.25rem; }
+  .intake-section {
+    border: 0;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    min-width: 0;
+  }
+  .intake-section > legend {
+    font-size: 1.05rem;
+    font-weight: 650;
+    color: var(--ink);
+    padding: 0;
+    margin: 0 0 0.65rem;
+  }
+  .intake-hint { margin: 0.3rem 0 0; font-size: 0.82rem; }
+  .opt { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+  .path-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+  @media (min-width: 640px) {
+    .path-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  .path-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--canvas);
+    cursor: pointer;
+    font-weight: 400;
+    min-width: 0;
+  }
+  .path-card:hover { border-color: var(--brand); }
+  .path-card:has(input:checked) {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+    box-shadow: 0 0 0 1px var(--brand);
+  }
+  .path-card:has(input:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .path-card input {
+    margin: 0 0 0.15rem;
+    width: auto;
+    accent-color: var(--brand);
+  }
+  .path-title {
+    font-weight: 650;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .path-desc { font-size: 0.82rem; line-height: 1.4; }
+  .intake-row { flex-wrap: wrap; }
+  .intake-details {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem 1rem;
+    background: var(--canvas);
+  }
+  .intake-details > summary {
+    cursor: pointer;
+    font-weight: 650;
+    color: var(--ink);
+    list-style-position: outside;
+  }
+  .intake-details > summary .opt {
+    display: block;
+    font-weight: 400;
+    margin-top: 0.15rem;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+
+<script>
+  const form = document.getElementById("intake-form") as HTMLFormElement | null;
+  const clinicInput = document.getElementById("clinicName") as HTMLInputElement | null;
+  const clinicReq = document.querySelector(".clinic-req") as HTMLElement | null;
+  const clinicOpt = document.querySelector(".clinic-opt") as HTMLElement | null;
+  const DRAFT_KEY = "cs-intake-draft";
+
+  function selectedPath() {
+    return (form?.querySelector('input[name="path"]:checked') as HTMLInputElement | null)?.value;
+  }
+
+  function syncClinicRequirement() {
+    const owner = selectedPath() === "clinic_owner";
+    if (!clinicInput) return;
+    clinicInput.required = owner;
+    if (clinicReq) clinicReq.hidden = !owner;
+    if (clinicOpt) clinicOpt.hidden = owner;
+  }
+
+  function saveDraft() {
+    if (!form) return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+    } catch {
+      /* private mode / quota */
+    }
+  }
+
+  function restoreDraft() {
+    if (!form) return;
+    let raw = "";
+    try {
+      raw = sessionStorage.getItem(DRAFT_KEY) ?? "";
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let data: Record<string, string>;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    for (const [name, value] of Object.entries(data)) {
+      if (name === "marketingConsent") {
+        const box = form.querySelector<HTMLInputElement>('[name="marketingConsent"]');
+        if (box) box.checked = value === "yes";
+        continue;
+      }
+      if (name === "path") {
+        const radio = form.querySelector<HTMLInputElement>(`input[name="path"][value="${CSS.escape(value)}"]`);
+        if (radio) radio.checked = true;
+        continue;
+      }
+      const el = form.elements.namedItem(name);
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+        el.value = value;
+      }
+    }
+    const dcFilled = ["supervisingDcName", "supervisingDcLicense", "supervisingDcEmail"].some(
+      (n) => (data[n] ?? "").trim(),
+    );
+    const details = document.getElementById("dc-details") as HTMLDetailsElement | null;
+    if (details && dcFilled) details.open = true;
+  }
+
+  restoreDraft();
+  syncClinicRequirement();
+
+  form?.addEventListener("change", () => {
+    syncClinicRequirement();
+    saveDraft();
+  });
+  form?.addEventListener("input", saveDraft);
+
+  const errorEl = document.getElementById("intake-error");
+  if (errorEl) {
+    const clinicInvalid = clinicInput?.getAttribute("aria-invalid") === "true";
+    const legal = document.getElementById("legalName") as HTMLInputElement | null;
+    const month = document.getElementById("birthMonth") as HTMLSelectElement | null;
+    const target = clinicInvalid ? clinicInput : legal?.getAttribute("aria-invalid") === "true" ? legal : month?.getAttribute("aria-invalid") === "true" ? month : legal;
+    target?.focus();
+  }
+</script>
