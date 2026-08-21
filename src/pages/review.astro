@@ -3,9 +3,11 @@
  * Testimonial collection — the landing for the post-completion review email.
  * Tokenized (no login). Stores the testimonial to the append-only events log
  * for an admin to curate onto the marketing site, and (optionally) nudges a
- * Google review when GOOGLE_REVIEW_URL is configured.
+ * Trustpilot / Google review when those URLs are configured.
  */
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import Illustration from "@/components/marketing/Illustration.astro";
+import BusyOverlay from "@/components/BusyOverlay.astro";
 import { getDb } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { schema } from "@/db/client";
@@ -18,90 +20,378 @@ const url = Astro.url;
 const email = (url.searchParams.get("e") ?? "").trim().toLowerCase();
 const token = (url.searchParams.get("t") ?? "").trim();
 const valid = !!email && (await verifyContactToken(env, email, token));
-// Off-site review nudge shown AFTER they've submitted. Trustpilot is the
-// primary ask (ChiroSmarts is online-only, so it can't have a Google Business
-// Profile of its own); GOOGLE_REVIEW_URL stays supported if ever applicable.
 const googleUrl = env.GOOGLE_REVIEW_URL || "";
 const trustpilotUrl = env.TRUSTPILOT_REVIEW_URL || "";
 
+const ratingLabels: Record<number, string> = {
+  1: "Poor",
+  2: "Below average",
+  3: "Okay",
+  4: "Good",
+  5: "Excellent",
+};
+
 let saved = false;
 let error = "";
+let rating = 5;
+let text = "";
+let displayName = "";
+let consentPublish = true;
+
 if (Astro.request.method === "POST" && valid) {
   const form = await Astro.request.formData();
-  const rating = Math.min(5, Math.max(1, Number(form.get("rating")) || 0));
-  const text = String(form.get("text") ?? "").trim().slice(0, 2000);
-  const name = String(form.get("name") ?? "").trim().slice(0, 120);
-  const consentPublish = form.get("consentPublish") != null;
+  rating = Math.min(5, Math.max(1, Number(form.get("rating")) || 0));
+  text = String(form.get("text") ?? "").trim().slice(0, 2000);
+  displayName = String(form.get("name") ?? "").trim().slice(0, 120);
+  consentPublish = form.get("consentPublish") != null;
   if (!text) {
-    error = "Please add a sentence or two.";
+    error = "Please add a sentence or two so other Oregon CAs know how it went.";
   } else {
     const user = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).get();
     await logEvent(db, {
       userId: user?.id ?? null,
       type: "testimonial_submitted",
-      payload: { rating, text, name, email, consentPublish },
+      payload: { rating, text, name: displayName, email, consentPublish },
     });
     saved = true;
   }
 }
+
+const offsiteReviews = [
+  trustpilotUrl && { href: trustpilotUrl, label: "Post it on Trustpilot" },
+  googleUrl && { href: googleUrl, label: "Leave a Google review too" },
+].filter(Boolean) as { href: string; label: string }[];
 ---
 
-<MarketingLayout title="Leave a review" description="Tell us how your ChiroSmarts course went." canonicalPath="/review">
-  <section class="mk-section" style="padding-top:3rem">
-    <div class="mk-container" style="max-width:560px">
+<MarketingLayout
+  title="Leave a review"
+  description="Tell us how your ChiroSmarts course went."
+  canonicalPath="/review"
+  hideLeadCapture={true}
+>
+  <BusyOverlay />
+  <section class="mk-section review-section">
+    <div class="mk-container review-wrap">
       {!valid ? (
-        <>
-          <h1>That link didn't work</h1>
-          <p style="color:var(--muted)">This review link is invalid or incomplete.</p>
-        </>
+        <div class="mk-card review-card">
+          <Illustration name="empty-state" maxWidth={140} loading="eager" class="review-illo" />
+          <h1>That link didn’t work</h1>
+          <p class="review-lede">
+            This review link is invalid or incomplete. If you just finished a
+            course, use the link in the email we sent — or browse published
+            reviews while you wait.
+          </p>
+          <div class="review-actions">
+            <a class="btn-primary" href="/reviews">See published reviews</a>
+            <a class="btn-secondary" href="/help/contact">Contact support</a>
+          </div>
+        </div>
       ) : saved ? (
-        <div style="text-align:center">
-          <h1>Thank you 🙏</h1>
-          <p style="color:var(--muted)">We really appreciate you taking the time.</p>
-          {trustpilotUrl && (
-            <>
-              <p style="margin-top:1.25rem;color:var(--muted)">
-                One more thing that really helps other Oregon CAs find us:
-              </p>
-              <p style="margin-top:0.5rem">
-                <a class="btn-primary" href={trustpilotUrl} target="_blank" rel="noopener noreferrer">
-                  Post it on Trustpilot →
-                </a>
-              </p>
-            </>
+        <div class="mk-card review-card" role="status">
+          <Illustration name="certificate-moment" maxWidth={140} loading="eager" class="review-illo" />
+          <h1>Thank you</h1>
+          <p class="review-lede">
+            We really appreciate you taking the time.
+            {consentPublish
+              ? " If you said we may publish it, it will appear on the site after we review it."
+              : " We’ll keep this private — it won’t appear on the site."}
+          </p>
+          {offsiteReviews.length > 0 && (
+            <div class="review-offsite">
+              <p class="review-offsite-kicker">One more thing that helps other Oregon CAs find us</p>
+              <div class="review-actions">
+                {offsiteReviews.map((r, i) => (
+                  <a
+                    class={i === 0 ? "btn-primary" : "btn-secondary"}
+                    href={r.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {r.label}
+                  </a>
+                ))}
+              </div>
+            </div>
           )}
-          {googleUrl && (
-            <p style="margin-top:1.25rem"><a class="btn-primary" href={googleUrl} target="_blank" rel="noopener">Leave a Google review too →</a></p>
-          )}
+          <p class="review-footer-link">
+            <a href="/reviews">See published reviews</a>
+          </p>
         </div>
       ) : (
-        <>
+        <div class="mk-card review-card">
+          <Illustration name="certificate-moment" maxWidth={120} loading="eager" class="review-illo" />
           <h1>How was your course?</h1>
-          <p style="color:var(--muted)">
+          <p class="review-lede">
             A sentence or two helps other Oregon CAs decide to get certified.
-            {error && (<span style="color:var(--danger,#b3261e)"> {error}</span>)}
           </p>
-          <form method="POST" style="display:flex;flex-direction:column;gap:0.7rem;margin-top:1rem">
-            <label style="font-weight:600">Rating
-              <select name="rating" style="width:100%;padding:0.5rem;margin-top:0.25rem">
-                <option value="5">★★★★★ — Excellent</option>
-                <option value="4">★★★★ — Good</option>
-                <option value="3">★★★ — Okay</option>
-                <option value="2">★★ — Below average</option>
-                <option value="1">★ — Poor</option>
-              </select>
+
+          {error && (
+            <p class="notice err" role="alert" id="review-error">
+              {error}
+            </p>
+          )}
+
+          <form
+            id="review-form"
+            method="POST"
+            class="review-form"
+            data-busy="Sending your review…"
+          >
+            <fieldset class="review-stars" aria-describedby="rating-hint">
+              <legend>Rating</legend>
+              <div class="star-row">
+                {[5, 4, 3, 2, 1].map((n) => (
+                  <Fragment>
+                    <input
+                      type="radio"
+                      id={`rating-${n}`}
+                      name="rating"
+                      value={n}
+                      checked={rating === n}
+                      required
+                    />
+                    <label for={`rating-${n}`} title={`${n} — ${ratingLabels[n]}`}>
+                      <span class="visually-hidden">{n} star{n === 1 ? "" : "s"} — {ratingLabels[n]}</span>
+                      <span aria-hidden="true">★</span>
+                    </label>
+                  </Fragment>
+                ))}
+              </div>
+              <p class="review-star-hint" id="rating-hint" aria-live="polite">
+                {rating} — {ratingLabels[rating]}
+              </p>
+            </fieldset>
+
+            <div class="review-field">
+              <label for="review-text">Your review</label>
+              <textarea
+                id="review-text"
+                name="text"
+                rows="5"
+                required
+                maxlength="2000"
+                placeholder="What stood out? Would you recommend it?"
+                aria-invalid={error ? "true" : undefined}
+                aria-describedby="review-count"
+                aria-errormessage={error ? "review-error" : undefined}
+              >{text}</textarea>
+              <p id="review-count" class="review-count">
+                <span data-count>{text.length}</span>/2000
+              </p>
+            </div>
+
+            <div class="review-field">
+              <label for="review-name">
+                Name to display <span class="opt">(optional)</span>
+              </label>
+              <input
+                id="review-name"
+                type="text"
+                name="name"
+                maxlength="120"
+                autocomplete="name"
+                placeholder="e.g. Jamie R., Portland"
+                value={displayName}
+              />
+            </div>
+
+            <label class="review-consent" for="consentPublish">
+              <input
+                id="consentPublish"
+                type="checkbox"
+                name="consentPublish"
+                checked={consentPublish}
+              />
+              <span>You may publish my review on the ChiroSmarts site.</span>
             </label>
-            <label style="font-weight:600">Your review
-              <textarea name="text" rows="4" required placeholder="What stood out? Would you recommend it?" style="width:100%;padding:0.5rem;margin-top:0.25rem"></textarea>
-            </label>
-            <label style="font-weight:600">Name to display (optional)
-              <input type="text" name="name" placeholder="e.g. Jamie R., Portland" style="width:100%;padding:0.5rem;margin-top:0.25rem" />
-            </label>
-            <label style="font-weight:400;font-size:0.9rem"><input type="checkbox" name="consentPublish" checked /> You may publish my review on the ChiroSmarts site.</label>
-            <button type="submit" class="btn-primary" style="padding:0.55rem 1.2rem;align-self:flex-start">Submit review</button>
+
+            <button type="submit" class="btn-primary" id="review-submit">
+              Submit review
+            </button>
           </form>
-        </>
+        </div>
       )}
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .review-section { padding-top: 3rem; padding-bottom: 3rem; }
+  .review-wrap { max-width: 560px; }
+  .review-card { padding: 1.75rem 1.5rem 1.6rem; }
+  .review-card h1 {
+    font-size: 1.7rem;
+    margin: 0 0 0.5rem;
+    line-height: 1.25;
+  }
+  .review-illo { margin: 0 auto 1rem; }
+  .review-lede {
+    color: var(--muted);
+    margin: 0 0 1.25rem;
+    font-size: 1.05rem;
+  }
+  .review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+  .review-offsite {
+    margin-top: 0.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .review-offsite-kicker {
+    color: var(--muted);
+    margin: 0 0 0.85rem;
+    font-size: 0.95rem;
+  }
+  .review-footer-link {
+    margin: 1.25rem 0 0;
+    font-size: 0.95rem;
+  }
+  .review-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  .review-field label,
+  .review-stars legend {
+    display: block;
+    font-weight: 650;
+    color: var(--ink);
+    margin: 0 0 0.4rem;
+  }
+  .review-stars {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .opt { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+  .star-row {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 0.15rem;
+  }
+  .star-row input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .star-row label {
+    margin: 0;
+    padding: 0.15rem 0.2rem;
+    cursor: pointer;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--border);
+    transition: color 0.12s ease;
+  }
+  .star-row:not(:hover) input:checked ~ label,
+  .star-row label:hover,
+  .star-row label:hover ~ label,
+  .star-row input:focus-visible + label {
+    color: var(--gold);
+  }
+  .star-row input:focus-visible + label {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .review-star-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .review-field textarea,
+  .review-field input[type="text"] {
+    width: 100%;
+  }
+  .review-count {
+    margin: 0.3rem 0 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: right;
+  }
+  .review-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    font-weight: 400;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .review-consent input {
+    width: auto;
+    margin-top: 0.2rem;
+    accent-color: var(--brand);
+  }
+  .review-form .btn-primary {
+    align-self: flex-start;
+    font-weight: 600;
+  }
+  .review-form .btn-primary:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .star-row label { transition: none; }
+  }
+</style>
+
+<script>
+  const form = document.getElementById("review-form") as HTMLFormElement | null;
+  const hint = document.getElementById("rating-hint");
+  const labels: Record<string, string> = {
+    "1": "Poor",
+    "2": "Below average",
+    "3": "Okay",
+    "4": "Good",
+    "5": "Excellent",
+  };
+
+  form?.querySelectorAll<HTMLInputElement>('input[name="rating"]').forEach((input) => {
+    const update = () => {
+      if (!hint || !input.checked) return;
+      hint.textContent = `${input.value} — ${labels[input.value]}`;
+    };
+    input.addEventListener("change", update);
+    update();
+  });
+
+  const textarea = document.getElementById("review-text") as HTMLTextAreaElement | null;
+  const count = document.querySelector("[data-count]");
+  textarea?.addEventListener("input", () => {
+    if (count) count.textContent = String(textarea.value.length);
+  });
+
+  const submit = document.getElementById("review-submit") as HTMLButtonElement | null;
+  form?.addEventListener("submit", () => {
+    if (!form.checkValidity()) return;
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "Sending…";
+    }
+  });
+
+  const err = document.getElementById("review-error");
+  if (err) textarea?.focus();
+</script>
