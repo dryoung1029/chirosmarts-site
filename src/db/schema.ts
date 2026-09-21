@@ -274,6 +274,14 @@ export const courses = sqliteTable("courses", {
   maxPlaybackRate: real("max_playback_rate").notNull().default(1.5),
   instructorName: text("instructor_name").notNull().default("Jason Young, DC"),
   certifyingBodyLine: text("certifying_body_line"),
+  // True only for an initial-certification course where the state requires a
+  // SEPARATE exam after this training (e.g. Oregon's NBCE requirement) — the
+  // final-exam page's "this is not the certification exam" disclaimer is
+  // scoped to this flag. CE/renewal courses (vitals, HIPAA, cultural
+  // competency, …) have no such follow-on exam and must not show it.
+  requiresStateExam: integer("requires_state_exam", { mode: "boolean" })
+    .notNull()
+    .default(false),
   createdAt: text("created_at").notNull().default(nowUtc),
   updatedAt: text("updated_at").notNull().default(nowUtc),
 });

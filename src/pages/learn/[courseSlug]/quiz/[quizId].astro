@@ -91,12 +91,12 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
   <h1>{quiz.title}</h1>
   <p class="muted" style="margin-top:0">
     {isFinal
-      ? `Final exam — you need ${(threshold * 100).toFixed(0)}% to pass.`
-      : `Knowledge check — score ${(threshold * 100).toFixed(0)}% to pass. Passing it is required for your certificate; you can retake it anytime.`}
+      ? `Final exam — you need ${(threshold * 100).toFixed(0)}% to pass. Passing it is required for your certificate.`
+      : `Knowledge check — score ${(threshold * 100).toFixed(0)}% to pass. This is a comprehension check, not the certificate gate; you can retake it anytime.`}
   </p>
 
   {
-    isFinal && (
+    isFinal && course.requiresStateExam && (
       <div
         class="notice"
         style="background:var(--brand-tint);border:1px solid var(--brand);color:var(--ink)"
@@ -138,7 +138,63 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
   }
 
   {
-    !locked && (
+    // Once an attempt is graded, this becomes a READ-ONLY results view — never
+    // the live form. Otherwise seeing the correct answers here and resubmitting
+    // the same form would let anyone pass by answering wrong on purpose first.
+    // A genuine retake means reloading a blank form via the link below, with no
+    // correctness hints anywhere on the page.
+    !locked && feedback && justAttempt && (
+      <>
+        {questions.map((q) => {
+          const selected = new Set(((justAttempt!.answers as AnswerMap) ?? {})[q.id] ?? []);
+          return (
+            <div class="panel">
+              <p style="color:var(--text);margin:0 0 0.75rem">
+                {q.position}. {q.prompt}
+              </p>
+              {q.options.map((o) => (
+                <p
+                  style={`margin:0.3rem 0;${o.isCorrect ? "color:var(--ok)" : selected.has(o.id) ? "color:var(--danger)" : ""}`}
+                >
+                  {o.text}
+                  {o.isCorrect && " ✓ correct answer"}
+                  {!o.isCorrect && selected.has(o.id) && " — your answer"}
+                </p>
+              ))}
+              {q.explanation && (
+                <p class="muted" style="margin:0.5rem 0 0">
+                  {correctById.get(q.id) ? "Correct. " : ""}
+                  {q.explanation}
+                </p>
+              )}
+              {!correctById.get(q.id) &&
+                q.sourceLessonId &&
+                q.sourceStartSeconds != null &&
+                lessonModule.get(q.sourceLessonId) && (
+                  <p style="margin:0.5rem 0 0">
+                    <a
+                      href={`/learn/${courseSlug}/${lessonModule.get(q.sourceLessonId)}/${q.sourceLessonId}?t=${q.sourceStartSeconds}`}
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      ▶ Watch the answer in the video ({fmtClock(q.sourceStartSeconds)})
+                    </a>
+                  </p>
+                )}
+            </div>
+          );
+        })}
+        {!justAttempt.passed && (
+          <p>
+            <a class="btn" href={`/learn/${courseSlug}/quiz/${quizId}`}>Retake the quiz →</a>
+          </p>
+        )}
+      </>
+    )
+  }
+
+  {
+    !locked && !feedback && (
       <form method="POST" action={`/api/quizzes/${quizId}/attempt`}>
         {questions.map((q) => (
           <div class="panel">
@@ -146,44 +202,15 @@ const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 6
               {q.position}. {q.prompt}
             </p>
             {q.options.map((o) => (
-              <label
-                class="check"
-                style={`margin:0.3rem 0;${
-                  feedback ? (o.isCorrect ? "color:var(--ok)" : "") : ""
-                }`}
-              >
+              <label class="check" style="margin:0.3rem 0">
                 <input
                   type={q.type === "multi_choice" ? "checkbox" : "radio"}
                   name={`q:${q.id}`}
                   value={o.id}
                 />
-                <span>
-                  {o.text}
-                  {feedback && o.isCorrect && " ✓"}
-                </span>
+                <span>{o.text}</span>
               </label>
             ))}
-            {feedback && q.explanation && (
-              <p class="muted" style="margin:0.5rem 0 0">
-                {correctById.get(q.id) ? "Correct. " : ""}
-                {q.explanation}
-              </p>
-            )}
-            {feedback &&
-              !correctById.get(q.id) &&
-              q.sourceLessonId &&
-              q.sourceStartSeconds != null &&
-              lessonModule.get(q.sourceLessonId) && (
-                <p style="margin:0.5rem 0 0">
-                  <a
-                    href={`/learn/${courseSlug}/${lessonModule.get(q.sourceLessonId)}/${q.sourceLessonId}?t=${q.sourceStartSeconds}`}
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    ▶ Watch the answer in the video ({fmtClock(q.sourceStartSeconds)})
-                  </a>
-                </p>
-              )}
           </div>
         ))}
         <button type="submit">

@@ -34,6 +34,8 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const rsmRaw = String((form as Record<string, unknown>).requiredSeatMinutes ?? "").trim();
   const rsmNum = rsmRaw === "" ? NaN : Math.floor(Number(rsmRaw));
   const requiredSeatMinutes = Number.isFinite(rsmNum) && rsmNum >= 0 ? rsmNum : null;
+  // Checkbox: present in the form data (any value) only when checked.
+  const requiresStateExam = "requiresStateExam" in form;
 
   const existing = await db
     .select({ priceCents: schema.courses.priceCents })
@@ -54,6 +56,7 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
       passThreshold: d.passThreshold,
       maxPlaybackRate: d.maxPlaybackRate,
       status: d.status,
+      requiresStateExam,
       updatedAt: nowIso(),
     })
     .where(eq(schema.courses.id, id));

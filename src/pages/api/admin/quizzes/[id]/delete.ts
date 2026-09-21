@@ -14,7 +14,7 @@ export const POST: APIRoute = async ({ params, locals, redirect }) => {
   const quizId = params.id!;
   const loc = await quizLocation(env, quizId);
   if (!loc) return redirect("/admin/content", 303);
-  const anchor = loc.moduleId ? `#mod-${loc.moduleId}` : "";
+  const anchor = loc.moduleId ? `#mod-${loc.moduleId}` : "#final-exam";
   const back = (msg: string) =>
     redirect(`/admin/content/${loc.courseId}?done=${encodeURIComponent(msg)}${anchor}`, 303);
 
