@@ -19,13 +19,36 @@ const Body = z.object({
   status: z.enum(["draft", "published", "archived"]),
 });
 
-export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
+export const POST: APIRoute = async (ctx) => {
+  const id = ctx.params.id!;
+  try {
+    return await saveCourse(ctx);
+  } catch (e) {
+    // An unhandled throw here used to surface as a bare 500 with the real cause
+    // buried in Worker logs the owner can't read. Admin-only route, so echo the
+    // actual message back instead of making them guess.
+    console.error("[admin] course save failed", e);
+    const message = e instanceof Error ? e.message : String(e);
+    return ctx.redirect(
+      `/admin/content/${id}?error=${encodeURIComponent(message.slice(0, 300))}`,
+      303,
+    );
+  }
+};
+
+const saveCourse: APIRoute = async ({ params, request, locals, redirect }) => {
   const db = getDb(locals.runtime.env);
   const id = params.id!;
   const form = Object.fromEntries(await request.formData());
   const parsed = Body.safeParse(form);
   if (!parsed.success) {
-    return redirect(`/admin/content/${id}?done=Invalid+input`, 303);
+    const detail = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "field"}: ${i.message}`)
+      .join("; ");
+    return redirect(
+      `/admin/content/${id}?error=${encodeURIComponent(`Invalid input — ${detail}`)}`,
+      303,
+    );
   }
   const d = parsed.data;
   const priceCents = Math.round(d.priceDollars * 100);
