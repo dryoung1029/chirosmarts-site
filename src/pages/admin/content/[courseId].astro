@@ -21,6 +21,7 @@ if (!course) return Astro.redirect("/admin/content", 302);
 const structure = await getCourseStructure(db, courseId);
 const resources = await listCourseResources(db, courseId);
 const flash = Astro.url.searchParams.get("done");
+const flashError = Astro.url.searchParams.get("error");
 const fmtMin = (s: number) => (s / 60).toFixed(1);
 const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const pct = (f: number) => `${Math.round(f * 100)}%`;
@@ -82,6 +83,13 @@ if (lessonIds.length) {
   <p style="margin:0"><a href="/admin/content">← All courses</a></p>
   <h1>Edit course</h1>
   {flash && <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>}
+  {
+    flashError && (
+      <div class="panel" style="border-color:var(--danger);color:var(--danger)">
+        <strong>Save failed.</strong> {flashError}
+      </div>
+    )
+  }
 
   <!-- Course metadata -->
   <form class="panel" method="POST" action={`/api/admin/courses/${course.id}`}>
