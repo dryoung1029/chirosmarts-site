@@ -28,9 +28,14 @@ export const POST: APIRoute = async (ctx) => {
     // buried in Worker logs the owner can't read. Admin-only route, so echo the
     // actual message back instead of making them guess.
     console.error("[admin] course save failed", e);
+    // Drizzle wraps the driver error: its own message is just the SQL + params,
+    // while the actual reason ("no such column", "D1_ERROR: ...") lives on
+    // `cause`. Report the cause first — that's the part that names the problem.
+    const cause = e instanceof Error && e.cause instanceof Error ? e.cause.message : "";
     const message = e instanceof Error ? e.message : String(e);
+    const detail = [cause, message].filter(Boolean).join(" ⟵ ");
     return ctx.redirect(
-      `/admin/content/${id}?error=${encodeURIComponent(message.slice(0, 300))}`,
+      `/admin/content/${id}?error=${encodeURIComponent(detail.slice(0, 900))}`,
       303,
     );
   }
