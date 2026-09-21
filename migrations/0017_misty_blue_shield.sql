@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `requires_state_exam` integer DEFAULT false NOT NULL;

@@ -1,41 +1,9 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f65d1bb6-4d45-4033-b529-9edb66c5d814",
+  "id": "bee18b75-b1eb-4d27-9124-bb2402518491",
   "prevId": "ac443b29-4e6b-45af-abb8-4752059b6902",
   "tables": {
-    "aeo_audit_store": {
-      "name": "aeo_audit_store",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "data": {
-          "name": "data",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "answer_options": {
       "name": "answer_options",
       "columns": {
@@ -1228,6 +1196,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "requires_state_exam": {
+          "name": "requires_state_exam",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
