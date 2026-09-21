@@ -66,10 +66,10 @@ async function moduleLessonCues(env: CloudflareEnv, moduleId: string): Promise<L
   return groups;
 }
 
-/** Ordered transcript cues across every module/lesson in a course (for the
- * course-level final exam, which should draw on the whole course, not one
- * module). */
-async function courseCues(env: CloudflareEnv, courseId: string): Promise<Cue[]> {
+/** Transcript cues across every module/lesson in a course, grouped and
+ * ordered by lesson (for the course-level final exam, which should draw on
+ * the whole course, not one module). */
+async function courseLessonCues(env: CloudflareEnv, courseId: string): Promise<LessonCues[]> {
   const db = getDb(env);
   const modules = await db
     .select({ id: schema.modules.id })
@@ -77,9 +77,9 @@ async function courseCues(env: CloudflareEnv, courseId: string): Promise<Cue[]> 
     .where(eq(schema.modules.courseId, courseId))
     .orderBy(asc(schema.modules.position))
     .all();
-  const cues: Cue[] = [];
-  for (const m of modules) cues.push(...(await moduleCues(env, m.id)));
-  return cues;
+  const groups: LessonCues[] = [];
+  for (const m of modules) groups.push(...(await moduleLessonCues(env, m.id)));
+  return groups;
 }
 
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
@@ -116,7 +116,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 async function generateFromCues(
   env: CloudflareEnv,
-  cues: Cue[],
+  lessonGroups: LessonCues[],
   count: number,
   notEnoughContentMessage: string,
 ): Promise<GeneratedQuestion[]> {
@@ -124,7 +124,12 @@ async function generateFromCues(
     throw new Error("AI isn't configured (missing ANTHROPIC_API_KEY).");
   }
   const n = Math.max(1, Math.min(20, Math.floor(count) || 5));
-  const text = cues.map((c) => c.text).join(" ").slice(0, 14000);
+  const cues = lessonGroups.flatMap((g) => g.cues);
+  const lessonsWithText = lessonGroups.filter((g) => g.cues.length > 0);
+  const text = lessonsWithText
+    .map((g, i) => `### LESSON ${i + 1}: ${g.title}\n${g.cues.map((c) => c.text).join(" ")}`)
+    .join("\n\n")
+    .slice(0, 14000);
   if (text.trim().length < 200) {
     throw new Error(notEnoughContentMessage);
   }
@@ -219,10 +224,10 @@ export async function generateQuizQuestions(
   moduleId: string,
   count: number,
 ): Promise<GeneratedQuestion[]> {
-  const cues = await moduleCues(env, moduleId);
+  const groups = await moduleLessonCues(env, moduleId);
   return generateFromCues(
     env,
-    cues,
+    groups,
     count,
     "Not enough transcript content to generate from — add captions/transcripts to this module's lessons first.",
   );
@@ -235,10 +240,10 @@ export async function generateFinalExamQuestions(
   courseId: string,
   count: number,
 ): Promise<GeneratedQuestion[]> {
-  const cues = await courseCues(env, courseId);
+  const groups = await courseLessonCues(env, courseId);
   return generateFromCues(
     env,
-    cues,
+    groups,
     count,
     "Not enough transcript content to generate from — add captions/transcripts to this course's lessons first.",
   );
