@@ -13,9 +13,64 @@ export function isBrevoConfigured(env: CloudflareEnv): boolean {
   return !!env.BREVO_API_KEY;
 }
 
+/**
+ * Brevo list id for a lead source. Newsletter signups and free-checklist
+ * downloaders both land on the main newsletter list (they're distinguishable
+ * later by their SOURCE contact attribute); other sources use LEADS.
+ */
+function listIdForSource(env: CloudflareEnv, source: string): number {
+  if (source === "newsletter" || source === "checklist_pdf")
+    return Number(env.BREVO_LIST_ID_NEWSLETTER) || Number(env.BREVO_LIST_ID_LEADS) || 0;
+  return Number(env.BREVO_LIST_ID_LEADS) || 0;
+}
+
 interface UpsertOutcome {
   ok: boolean;
   action: "created" | "updated" | "failed";
+}
+
+/** Push ONE confirmed lead to Brevo immediately (real-time on confirm), then
+ *  stamp it synced. Safe to call when Brevo is unconfigured (no-op). */
+export async function syncLeadToBrevo(
+  env: CloudflareEnv,
+  db: Db,
+  lead: { id: string; email: string; source: string; birthMonth: number | null },
+): Promise<boolean> {
+  if (!isBrevoConfigured(env)) return false;
+  const listId = listIdForSource(env, lead.source);
+  const outcome = await upsertContact(env, {
+    email: lead.email,
+    attributes: { SOURCE: lead.source, BIRTH_MONTH: lead.birthMonth ?? "", ROLE: "lead" },
+    listIds: listId ? [listId] : [],
+  });
+  if (outcome.ok) {
+    await db
+      .update(schema.marketingLeads)
+      .set({ syncedToBrevoAt: nowIso() })
+      .where(eq(schema.marketingLeads.id, lead.id));
+  }
+  return outcome.ok;
+}
+
+/** Push ONE opted-in user to Brevo immediately (real-time on intake opt-in).
+ *  Best-effort; safe to call when Brevo is unconfigured (no-op). */
+export async function syncUserToBrevo(
+  env: CloudflareEnv,
+  user: { email: string; role: string; birthMonth: number | null; clinicName?: string | null },
+): Promise<boolean> {
+  if (!isBrevoConfigured(env)) return false;
+  const usersList = Number(env.BREVO_LIST_ID_USERS) || Number(env.BREVO_LIST_ID_LEADS) || 0;
+  const outcome = await upsertContact(env, {
+    email: user.email,
+    attributes: {
+      ROLE: user.role,
+      BIRTH_MONTH: user.birthMonth ?? "",
+      CLINIC: user.clinicName ?? "",
+      SOURCE: "account",
+    },
+    listIds: usersList ? [usersList] : [],
+  });
+  return outcome.ok;
 }
 
 async function upsertContact(
