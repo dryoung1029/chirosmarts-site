@@ -13,6 +13,8 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 
 const MODEL = "claude-haiku-4-5";
+/** Total transcript characters we send the model, split evenly across lessons. */
+const PROMPT_BUDGET_CHARS = 14000;
 
 export interface GeneratedQuestion {
   prompt: string;
@@ -66,6 +68,22 @@ async function moduleLessonCues(env: CloudflareEnv, moduleId: string): Promise<L
   return groups;
 }
 
+/** Transcript cues across every module/lesson in a course, grouped and
+ * ordered by lesson (for the course-level final exam, which should draw on
+ * the whole course, not one module). */
+async function courseLessonCues(env: CloudflareEnv, courseId: string): Promise<LessonCues[]> {
+  const db = getDb(env);
+  const modules = await db
+    .select({ id: schema.modules.id })
+    .from(schema.modules)
+    .where(eq(schema.modules.courseId, courseId))
+    .orderBy(asc(schema.modules.position))
+    .all();
+  const groups: LessonCues[] = [];
+  for (const m of modules) groups.push(...(await moduleLessonCues(env, m.id)));
+  return groups;
+}
+
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
 
 /** Find the transcript cue a quote most likely came from (word-overlap). */
@@ -87,38 +105,42 @@ function matchCue(cues: Cue[], quote: string): Cue | null {
   return bestScore >= 2 ? best : null;
 }
 
-export async function generateQuizQuestions(
+/** Fisher-Yates shuffle (not security-sensitive — just avoiding a positional
+ * tell like "the correct answer is always option A"). */
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function generateFromCues(
   env: CloudflareEnv,
-  moduleId: string,
+  lessonGroups: LessonCues[],
   count: number,
+  notEnoughContentMessage: string,
 ): Promise<GeneratedQuestion[]> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new Error("AI isn't configured (missing ANTHROPIC_API_KEY).");
   }
   const n = Math.max(1, Math.min(20, Math.floor(count) || 5));
-  const groups = await moduleLessonCues(env, moduleId);
-  // Flat cue list is still what we match generated quotes back against.
-  const cues = groups.flatMap((g) => g.cues);
-
-  // Give every lesson a fair slice of the prompt budget so questions aren't
-  // biased toward whichever lesson happens to come first. We label each lesson
-  // section so the model knows the module spans multiple lessons and is told to
-  // spread questions across all of them.
-  const TOTAL_BUDGET = 14000;
-  const lessonsWithText = groups.filter((g) => g.cues.some((c) => c.text.trim()));
-  const perLessonBudget = lessonsWithText.length
-    ? Math.floor(TOTAL_BUDGET / lessonsWithText.length)
-    : TOTAL_BUDGET;
+  const cues = lessonGroups.flatMap((g) => g.cues);
+  const lessonsWithText = lessonGroups.filter((g) => g.cues.length > 0);
+  // Split the prompt budget per lesson BEFORE joining. Truncating the joined
+  // string instead would drop later lessons entirely whenever the earlier ones
+  // fill the budget — while the prompt below still promises the model every
+  // lesson is present and asks for even coverage.
+  const perLessonBudget = Math.floor(PROMPT_BUDGET_CHARS / Math.max(1, lessonsWithText.length));
   const text = lessonsWithText
-    .map((g, i) => {
-      const body = g.cues.map((c) => c.text).join(" ").slice(0, perLessonBudget).trim();
-      return `### LESSON ${i + 1}: ${g.title}\n${body}`;
-    })
+    .map(
+      (g, i) =>
+        `### LESSON ${i + 1}: ${g.title}\n${g.cues.map((c) => c.text).join(" ").slice(0, perLessonBudget)}`,
+    )
     .join("\n\n");
-  if (text.replace(/### LESSON \d+:.*/g, "").trim().length < 200) {
-    throw new Error(
-      "Not enough transcript content to generate from — add captions/transcripts to this module's lessons first.",
-    );
+  if (text.trim().length < 200) {
+    throw new Error(notEnoughContentMessage);
   }
 
   const multi = lessonsWithText.length > 1;
@@ -134,12 +156,24 @@ export async function generateQuizQuestions(
     `exactly ${n} objects, each {"prompt": string, "options": [4 strings], "correctIndex": ` +
     `integer 0-3, "explanation": string, "sourceQuote": string}. "sourceQuote" is a short ` +
     `VERBATIM phrase (6-15 words) copied exactly from the content where the answer is taught. ` +
-    `Exactly one option is correct. Distractors must be plausible but clearly wrong per the ` +
-    `material. Base every question STRICTLY on the provided content — never invent facts. ` +
-    `Write all four options at roughly the SAME length, detail, and specificity — the correct ` +
-    `answer must NOT be the longest, most-qualified, or most-detailed choice, since that gives ` +
-    `the answer away. Vary which position (index 0-3) is correct across questions. Avoid ` +
-    `"all/none of the above" and absolute words (always, never) unless they appear in the source. ` +
+    `Exactly one option is correct. Base every question STRICTLY on the provided content — ` +
+    `never invent facts.\n\n` +
+    `Distractor quality is the most important part of this task — a test-taker who never ` +
+    `watched the training must NOT be able to guess the correct answer from how it's written. ` +
+    `Specifically:\n` +
+    `- Every option (correct and incorrect) must be similar in LENGTH and level of DETAIL. ` +
+    `Never make the correct answer the longest, most specific, or most hedged/qualified option — ` +
+    `that's a dead giveaway. If the correct answer is one sentence, every distractor should also ` +
+    `be about one sentence.\n` +
+    `- Distractors must be plausible, topically relevant claims a person could genuinely believe ` +
+    `— not random facts, not jokes, not obviously-absurd options, not "none of the above"/"all of ` +
+    `the above".\n` +
+    `- Avoid absolute words ("always", "never", "must") appearing only on wrong options, and avoid ` +
+    `vague hedge words ("sometimes", "may") appearing only on the correct one — mix these evenly or ` +
+    `omit them.\n` +
+    `- Do not reuse exact phrasing from the source material only in the correct option; either ` +
+    `paraphrase the correct answer too, or use similar terminology across all options.\n` +
+    `- Vary which position (1st-4th) holds the correct answer across questions.\n\n` +
     `No preamble, no markdown, no code fences.`;
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
@@ -173,10 +207,18 @@ export async function generateQuizQuestions(
     const correctIndex = Number(q.correctIndex);
     if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= q.options.length) continue;
     const cue = typeof q.sourceQuote === "string" ? matchCue(cues, q.sourceQuote) : null;
+
+    // Shuffle option order server-side too — never trust the model to vary
+    // the correct answer's position on its own across a whole batch.
+    const options: string[] = q.options.map((o: unknown) => String(o).trim()).slice(0, 6);
+    const order: number[] = shuffle(options.map((_, i) => i));
+    const shuffled: string[] = order.map((i) => options[i]);
+    const newCorrectIndex = order.indexOf(correctIndex);
+
     out.push({
       prompt: q.prompt.trim(),
-      options: q.options.map((o: unknown) => String(o).trim()).slice(0, 6),
-      correctIndex,
+      options: shuffled,
+      correctIndex: newCorrectIndex,
       explanation: typeof q.explanation === "string" ? q.explanation.trim() : "",
       sourceLessonId: cue?.lessonId ?? null,
       sourceStartSeconds: cue ? cue.startSeconds : null,
@@ -184,4 +226,34 @@ export async function generateQuizQuestions(
   }
   if (!out.length) throw new Error("The AI didn't return usable questions — try again.");
   return out;
+}
+
+export async function generateQuizQuestions(
+  env: CloudflareEnv,
+  moduleId: string,
+  count: number,
+): Promise<GeneratedQuestion[]> {
+  const groups = await moduleLessonCues(env, moduleId);
+  return generateFromCues(
+    env,
+    groups,
+    count,
+    "Not enough transcript content to generate from — add captions/transcripts to this module's lessons first.",
+  );
+}
+
+/** Same generation, but drawing on transcripts from every module in the
+ * course — for the course-level final exam. */
+export async function generateFinalExamQuestions(
+  env: CloudflareEnv,
+  courseId: string,
+  count: number,
+): Promise<GeneratedQuestion[]> {
+  const groups = await courseLessonCues(env, courseId);
+  return generateFromCues(
+    env,
+    groups,
+    count,
+    "Not enough transcript content to generate from — add captions/transcripts to this course's lessons first.",
+  );
 }

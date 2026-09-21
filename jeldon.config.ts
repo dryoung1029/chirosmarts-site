@@ -52,7 +52,7 @@ export default defineDomainPack({
           "Oregon Board of Chiropractic Examiners",
           "National Board of Chiropractic Examiners",
         ],
-        sameAs: [], // add confirmed profile URLs (LinkedIn, clinic) before relying on sameAs E-E-A-T
+        sameAs: ["https://www.linkedin.com/in/jasonyoungdc/"],
       },
     },
   ],

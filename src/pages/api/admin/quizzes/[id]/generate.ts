@@ -5,24 +5,24 @@
  */
 import type { APIRoute } from "astro";
 import { appendQuestions, quizLocation } from "@/lib/admin/quiz-authoring";
-import { generateQuizQuestions } from "@/lib/admin/quiz-gen";
+import { generateFinalExamQuestions, generateQuizQuestions } from "@/lib/admin/quiz-gen";
 
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const env = locals.runtime.env;
   const quizId = params.id!;
   const loc = await quizLocation(env, quizId);
   if (!loc) return redirect("/admin/content", 303);
-  const anchor = loc.moduleId ? `#mod-${loc.moduleId}` : "";
+  const anchor = loc.moduleId ? `#mod-${loc.moduleId}` : "#final-exam";
   const back = (msg: string) =>
     redirect(`/admin/content/${loc.courseId}?done=${encodeURIComponent(msg)}${anchor}`, 303);
-
-  if (!loc.moduleId) return back("AI generation needs a module quiz (transcripts come from its lessons).");
 
   const form = await request.formData();
   const count = Number(form.get("count") ?? 5);
 
   try {
-    const generated = await generateQuizQuestions(env, loc.moduleId, count);
+    const generated = loc.moduleId
+      ? await generateQuizQuestions(env, loc.moduleId, count)
+      : await generateFinalExamQuestions(env, loc.courseId, count);
     const added = await appendQuestions(
       env,
       quizId,

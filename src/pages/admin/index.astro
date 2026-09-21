@@ -4,16 +4,39 @@ import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
 import { sql, eq, desc } from "drizzle-orm";
 import { formatPacific } from "@/lib/time";
+import type { SyncContactDetail } from "@/lib/brevo";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
 const flash = Astro.url.searchParams.get("done");
+
+// Last Brevo sync detail — answers "who exactly did we just push?" from the
+// append-only events log, since the flash message above is only a count.
+const lastBrevoSync = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.type, "brevo_sync"))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(1)
+  .get();
+const lastBrevoSyncContacts =
+  (lastBrevoSync?.payload as { contacts?: SyncContactDetail[] } | null)?.contacts ?? [];
 
 // Email config snapshot for the diagnostics panel.
 const emailHasKey = !!env.RESEND_API_KEY;
 const emailFrom = env.EMAIL_FROM || "onboarding@resend.dev (default sandbox)";
 const emailReplyTo = env.EMAIL_REPLY_TO || "(none)";
 const emailIsSandbox = /@resend\.dev/i.test(emailFrom) || !env.EMAIL_FROM;
+
+// Recent real (production) magic-link send failures — so "is Resend actually
+// failing right now?" is answerable without digging through Worker logs.
+const recentSendFailures = await db
+  .select()
+  .from(schema.events)
+  .where(eq(schema.events.type, "magic_link_send_failed"))
+  .orderBy(desc(schema.events.occurredAt))
+  .limit(5)
+  .all();
 
 // Stripe config snapshot (mode inferred from the key prefix; key never exposed).
 const stripeHasKey = !!env.STRIPE_SECRET_KEY;
@@ -129,6 +152,37 @@ const stats = [
     <form method="POST" action="/api/admin/brevo-sync" style="margin:0">
       <button type="submit">Sync to Brevo</button>
     </form>
+    {
+      lastBrevoSyncContacts.length > 0 && (
+        <details style="margin-top:0.8rem">
+          <summary style="cursor:pointer;font-size:0.9rem;color:var(--muted)">
+            Last sync — {lastBrevoSyncContacts.length} contact(s) touched, {formatPacific(lastBrevoSync!.occurredAt, { dateStyle: "medium", timeStyle: "short" })}
+          </summary>
+          <table style="width:100%;border-collapse:collapse;margin-top:0.5rem;font-size:0.85rem">
+            <thead>
+              <tr style="text-align:left">
+                <th style="padding:0.3rem 0.5rem">Email</th>
+                <th style="padding:0.3rem 0.5rem">Kind</th>
+                <th style="padding:0.3rem 0.5rem">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lastBrevoSyncContacts.map((c) => (
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:0.3rem 0.5rem">{c.email}</td>
+                  <td style="padding:0.3rem 0.5rem">{c.kind}</td>
+                  <td style="padding:0.3rem 0.5rem">
+                    {c.action === "created" && <span class="notice ok" style="padding:0.1rem 0.4rem">new</span>}
+                    {c.action === "updated" && <span class="muted">already in Brevo</span>}
+                    {c.action === "failed" && <span class="notice err" style="padding:0.1rem 0.4rem">failed</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )
+    }
   </div>
 
   <div class="panel">
@@ -165,6 +219,36 @@ const stats = [
       <button type="button" id="email-test-btn">Send test email</button>
     </div>
     <p id="email-test-status" class="muted" style="font-size:0.85rem;margin:0.5rem 0 0;white-space:pre-wrap"></p>
+    {
+      recentSendFailures.length > 0 && (
+        <details style="margin-top:0.8rem" open>
+          <summary style="cursor:pointer;font-size:0.9rem;color:var(--warn)">
+            {recentSendFailures.length} recent sign-in email send failure(s)
+          </summary>
+          <table style="width:100%;border-collapse:collapse;margin-top:0.5rem;font-size:0.85rem">
+            <thead>
+              <tr style="text-align:left">
+                <th style="padding:0.3rem 0.5rem">When</th>
+                <th style="padding:0.3rem 0.5rem">Email</th>
+                <th style="padding:0.3rem 0.5rem">Resend error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentSendFailures.map((f) => {
+                const payload = f.payload as { email?: string; error?: string } | null;
+                return (
+                  <tr style="border-top:1px solid var(--border)">
+                    <td style="padding:0.3rem 0.5rem;white-space:nowrap">{formatPacific(f.occurredAt, { dateStyle: "medium", timeStyle: "short" })}</td>
+                    <td style="padding:0.3rem 0.5rem">{payload?.email ?? "?"}</td>
+                    <td style="padding:0.3rem 0.5rem">{payload?.error ?? "(no detail)"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </details>
+      )
+    }
   </div>
 
   <div class="panel">

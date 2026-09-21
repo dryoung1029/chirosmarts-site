@@ -38,8 +38,11 @@ export const GET: APIRoute = async ({ url, locals }) => {
     return new Response("Not found", { status: 404 });
   }
 
+  // Normalize to a plain ArrayBuffer: a Uint8Array view isn't assignable to
+  // BodyInit under the current workers-types, and copying the exact byte range
+  // avoids shipping any slack in the view's underlying buffer.
   const pdfResponse = (bytes: Uint8Array | ArrayBuffer) =>
-    new Response(bytes, {
+    new Response(bytes instanceof Uint8Array ? bytes.slice().buffer : bytes, {
       headers: {
         "content-type": "application/pdf",
         "content-disposition": `attachment; filename="${FILENAME}"`,
