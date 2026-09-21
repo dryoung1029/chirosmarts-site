@@ -13,7 +13,7 @@ import { getSiteUrl } from "@/lib/env";
 import { sendEmail } from "@/lib/email/resend";
 import { logEvent } from "@/lib/events";
 
-export type LeadSource = "renewal_checker" | "checklist_pdf" | "other";
+export type LeadSource = "renewal_checker" | "checklist_pdf" | "newsletter" | "other";
 
 export function normalizeEmail(e: string): string {
   return e.trim().toLowerCase();
@@ -24,16 +24,25 @@ export function isValidEmail(e: string): boolean {
 
 function emailBody(source: LeadSource, confirmUrl: string, site: string) {
   const isChecklist = source === "checklist_pdf";
+  const isNewsletter = source === "newsletter";
   const subject = isChecklist
     ? "Confirm your email to get the Oregon CA certification checklist"
-    : "Confirm your ChiroSmarts renewal reminder";
+    : isNewsletter
+      ? "Confirm your ChiroSmarts newsletter subscription"
+      : "Confirm your ChiroSmarts renewal reminder";
   const lead = isChecklist
     ? "Thanks for requesting the Oregon CA certification checklist."
-    : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
-  const cta = isChecklist ? "Confirm & get the checklist" : "Confirm my email";
+    : isNewsletter
+      ? "Thanks for subscribing to the ChiroSmarts newsletter — practical tips for Oregon chiropractic assistants."
+      : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
+  const cta = isChecklist
+    ? "Confirm & get the checklist"
+    : isNewsletter
+      ? "Confirm my subscription"
+      : "Confirm my email";
   // Decorative renewal-reminder illustration (09), hosted as an absolute PNG so it
   // renders in every email client. Only the renewal flow has a mapped image.
-  const hero = isChecklist
+  const hero = isChecklist || isNewsletter
     ? ""
     : `<img src="${site}/email/renewal.png" alt="" width="320" style="display:block;max-width:320px;height:auto;margin:0 0 12px">`;
   const text = `${lead}\n\nPlease confirm your email to continue:\n${confirmUrl}\n\nIf you didn't request this, you can ignore this message.`;
@@ -43,6 +52,21 @@ function emailBody(source: LeadSource, confirmUrl: string, site: string) {
     `<p>Please confirm your email to continue:</p>` +
     `<p><a href="${confirmUrl}">${cta}</a></p>` +
     `<p style="color:#666;font-size:13px">If you didn't request this, you can ignore this message.</p>`;
+  return { subject, text, html };
+}
+
+/** Delivery email re-sent when an ALREADY-confirmed checklist lead asks again —
+ *  gives them a fresh, reusable download link (the asset route is gated by the
+ *  lead's confirmed status, so this link keeps working). */
+function checklistResendBody(assetUrl: string, site: string) {
+  const subject = "Your Oregon CA certification checklist (download link)";
+  const text =
+    `Here's your Oregon CA certification checklist — download it any time:\n${assetUrl}\n\n` +
+    `Ready to start? Module 1 of the training is free: ${site}/courses`;
+  const html =
+    `<p>Here's your Oregon CA certification checklist — download it any time:</p>` +
+    `<p><a href="${assetUrl}">Download the checklist (PDF)</a></p>` +
+    `<p style="color:#666;font-size:13px">Ready to start? <a href="${site}/courses">Module 1 of the training is free</a>.</p>`;
   return { subject, text, html };
 }
 
@@ -81,6 +105,20 @@ export async function captureLead(
     .get();
 
   if (existing && existing.status === "confirmed") {
+    // For the checklist, "already confirmed" must NOT be a dead end — the
+    // original confirm link is single-use, so re-send a reusable download link
+    // so they can get their PDF again.
+    if (source === "checklist_pdf") {
+      const site = getSiteUrl(env).replace(/\/$/, "");
+      const assetUrl = `${site}/api/leads/asset?lid=${existing.id}`;
+      const { subject, text, html } = checklistResendBody(assetUrl, site);
+      await sendEmail(env, { to: email, subject, html, text });
+      return {
+        ok: true,
+        alreadyConfirmed: true,
+        message: "You're already confirmed — we just emailed your checklist download link again. Check your inbox.",
+      };
+    }
     return {
       ok: true,
       alreadyConfirmed: true,

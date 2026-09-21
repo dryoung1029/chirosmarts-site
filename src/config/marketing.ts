@@ -11,21 +11,28 @@ export function ownerCopy(desc: string): string {
 
 export const OWNER = {
   hero: {
-    headline: "Become a certified Oregon CA — without the guesswork.",
+    headline: "The fastest, easiest way to become a certified Oregon CA.",
     subhead:
-      "The state-required training, your hands-on log, exam prep, and a verifiable certificate — every step in one place, with your renewal tracked automatically every year after. Built by an Oregon chiropractor who's been training CAs for over a decade. Module 1 is free — start tonight.",
+      "Everything Oregon requires — 8 hours of training, your hands-on log, exam prep, and a verifiable certificate — online and in one place, with your renewal tracked automatically every year after. Most students finish in a couple of evenings. Module 1 is free — start tonight.",
     demoCaption:
       "A real student dashboard — from first login to certified, and every renewal after.",
   },
-  // Owner-supplied stats included [VERIFY] numbers (CA count, year). Per the
-  // owner's own note ("only real numbers can ship"), stats stay EMPTY until the
-  // confirmed figures are provided — the bar renders nothing rather than a flag.
-  stats: [] as { value: string; label: string }[],
+  // Social-proof stats — every figure is REAL, drawn from the imported 11-year
+  // Gravity Forms history (666 unique buyers / 691 paid certifications; a warm
+  // list of ~1,800 prior buyers + free-CEU signups; online CA training offered
+  // since 2015, owner-confirmed). Rounded DOWN so each claim is defensible.
+  stats: [
+    { value: "660+", label: "Oregon CAs trained" },
+    { value: "Since 2015", label: "Certifying Oregon chiropractic assistants" },
+    { value: "1,800+", label: "Chiropractic professionals reached" },
+  ] as { value: string; label: string }[],
   instructor: {
     name: "Jason Young, DC",
     credentials:
       "Chiropractic physician · Former president, Oregon Board of Chiropractic Examiners",
     bio: "Dr. Young has practiced in Corvallis, Oregon since 2008 and has trained Oregon chiropractic assistants for more than a decade. He holds a bachelor's degree in human biology and a master's in nutrition, served as an at-large director of the National Board of Chiropractic Examiners, and runs Body of Health Chiropractic & Wellness Center. He built ChiroSmarts to be the resource he wanted for his own staff: training that's actually clear about what Oregon requires, with nothing left to guess.",
+    // Headshot lives at public/instructor/jason-young.jpg (served at this path).
+    // Set to null only if the file is removed, to avoid shipping a broken image.
     photo: "/instructor/jason-young.jpg" as string | null,
   },
   homepageFaq: [
@@ -66,7 +73,7 @@ export const OWNER = {
       "New hire? One seat, one email, and they're training the same day — with their hours, exam, and certificate documented to audit standard. Their records stay attached to their name, and your dashboard always shows you who's current.",
     videoIntro:
       "See it in 90 seconds. Dr. Young walks through buying seats, inviting a new CA, and the compliance view your front office will actually use.",
-    demoVideoStreamUid: null as string | null,
+    demoVideoStreamUid: "7747d9da1c7ca001e3f92ea1233e11f6" as string | null,
   },
   about:
     "I'm Dr. Jason Young, and I've practiced chiropractic in Corvallis, Oregon since 2008. ChiroSmarts grew out of a problem I kept running into in my own clinic: a new chiropractic assistant needed to be trained and certified quickly, but the only options were waiting months for an opening in a classroom course or traveling across the state for an entire weekend. Getting a CA properly trained in Oregon was harder, and slower, than it needed to be.\n\nI was the first chiropractor in Oregon to offer online chiropractic assistant training. At the time the state's rules didn't account for online instruction, so I went to the Oregon Board of Chiropractic Examiners (OBCE) and made the case for allowing it. Later I served on that board from 2013 to 2019 — including two terms as its president — and helped shape the rules that govern CA practice in Oregon today. I've also served as an at-large director of the National Board of Chiropractic Examiners.\n\nThat's the perspective behind this platform: I've trained Oregon CAs for over a decade, and I've sat on the regulatory side of the table. ChiroSmarts is the resource I wanted for my own staff — training that's clear about exactly what Oregon requires, with the hours, exam, certificate, and yearly renewals all tracked to audit standard, so nothing is left to guess." as

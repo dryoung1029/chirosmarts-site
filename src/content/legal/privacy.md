@@ -1,17 +1,17 @@
 ---
 title: Privacy Policy
-lastUpdated: "[EFFECTIVE DATE]"
-version: "2026-06-draft"
+lastUpdated: "July 1, 2026"
+version: "2026-07-01"
 ---
 
 <!--
   DRAFT FOR ATTORNEY REVIEW — delete this comment before publishing.
   Not legal advice; must be reviewed by an Oregon-licensed attorney before launch.
   Placeholders (mirror in src/config/legal.ts; replace bracketed text when final):
-    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, [EFFECTIVE DATE].
+    Talisman Health Enterprise Management, LLC, contact@chirosmarts.com, 867 NW 23rd St, Corvallis, OR 97330, July 1, 2026.
 -->
 
-**Effective date: [EFFECTIVE DATE]**
+**Effective date: July 1, 2026**
 
 This policy describes how Talisman Health Enterprise Management, LLC ("ChiroSmarts," "we") collects, uses, and shares information through ChiroSmarts.com.
 

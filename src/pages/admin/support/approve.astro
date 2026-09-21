@@ -1,0 +1,92 @@
+---
+/**
+ * One-click "approve & send" from the owner-review email.
+ *
+ * Authorized EITHER by an admin session (normal case, clicking from the queue)
+ * OR by the HMAC token in the emailed link, so it works from a phone without
+ * signing in. The token only ever authorizes sending THIS one draft as written.
+ * Escalated drafts are never sendable from here — those need editing first.
+ */
+import Layout from "@/layouts/Layout.astro";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db/client";
+import { isAdmin } from "@/lib/admin";
+import { verifyContactToken } from "@/lib/contact-token";
+import { sendStudentReplyEmail } from "@/lib/email/support";
+import { logEvent } from "@/lib/events";
+import { nowIso } from "@/lib/time";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+const id = Astro.url.searchParams.get("id") ?? "";
+const token = Astro.url.searchParams.get("t") ?? "";
+
+const admin = isAdmin(env, Astro.locals.user);
+const tokenOk = !!id && (await verifyContactToken(env, id, token));
+
+let heading = "";
+let detail = "";
+
+const row = id
+  ? await db
+      .select()
+      .from(schema.supportRequests)
+      .where(eq(schema.supportRequests.id, id))
+      .get()
+  : null;
+
+if (!admin && !tokenOk) {
+  heading = "That link didn't work";
+  detail = "This approval link is invalid or expired. Open the support queue instead.";
+} else if (!row) {
+  heading = "Not found";
+  detail = "That support request no longer exists.";
+} else if (row.status === "sent") {
+  heading = "Already sent";
+  detail = `This reply went to ${row.email} on ${row.sentAt ?? "an earlier date"}.`;
+} else if (row.status === "escalated") {
+  heading = "This one needs your words";
+  detail =
+    "The assistant flagged this as a judgement call, so it can't be sent as-is. Open the queue to edit and send it.";
+} else if (!row.draftBody) {
+  heading = "No draft to send";
+  detail = "This request hasn't been drafted yet.";
+} else {
+  const out = await sendStudentReplyEmail(env, {
+    to: row.email,
+    subject: row.draftSubject || `Re: ${row.subject}`,
+    body: row.draftBody,
+  });
+  if (out.delivered) {
+    await db
+      .update(schema.supportRequests)
+      .set({
+        status: "sent",
+        sentAt: nowIso(),
+        sentBy: Astro.locals.user?.email ?? "approved-by-link",
+        updatedAt: nowIso(),
+      })
+      .where(eq(schema.supportRequests.id, row.id));
+    await logEvent(db, {
+      userId: row.userId,
+      type: "support_reply_sent",
+      payload: { requestId: row.id, category: row.category, approvedBy: Astro.locals.user?.email ?? "link" },
+    });
+    heading = "Sent ✓";
+    detail = `Your reply is on its way to ${row.email}.`;
+  } else {
+    heading = "Couldn't send";
+    detail = out.error ?? "Resend rejected the message. Try again from the queue.";
+  }
+}
+---
+
+<Layout title="Approve reply · Admin" showNav={true}>
+  <div class="panel" style="max-width:34rem">
+    <h1 style="margin-bottom:0.5rem">{heading}</h1>
+    <p style="margin:0">{detail}</p>
+    <p style="margin-top:1.25rem">
+      <a href="/admin/support">← Back to the support queue</a>
+    </p>
+  </div>
+</Layout>

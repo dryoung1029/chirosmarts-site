@@ -29,17 +29,23 @@ interface Cue {
   text: string;
 }
 
-/** Ordered transcript cues for every lesson in a module. */
-async function moduleCues(env: CloudflareEnv, moduleId: string): Promise<Cue[]> {
+interface LessonCues {
+  lessonId: string;
+  title: string;
+  cues: Cue[];
+}
+
+/** Transcript cues for every lesson in a module, grouped and ordered by lesson. */
+async function moduleLessonCues(env: CloudflareEnv, moduleId: string): Promise<LessonCues[]> {
   const db = getDb(env);
   const lessons = await db
-    .select({ id: schema.lessons.id })
+    .select({ id: schema.lessons.id, title: schema.lessons.title })
     .from(schema.lessons)
     .where(eq(schema.lessons.moduleId, moduleId))
     .orderBy(asc(schema.lessons.position))
     .all();
 
-  const cues: Cue[] = [];
+  const groups: LessonCues[] = [];
   for (const l of lessons) {
     const rows = await db
       .select({
@@ -50,11 +56,14 @@ async function moduleCues(env: CloudflareEnv, moduleId: string): Promise<Cue[]> 
       .where(eq(schema.lessonTranscripts.lessonId, l.id))
       .orderBy(asc(schema.lessonTranscripts.chunkIndex))
       .all();
-    for (const r of rows) {
-      cues.push({ lessonId: l.id, startSeconds: Math.floor(r.startSeconds), text: r.text });
-    }
+    const cues = rows.map((r) => ({
+      lessonId: l.id,
+      startSeconds: Math.floor(r.startSeconds),
+      text: r.text,
+    }));
+    if (cues.length) groups.push({ lessonId: l.id, title: l.title, cues });
   }
-  return cues;
+  return groups;
 }
 
 /** Ordered transcript cues across every module/lesson in a course (for the
@@ -120,9 +129,16 @@ async function generateFromCues(
     throw new Error(notEnoughContentMessage);
   }
 
+  const multi = lessonsWithText.length > 1;
+  const spread = multi
+    ? `The content below is divided into ${lessonsWithText.length} lessons (marked "### LESSON N: title"). ` +
+      `Distribute your questions across ALL lessons as evenly as the material allows — do NOT draw every ` +
+      `question from the first lesson. Each lesson should be represented. `
+    : "";
+
   const system =
     `You write multiple-choice quiz questions that test a student's comprehension of ` +
-    `training content for chiropractic assistants. Output ONLY valid JSON: an array of ` +
+    `training content for chiropractic assistants. ${spread}Output ONLY valid JSON: an array of ` +
     `exactly ${n} objects, each {"prompt": string, "options": [4 strings], "correctIndex": ` +
     `integer 0-3, "explanation": string, "sourceQuote": string}. "sourceQuote" is a short ` +
     `VERBATIM phrase (6-15 words) copied exactly from the content where the answer is taught. ` +

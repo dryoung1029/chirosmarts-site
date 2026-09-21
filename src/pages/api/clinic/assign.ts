@@ -24,7 +24,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   const result = await assignSeat(db, clinic, courseId, email);
   if (!result.ok) {
-    return redirect(`/dashboard?error=${encodeURIComponent(result.reason)}`, 303);
+    return redirect(`/clinic?error=${encodeURIComponent(result.reason)}`, 303);
   }
 
   await logEvent(db, {
@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   // Active member → immediate grant, nothing to email.
   if (result.mode === "active") {
-    return redirect(`/dashboard?assigned=active`, 303);
+    return redirect(`/clinic?assigned=active`, 303);
   }
 
   // Invite path → email the claim link (course title for context).
@@ -52,9 +52,11 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     courseTitle: course?.title,
   });
 
-  // In dev (no Resend key) surface the claim link so it's testable.
-  if (!delivered && !env.RESEND_API_KEY) {
-    return redirect(`/dashboard?assigned=invited&dev=${encodeURIComponent(url)}`, 303);
+  // Whenever the email didn't actually go out (no Resend key, or key set but the
+  // domain isn't verified yet), surface the claim link so the owner can share it
+  // directly — this is what makes the clinic demo work without live email.
+  if (!delivered) {
+    return redirect(`/clinic?assigned=invited&invite=${encodeURIComponent(url)}`, 303);
   }
-  return redirect(`/dashboard?assigned=invited`, 303);
+  return redirect(`/clinic?assigned=invited`, 303);
 };

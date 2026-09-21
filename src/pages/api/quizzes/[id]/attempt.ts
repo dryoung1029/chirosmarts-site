@@ -56,6 +56,23 @@ export const POST: APIRoute = async ({ request, locals, params, redirect }) => {
     if (!module || !(await canAccessModule(db, user.id, module))) {
       return redirect(`/learn/${course.slug}`, 302);
     }
+    // Knowledge check requires the module's video(s) ≥90% watched (no-skip).
+    const seat = await getCourseSeatTime(db, user.id, course.id);
+    const moduleLessonIds = new Set(
+      (
+        await db
+          .select({ id: schema.lessons.id })
+          .from(schema.lessons)
+          .where(eq(schema.lessons.moduleId, quiz.moduleId))
+          .all()
+      ).map((l) => l.id),
+    );
+    const allWatched = seat.perLesson
+      .filter((p) => moduleLessonIds.has(p.lessonId))
+      .every((p) => p.meetsThreshold);
+    if (!allWatched) {
+      return redirect(`${backToQuiz}?locked=1`, 303);
+    }
   } else {
     // Course-level final exam: requires enrollment + the seat-time gate.
     if (!(await hasActiveEnrollment(db, user.id, course.id))) {

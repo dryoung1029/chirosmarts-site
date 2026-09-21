@@ -25,7 +25,12 @@ for (const rel of entry.data.related ?? []) {
 }
 ---
 
-<Layout title={`${entry.data.title} · Help`} showNav={true}>
+<Layout
+  title={`${entry.data.title} · Help`}
+  showNav={true}
+  description={entry.data.summary}
+  canonicalPath={`/help/${entry.id}`}
+>
   <p style="margin:0 0 0.75rem">
     <a href="/help" style="font-size:0.9rem">← Help Center</a>
   </p>

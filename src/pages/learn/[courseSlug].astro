@@ -164,11 +164,18 @@ const resources = (await listCourseResources(db, course.id)).filter(
           </ol>
 
           {unlocked && moduleQuiz.has(module.id) && (
-            <p style="margin:0.75rem 0 0">
-              <a href={`/learn/${course.slug}/quiz/${moduleQuiz.get(module.id)!.id}`}>
-                Knowledge check →
-              </a>
-            </p>
+            lessons.length > 0 && !lessons.every((l) => lessonCredit.get(l.id)?.meetsThreshold) ? (
+              <p class="muted" style="margin:0.75rem 0 0">
+                🔒 Knowledge check unlocks after you watch ≥{thresholdPct}% of the module's
+                video{lessons.length === 1 ? "" : "s"}.
+              </p>
+            ) : (
+              <p style="margin:0.75rem 0 0">
+                <a href={`/learn/${course.slug}/quiz/${moduleQuiz.get(module.id)!.id}`}>
+                  Knowledge check →
+                </a>
+              </p>
+            )
           )}
 
           {!unlocked && (

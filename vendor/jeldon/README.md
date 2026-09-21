@@ -35,3 +35,18 @@ When the engine publishes to GitHub Packages under the `@jeldon` scope:
 
 `jeldon.config.ts` and every import site stay **unchanged** — only the install
 source flips. That's the whole point of the Domain Pack boundary.
+
+## Edge-safety patches applied to the vendored dist (re-apply on re-vendor)
+
+The engine's published build isn't Workers-safe out of the box; two patches make
+it run in the Cloudflare worker (and must be re-applied when re-vendoring, until
+fixed upstream):
+
+1. **config/dist**: `node:`-prefix the `fs`/`path`/`url` imports (the build
+   strips the source's `node:` prefixes → bare `fs` fails in workerd), and make
+   `jiti` a lazy `await import("jiti")` inside `loadDomainPack` so the CLI-only
+   TS loader is code-split out of the worker entirely.
+2. **aeo-audit/dist**: `node:`-prefix the `fs/promises` import.
+
+All five vendored package.json also carry `"sideEffects": false`. Upstream fix:
+the engine should emit `node:`-prefixed builtins and lazy-load `jiti`.

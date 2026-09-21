@@ -127,7 +127,42 @@ export interface GeneratedArticle {
   excerpt: string;
   seoDescription: string;
   markdown: string;
+  tags: string[];
   model: string;
+}
+
+/**
+ * Suggest 3–4 short topical tags for an article. Cheap model; empty array if
+ * the AI isn't configured (the editor's tag field still lets you add them).
+ */
+export async function suggestTags(
+  env: CloudflareEnv,
+  input: { title: string; topic?: string },
+): Promise<string[]> {
+  if (!env.ANTHROPIC_API_KEY) return [];
+  const system = `Suggest 3 to 4 short topical tags for a blog article aimed at Oregon chiropractic assistants and the clinics that employ them. Each tag is lowercase, 1–3 words, no "#". Prefer reusable themes (e.g. "certification", "front desk", "renewal", "compliance", "hipaa", "getting started"). Return ONLY a comma-separated list, nothing else.`;
+  const user = `TITLE: ${input.title}${input.topic ? `\nTOPIC: ${input.topic}` : ""}`;
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 60,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+    const text = msg.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    const seen = new Set<string>();
+    return text
+      .split(",")
+      .map((t) => t.trim().replace(/^#/, "").replace(/[."']/g, "").toLowerCase())
+      .filter((t) => t && !seen.has(t) && seen.add(t))
+      .slice(0, 4);
+  } catch {
+    return [];
+  }
 }
 
 export async function generateArticle(
@@ -141,12 +176,14 @@ export async function generateArticle(
   const markdown = await complete(env, SYSTEM, user, 4500);
   const title = firstH1(markdown) ?? input.topic;
   const excerpt = firstParagraph(markdown).slice(0, 200);
+  const tags = await suggestTags(env, { title, topic: input.topic });
   return {
     title,
     slug: slugify(title),
     excerpt,
     seoDescription: excerpt.slice(0, 160),
     markdown,
+    tags,
     model: MODEL,
   };
 }
@@ -266,6 +303,39 @@ Rules for the prompt you write:
 - Describe that one subject plus at most one small supporting element, and explicitly call for generous empty background and an uncluttered, minimal composition.
 - Keep the prompt SHORT and restrained — long, detailed prompts make the model cram in clutter. Do not enumerate many objects.
 - Restate the key constraints inside the prompt: flat minimal vector illustration, single focal subject, lots of negative space, cream (#FAFAF7) background, teal/terracotta palette, no text or letters or logos.`;
+
+/**
+ * Draft concise alt text for a hero image — describes the illustration for
+ * screen readers + SEO (the engine's "Hero alt text" check). Cheap model; falls
+ * back to a derived string if the AI isn't configured. ~8–14 words, no "image of".
+ */
+export async function generateHeroAlt(
+  env: CloudflareEnv,
+  input: { title: string; prompt?: string },
+): Promise<string> {
+  const fallback = `Illustration for "${input.title}"`.slice(0, 120);
+  if (!env.ANTHROPIC_API_KEY) return fallback;
+  const system = `You write a single concise alt-text description (8–14 words) for a flat editorial illustration that heads a blog article. Describe what the illustration depicts, plainly, for a screen-reader user. Do NOT start with "image of"/"illustration of", no quotes, no period, no marketing language. Output ONLY the alt text.`;
+  const user = `ARTICLE TITLE: ${input.title}${input.prompt ? `\nIMAGE PROMPT: ${input.prompt}` : ""}`;
+  try {
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 60,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
+    const text = msg.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .replace(/^["'\s]+|["'\s.]+$/g, "")
+      .trim();
+    return text || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export async function generateHeroPrompt(
   env: CloudflareEnv,

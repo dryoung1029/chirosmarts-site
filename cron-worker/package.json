@@ -1,0 +1,11 @@
+{
+  "name": "chirosmarts-cron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily cron Worker that triggers ChiroSmarts lifecycle email flows.",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test:scheduled": "wrangler dev --test-scheduled"
+  }
+}

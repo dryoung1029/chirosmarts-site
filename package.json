@@ -21,16 +21,21 @@
     "db:seed:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed.sql",
     "db:seed:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed.sql",
     "db:seed:catalog:local": "wrangler d1 execute chirosmarts --local --file=./scripts/seed-catalog.sql",
-    "db:seed:catalog:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed-catalog.sql"
+    "db:seed:catalog:remote": "wrangler d1 execute chirosmarts --remote --file=./scripts/seed-catalog.sql",
+    "jeldon": "jeldon",
+    "validate": "jeldon validate",
+    "doctor": "jeldon doctor"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
     "@astrojs/cloudflare": "^12.6.0",
     "@jeldon/aeo-audit": "file:vendor/jeldon/aeo-audit",
+    "@jeldon/amplify": "file:vendor/jeldon/amplify",
     "@jeldon/cli": "file:vendor/jeldon/cli",
     "@jeldon/config": "file:vendor/jeldon/config",
     "@jeldon/core-scoring": "file:vendor/jeldon/core-scoring",
     "@jeldon/schema-graph": "file:vendor/jeldon/schema-graph",
+    "@jeldon/store": "file:vendor/jeldon/store",
     "astro": "^5.13.0",
     "drizzle-orm": "^0.44.2",
     "marked": "^14.1.4",

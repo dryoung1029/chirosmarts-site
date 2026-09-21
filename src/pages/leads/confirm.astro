@@ -2,11 +2,45 @@
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb } from "@/db/client";
 import { confirmLead } from "@/lib/leads";
+import { syncLeadToBrevo } from "@/lib/brevo";
+import { notifyAdmins } from "@/lib/email/admin-notify";
 
-const db = getDb(Astro.locals.runtime.env);
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
 const token = Astro.url.searchParams.get("token") ?? "";
 const lead = await confirmLead(db, token);
 const isChecklist = lead?.source === "checklist_pdf";
+const isNewsletter = lead?.source === "newsletter";
+
+// Newsletter subscribers AND free-checklist downloaders land in Brevo
+// immediately on confirm (real-time list loading — both go to the newsletter
+// list, tagged by SOURCE); other sources sync via the admin batch. The form
+// discloses ongoing email + unsubscribe, so this matches what they agreed to.
+// Best-effort — never blocks the confirmation / download.
+if (lead && (isNewsletter || isChecklist)) {
+  try {
+    await syncLeadToBrevo(env, db, {
+      id: lead.id,
+      email: lead.email,
+      source: lead.source,
+      birthMonth: lead.birthMonth,
+    });
+  } catch {
+    /* admin batch sync will pick it up */
+  }
+}
+
+// Operational alert: a mailing-list opt-in was confirmed. Best-effort.
+if (lead && (isNewsletter || isChecklist)) {
+  const kind = isChecklist ? "checklist download" : "newsletter";
+  await notifyAdmins(env, {
+    subject: `New mailing-list signup (${kind})`,
+    lines: [
+      `<strong>${lead.email}</strong> confirmed a ${kind} signup and joined the list.`,
+    ],
+    ctaPath: "/admin/contacts",
+  });
+}
 ---
 
 <MarketingLayout
@@ -21,8 +55,13 @@ const isChecklist = lead?.source === "checklist_pdf";
           <>
             <h1>That link didn't work</h1>
             <p style="color:var(--muted)">
-              The confirmation link is invalid or has already been used. You can
-              request it again from the page where you signed up.
+              The confirmation link is invalid or has already been used —
+              confirmation links only work once. If you already confirmed and
+              just need your checklist again, request it below and we'll email
+              you a fresh download link.
+            </p>
+            <p style="margin-top:1.5rem">
+              <a class="btn-primary" href="/#get-checklist">Get the checklist again →</a>
             </p>
           </>
         ) : (
@@ -33,6 +72,12 @@ const isChecklist = lead?.source === "checklist_pdf";
                 <p style="color:var(--muted)">Your Oregon CA certification checklist is ready.</p>
                 <a class="btn-primary" href={`/api/leads/asset?lid=${lead.id}`}>Download the checklist (PDF)</a>
               </>
+            ) : isNewsletter ? (
+              <p style="color:var(--muted)">
+                You're subscribed to the ChiroSmarts newsletter — practical tips for
+                Oregon chiropractic assistants. You can unsubscribe anytime from any
+                email we send.
+              </p>
             ) : (
               <p style="color:var(--muted)">
                 We'll remind you before your Oregon CA renewal deadline. You can

@@ -1,0 +1,183 @@
+---
+/**
+ * Marketing roster, organized by segment/campaign. Reads imported_contacts.
+ * Each segment card links to a filtered CSV export to feed Brevo / the mailer.
+ * Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb } from "@/db/client";
+import { getContactStats } from "@/lib/contacts";
+import { getSiteUrl } from "@/lib/env";
+import { renewalSetupUrl } from "@/lib/contact-token";
+import { isValidEmail } from "@/lib/leads";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+let stats = null;
+let err = "";
+try {
+  stats = await getContactStats(db);
+} catch {
+  err = "The contact roster isn't ready yet — apply the latest migration and import legacy data.";
+}
+
+// Renewal-link generator (testing / support): make a valid signed link for any
+// email — the same URL the CSV export produces, so you can test the campaign
+// button in your own inbox or hand a link to someone who lost theirs.
+const linkFor = (Astro.url.searchParams.get("linkfor") ?? "").trim().toLowerCase();
+let generatedLink = "";
+let linkError = "";
+if (linkFor) {
+  if (isValidEmail(linkFor)) {
+    generatedLink = await renewalSetupUrl(env, getSiteUrl(env), linkFor);
+  } else {
+    linkError = "Enter a valid email address.";
+  }
+}
+
+const segments = stats
+  ? [
+      {
+        title: "Certified CAs",
+        count: stats.certified,
+        channel: "Renewal CE · Brevo",
+        blurb: "Completed a course → need annual CE. Primary target for the renewal pack.",
+        href: "/api/admin/contacts/export?segment=certified",
+      },
+      {
+        title: "Need renewal month",
+        count: stats.needsMonth,
+        channel: "Birth-month capture",
+        blurb: "Certified but no birth month yet. Send the re-permission email with the renewal-setup link to capture it and move them into precise reminders.",
+        href: "/api/admin/contacts/export?segment=needs_month",
+      },
+      {
+        title: "Renewal-ready",
+        count: stats.hasMonth,
+        channel: "Precise reminders",
+        blurb: "Birth month on file → already flow into 60-days-before reminders automatically.",
+        href: "/api/admin/contacts/export?segment=has_month",
+      },
+      {
+        title: "Past buyers",
+        count: stats.buyers,
+        channel: "Loyalty · Brevo",
+        blurb: "Strongest relationship. Lead the re-permission send here; warm them up first.",
+        href: "/api/admin/contacts/export?segment=buyers",
+      },
+      {
+        title: "Prospects (never bought)",
+        count: stats.prospects,
+        channel: "Upsell · Brevo",
+        blurb: "Free-CEU signups who never certified. Nurture toward the $149 initial cert.",
+        href: "/api/admin/contacts/export?segment=prospects",
+      },
+      {
+        title: "Oregon",
+        count: stats.oregon,
+        channel: "Geo-targeted",
+        blurb: "Contacts in Oregon — the core market for state-specific messaging.",
+        href: "/api/admin/contacts/export?segment=oregon",
+      },
+    ]
+  : [];
+---
+
+<Layout title="Contacts & campaigns · Admin" showNav={true}>
+  <AdminNav active="contacts" />
+  <h1 style="margin-bottom:0.25rem">Contacts &amp; campaigns</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Your imported marketing roster, grouped by segment. Each card exports a filtered
+    CSV to feed Brevo (mailing list) or the clinic postcard mailer. Warm up the domain
+    and re-permission old contacts before any big send (see the note at the bottom).
+  </p>
+
+  <div class="panel">
+    <h2 style="margin-top:0">Generate a renewal link<span class="muted" style="font-weight:400;font-size:0.9rem"> — for testing / support</span></h2>
+    <p class="muted" style="margin-top:0;font-size:0.9rem">
+      Makes a valid signed birth-month-capture link for any email — the same URL the
+      CSV export produces. Use it to test the campaign button in your own inbox, or to
+      re-send someone their link.
+    </p>
+    <form method="get" action="/admin/contacts" class="row" style="flex-wrap:wrap">
+      <input type="email" name="linkfor" value={linkFor} placeholder="you@example.com" style="flex:1;min-width:14rem" required />
+      <button type="submit" style="margin-top:0">Generate link</button>
+    </form>
+    {linkError && <p style="color:var(--danger);margin:0.6rem 0 0">{linkError}</p>}
+    {generatedLink && (
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+        <input id="gen-link" type="text" readonly value={generatedLink} style="flex:1;min-width:16rem;font-size:0.85rem" onclick="this.select()" />
+        <button type="button" class="btn" style="padding:0.4rem 0.9rem" onclick="navigator.clipboard.writeText(document.getElementById('gen-link').value);this.textContent='Copied ✓'">Copy</button>
+        <a class="btn" href={generatedLink} target="_blank" rel="noopener" style="padding:0.4rem 0.9rem">Open</a>
+      </div>
+    )}
+  </div>
+
+  {err ? (
+    <p class="panel" style="background:var(--warning-tint,#fdf6ec);color:var(--warning-ink,#633806);border:none">{err}</p>
+  ) : (
+    <>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0 1.5rem">
+        {[
+          { label: "Contacts", v: stats!.total },
+          { label: "Certified", v: stats!.certified },
+          { label: "Buyers", v: stats!.buyers },
+          { label: "Clinics", v: stats!.uniqueClinics },
+          { label: "Renewal-ready", v: stats!.hasMonth },
+        ].map((s) => (
+          <div class="panel" style="flex:1;min-width:8rem;text-align:center">
+            <div style="font-size:1.7rem;font-weight:700;color:var(--text)">{s.v}</div>
+            <div class="muted" style="font-size:0.82rem">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <h2 style="margin-bottom:0.5rem">Segments &amp; campaigns</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:1rem">
+        {segments.map((seg) => (
+          <div class="panel" style="display:flex;flex-direction:column;gap:0.35rem">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem">
+              <strong>{seg.title}</strong>
+              <span style="font-size:1.3rem;font-weight:700;color:var(--text)">{seg.count}</span>
+            </div>
+            <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--brand)">{seg.channel}</div>
+            <p class="muted" style="font-size:0.85rem;margin:0.1rem 0 0.5rem;flex:1">{seg.blurb}</p>
+            <a class="btn" href={seg.href} style="padding:0.4rem 0.9rem;align-self:flex-start;font-size:0.9rem">⬇ Export CSV</a>
+          </div>
+        ))}
+
+        {/* Clinics: B2B postcard mailer (own export). */}
+        <div class="panel" style="display:flex;flex-direction:column;gap:0.35rem">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.5rem">
+            <strong>Clinics</strong>
+            <span style="font-size:1.3rem;font-weight:700;color:var(--text)">{stats!.uniqueClinics}</span>
+          </div>
+          <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--brand)">Postcard mailer · B2B</div>
+          <p class="muted" style="font-size:0.85rem;margin:0.1rem 0 0.5rem;flex:1">
+            One row per clinic, busiest first, with a best-guess mailing address. Spot-check
+            addresses before a print run (legacy forms stored each CA's address, not the clinic's).
+          </p>
+          <a class="btn-primary" href="/api/admin/contacts/export-clinics" style="padding:0.4rem 0.9rem;align-self:flex-start;font-size:0.9rem">📮 Clinics CSV</a>
+        </div>
+      </div>
+
+      <p class="muted" style="margin-top:1rem;font-size:0.88rem">
+        Need everyone in one file? <a href="/api/admin/contacts/export">Download the full roster CSV</a>
+        (includes the per-contact renewal-setup link for the Brevo email).
+      </p>
+
+      <div class="panel" style="margin-top:1.25rem;background:var(--panel-2);border:none">
+        <strong>Before you email this list — read this</strong>
+        <ul class="muted" style="font-size:0.88rem;margin:0.5rem 0 0;padding-left:1.1rem;line-height:1.5">
+          <li><strong>Re-permission</strong> old contacts: one email asking them to confirm the newsletter +
+            renewal reminders, with easy unsubscribe. Drop anyone who doesn't engage — it protects your reputation.</li>
+          <li><strong>Warm up the domain.</strong> Start with <strong>Past buyers</strong>, send in batches, grow gradually.
+            Don't blast all {stats!.total} at once from a fresh domain.</li>
+          <li>The <strong>Need renewal month</strong> segment is the one to run the birth-month-capture email to —
+            it both re-permissions them and feeds the precise renewal flow.</li>
+        </ul>
+      </div>
+    </>
+  )}
+</Layout>

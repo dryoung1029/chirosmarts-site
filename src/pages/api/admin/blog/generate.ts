@@ -43,6 +43,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       excerpt: a.excerpt,
       seoDescription: a.seoDescription,
       bodyMarkdown: a.markdown,
+      tags: a.tags,
       status: "draft",
       model: a.model,
     });

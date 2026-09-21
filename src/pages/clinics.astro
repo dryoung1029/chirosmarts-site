@@ -73,8 +73,9 @@ const subhead = OWNER.clinics.subhead;
     </div>
   </section>
 
-  <!-- Owner-produced overview video (lazy; only if a Stream UID is configured) -->
-  {OWNER.clinics.demoVideoStreamUid ? (
+  <!-- Owner-produced overview video — only rendered once a Stream UID is set.
+       Until then the whole section is hidden (no placeholder ships live). -->
+  {OWNER.clinics.demoVideoStreamUid && (
     <section class="mk-section">
       <div class="mk-container">
         <p style="margin-top:0">{OWNER.clinics.videoIntro}</p>
@@ -86,15 +87,6 @@ const subhead = OWNER.clinics.subhead;
             allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;"
             allowfullscreen
           ></iframe>
-        </div>
-      </div>
-    </section>
-  ) : (
-    <section class="mk-section">
-      <div class="mk-container">
-        <p style="margin-top:0">{OWNER.clinics.videoIntro}</p>
-        <div class="mk-card" style="display:grid;place-items:center;min-height:160px;border-style:dashed;color:var(--muted)">
-          <span class="owner-copy">{ownerCopy("clinic overview video (Cloudflare Stream UID)")}</span>
         </div>
       </div>
     </section>

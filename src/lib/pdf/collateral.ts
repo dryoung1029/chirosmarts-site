@@ -97,6 +97,24 @@ function parseInline(text: string): Run[] {
   return runs.length ? runs : [{ text: "", bold: false }];
 }
 
+/**
+ * Flatten inline Markdown to plain text for single-font contexts (table cells).
+ * Drops link/code/bold markers so they never render literally; reports whether
+ * the whole cell was wrapped in **bold** so the cell can be drawn bold.
+ */
+function stripInline(text: string): { text: string; bold: boolean } {
+  const trimmed = text.trim();
+  const wholeBold =
+    /^\*\*[\s\S]+\*\*$/.test(trimmed) && !trimmed.slice(2, -2).includes("**");
+  const plain = trimmed
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [t](u) → t
+    .replace(/`([^`]+)`/g, "$1") // `code` → code
+    .replace(/\*\*/g, "") // bold markers
+    .replace(/(^|\s)\*(\S)/g, "$1$2") // opening italic *
+    .replace(/(\S)\*(\s|$)/g, "$1$2"); // closing italic *
+  return { text: plain, bold: wholeBold };
+}
+
 export async function renderCollateralPdf(
   opts: CollateralPdfOpts,
 ): Promise<Uint8Array> {
@@ -112,6 +130,23 @@ export async function renderCollateralPdf(
   const widthOf = (t: string, f: PDFFont, size: number) =>
     f.widthOfTextAtSize(t, size);
 
+  // Trim text to fit a pixel width, appending an ellipsis when clipped.
+  function truncateToWidth(text: string, f: PDFFont, size: number, maxW: number) {
+    if (widthOf(text, f, size) <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && widthOf(s + "…", f, size) > maxW) s = s.slice(0, -1);
+    return s.replace(/\s+$/, "") + "…";
+  }
+
+  // Reserve a centered zone for the "Page X of Y" label so the footer's left
+  // text can be truncated to never collide with it.
+  const PAGE_ZONE_HALF = 52;
+  const copyrightYear = (opts.generatedDate.match(/\d{4}/) ?? ["2026"])[0];
+  const copyrightLine = winAnsiSafe(
+    `© ${copyrightYear} ChiroSmarts. All rights reserved. This material may not be ` +
+      `reproduced or distributed without written permission.`,
+  );
+
   function footer(p: PDFPage) {
     p.drawLine({
       start: { x: MARGIN, y: FOOT_Y + 12 },
@@ -119,18 +154,28 @@ export async function renderCollateralPdf(
       thickness: 0.5,
       color: RULE,
     });
-    p.drawText(winAnsiSafe(`${opts.courseTitle} · ${opts.typeLabel}`), {
-      x: MARGIN,
-      y: FOOT_Y,
-      size: 8,
+    const leftMaxW = PAGE_W / 2 - PAGE_ZONE_HALF - 8 - MARGIN;
+    const left = truncateToWidth(
+      winAnsiSafe(`${opts.courseTitle} · ${opts.typeLabel}`),
       font,
-      color: MUTED,
-    });
+      8,
+      leftMaxW,
+    );
+    p.drawText(left, { x: MARGIN, y: FOOT_Y, size: 8, font, color: MUTED });
     const right = winAnsiSafe(`ChiroSmarts · ${opts.generatedDate}`);
     p.drawText(right, {
       x: PAGE_W - MARGIN - widthOf(right, font, 8),
       y: FOOT_Y,
       size: 8,
+      font,
+      color: MUTED,
+    });
+    // Copyright / reproduction notice, centered on its own line below.
+    const cw = widthOf(copyrightLine, font, 6.5);
+    p.drawText(copyrightLine, {
+      x: (PAGE_W - cw) / 2,
+      y: FOOT_Y - 11,
+      size: 6.5,
       font,
       color: MUTED,
     });
@@ -270,9 +315,11 @@ export async function renderCollateralPdf(
     const size = 9.5;
     const padY = 5;
     rows.forEach((cells, ri) => {
-      // measure row height by wrapping each cell
-      const cellLines = cells.map((c) =>
-        wrapPlain(c, font, size, colW - 10),
+      // strip inline markdown so **bold**/links don't render literally; a fully
+      // bolded cell (or any header cell) is drawn in the bold font.
+      const parsed = cells.map((c) => stripInline(c));
+      const cellLines = parsed.map((p) =>
+        wrapPlain(p.text, font, size, colW - 10),
       );
       const rowH = Math.max(...cellLines.map((l) => l.length)) * (size + 3) + padY * 2;
       ensure(rowH);
@@ -289,12 +336,13 @@ export async function renderCollateralPdf(
       cells.forEach((_, ci) => {
         const cx = MARGIN + ci * colW + 5;
         let cy = top - padY - size;
+        const cellFont = ri === 0 || parsed[ci].bold ? bold : font;
         for (const line of cellLines[ci]) {
           page.drawText(line, {
             x: cx,
             y: cy,
             size,
-            font: ri === 0 ? bold : font,
+            font: cellFont,
             color: INK,
           });
           cy -= size + 3;
@@ -386,22 +434,28 @@ export async function renderCollateralPdf(
       i++;
       continue;
     }
-    if (/^###\s+/.test(t)) {
-      y -= 4;
-      drawParagraph(parseInline(t.replace(/^###\s+/, "")), 12.5, INK, 0, 3);
-      i++;
-      continue;
-    }
-    if (/^##\s+/.test(t)) {
-      y -= 8;
-      drawParagraph(parseInline(t.replace(/^##\s+/, "")), 15, ACCENT, 0, 4);
-      y -= 2;
-      i++;
-      continue;
-    }
-    if (/^#\s+/.test(t)) {
-      y -= 6;
-      drawParagraph(parseInline(t.replace(/^#\s+/, "")), 17, INK, 0, 4);
+    // headings, levels 1-6 (#### and deeper render as small bold subheads)
+    const hm = t.match(/^(#{1,6})\s+(.*)$/);
+    if (hm) {
+      const level = hm[1].length;
+      const txt = hm[2];
+      if (level === 1) {
+        y -= 6;
+        drawParagraph(parseInline(txt), 17, INK, 0, 4);
+      } else if (level === 2) {
+        y -= 8;
+        drawParagraph(parseInline(txt), 15, ACCENT, 0, 4);
+        y -= 2;
+      } else if (level === 3) {
+        y -= 4;
+        drawParagraph(parseInline(txt), 12.5, INK, 0, 3);
+      } else {
+        // h4-h6: render as a small bold subheading so it's visually distinct
+        // from body text (which is regular weight at 10.5).
+        y -= 3;
+        const runs = parseInline(txt).map((r) => ({ ...r, bold: true }));
+        drawParagraph(runs, 11, INK, 0, 3);
+      }
       i++;
       continue;
     }

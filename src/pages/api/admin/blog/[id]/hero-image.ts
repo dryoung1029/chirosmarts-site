@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import {
   generateHeroImage,
+  generateHeroAlt,
   GeminiNotConfiguredError,
 } from "@/lib/blog";
 
@@ -20,7 +21,7 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
   const back = `/admin/blog/${id}`;
 
   const row = await db
-    .select({ id: schema.blogPosts.id })
+    .select({ id: schema.blogPosts.id, title: schema.blogPosts.title, heroAlt: schema.blogPosts.heroAlt })
     .from(schema.blogPosts)
     .where(eq(schema.blogPosts.id, id))
     .get();
@@ -36,9 +37,13 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
     await env.DOCS.put(key, bytes, { httpMetadata: { contentType } });
     // Cache-bust the public URL so a regenerated image shows immediately.
     const heroImage = `/blog/hero/${id}?v=${Date.now()}`;
+    // Auto-draft alt text on first generation; never overwrite an edited one.
+    const heroAlt = row.heroAlt?.trim()
+      ? row.heroAlt
+      : await generateHeroAlt(env, { title: row.title, prompt });
     await db
       .update(schema.blogPosts)
-      .set({ heroImage, heroPrompt: prompt, updatedAt: nowIso() })
+      .set({ heroImage, heroPrompt: prompt, heroAlt, updatedAt: nowIso() })
       .where(eq(schema.blogPosts.id, id));
     return redirect(`${back}?msg=Hero+image+generated#hero`, 303);
   } catch (err) {

@@ -9,9 +9,10 @@
  * the signature, not a session.
  */
 import type { APIRoute } from "astro";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { schema } from "@/db/client";
+import { notifyAdmins } from "@/lib/email/admin-notify";
 import { constructWebhookEvent } from "@/lib/stripe";
 import {
   activateEnrollment,
@@ -19,6 +20,13 @@ import {
   revokeEnrollmentByPaymentIntent,
 } from "@/lib/enrollment";
 import { grantPoolSeats } from "@/lib/seat-pools";
+import {
+  recordCoursePurchase,
+  recordSeatPurchase,
+  recordRefundByPaymentIntent,
+  hasSaleForCheckoutSession,
+  hasRefundForPaymentIntent,
+} from "@/lib/sales";
 import { logEvent } from "@/lib/events";
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -42,6 +50,31 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   const db = getDb(env);
 
+  try {
+    await handleEvent(env, db, event);
+  } catch (e) {
+    // Surface the real cause: log it AND return it in the body so it's visible
+    // on the Stripe dashboard's delivery attempt (and triggers a retry in case
+    // the failure was transient — fulfilment is idempotent).
+    const message = (e as Error)?.stack ?? (e as Error)?.message ?? String(e);
+    await logEvent(db, {
+      type: "stripe_webhook_error",
+      payload: { eventType: event.type, message: String(message).slice(0, 900) },
+    }).catch(() => {});
+    return new Response(`fulfilment error: ${message}`, { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+};
+
+async function handleEvent(
+  env: CloudflareEnv,
+  db: ReturnType<typeof getDb>,
+  event: Awaited<ReturnType<typeof constructWebhookEvent>>,
+): Promise<void> {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as {
       metadata?: Record<string, string> | null;
@@ -52,6 +85,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const meta = session.metadata ?? {};
 
     if (meta.kind === "course" && meta.userId && (meta.courseIds || meta.courseId)) {
+      // The buyer may no longer exist (e.g. a test account deleted after a test
+      // purchase). Activating would fail the enrollment's user FK and 500 the
+      // webhook forever, so skip gracefully and log for reconciliation instead.
+      const buyer = await db
+        .select({ id: schema.users.id, email: schema.users.email })
+        .from(schema.users)
+        .where(eq(schema.users.id, meta.userId))
+        .get();
+      if (!buyer) {
+        await logEvent(db, {
+          type: "stripe_webhook_orphan_user",
+          payload: { userId: meta.userId, checkoutSessionId: session.id ?? null },
+        }).catch(() => {});
+        return;
+      }
       // `courseIds` (CSV) is the bundle-ready form; `courseId` kept for any
       // older in-flight session. Activate each course in the session.
       const courseIds = (meta.courseIds ?? meta.courseId ?? "")
@@ -68,6 +116,47 @@ export const POST: APIRoute = async ({ request, locals }) => {
           });
         }
       }
+      // Revenue ledger: one row per PURCHASED SKU (bundles stay bundles). Guard
+      // against Stripe redelivering the event so revenue is never double-counted.
+      // Wrapped so a ledger failure can never break fulfilment (or wedge Stripe
+      // retries) — access has already been granted above.
+      try {
+        if (session.id && !(await hasSaleForCheckoutSession(db, session.id))) {
+          await recordCoursePurchase(db, {
+            userId: meta.userId,
+            courseIds,
+            source: "stripe",
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent ?? null,
+          });
+        }
+      } catch (e) {
+        await logEvent(db, {
+          userId: meta.userId,
+          type: "sales_ledger_error",
+          payload: { where: "course", message: String((e as Error)?.message ?? e) },
+        }).catch(() => {});
+      }
+      // Operational alert: we made a sale. Best-effort.
+      const dollars =
+        session.amount_total != null ? `$${(session.amount_total / 100).toFixed(2)}` : "—";
+      const titles = courseIds.length
+        ? (
+            await db
+              .select({ title: schema.courses.title })
+              .from(schema.courses)
+              .where(inArray(schema.courses.id, courseIds))
+              .all()
+          ).map((t) => t.title)
+        : [];
+      await notifyAdmins(env, {
+        subject: `New purchase — ${dollars}`,
+        lines: [
+          `<strong>${buyer.email}</strong> purchased ${titles.join(", ") || "a course"}.`,
+          `Amount paid: ${dollars}`,
+        ],
+        ctaPath: "/admin/revenue",
+      });
     } else if (
       meta.kind === "seats" &&
       meta.clinicId &&
@@ -88,11 +177,50 @@ export const POST: APIRoute = async ({ request, locals }) => {
           courseId: meta.courseId,
           payload: { clinicId: clinic.id, count, method: "stripe" },
         });
+        try {
+          if (session.id && !(await hasSaleForCheckoutSession(db, session.id))) {
+            await recordSeatPurchase(db, {
+              clinicId: clinic.id,
+              courseId: meta.courseId,
+              count,
+              source: "stripe",
+              stripeCheckoutSessionId: session.id,
+              stripePaymentIntentId: session.payment_intent ?? null,
+            });
+          }
+        } catch (e) {
+          await logEvent(db, {
+            type: "sales_ledger_error",
+            payload: { where: "seats", message: String((e as Error)?.message ?? e) },
+          }).catch(() => {});
+        }
+        // Operational alert: a clinic bought seats. Best-effort.
+        const dollars =
+          session.amount_total != null ? `$${(session.amount_total / 100).toFixed(2)}` : "—";
+        await notifyAdmins(env, {
+          subject: `New clinic seat purchase — ${count} seat(s)`,
+          lines: [
+            `Clinic <strong>${clinic.name}</strong> purchased <strong>${count}</strong> training seat(s).`,
+            `Amount paid: ${dollars}`,
+          ],
+          ctaPath: "/admin/revenue",
+        });
       }
     }
   } else if (event.type === "charge.refunded") {
     const charge = event.data.object as { payment_intent?: string | null };
     if (charge.payment_intent) {
+      // Revenue ledger: append offsetting refund rows (idempotent, non-blocking).
+      try {
+        if (!(await hasRefundForPaymentIntent(db, charge.payment_intent))) {
+          await recordRefundByPaymentIntent(db, charge.payment_intent);
+        }
+      } catch (e) {
+        await logEvent(db, {
+          type: "sales_ledger_error",
+          payload: { where: "refund", message: String((e as Error)?.message ?? e) },
+        }).catch(() => {});
+      }
       // Student-level course refund → revoke that enrollment (PLAN #9).
       const revoked = await revokeEnrollmentByPaymentIntent(
         db,
@@ -110,9 +238,4 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
   }
-
-  return new Response(JSON.stringify({ received: true }), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-};
+}

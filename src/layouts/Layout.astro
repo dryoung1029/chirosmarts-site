@@ -2,13 +2,27 @@
 interface Props {
   title: string;
   showNav?: boolean;
+  /** SEO meta description — set on PUBLIC pages (help, courses, verify). */
+  description?: string;
+  /** Canonical path (e.g. "/help") — set alongside description on public pages. */
+  canonicalPath?: string;
 }
-const { title, showNav = false } = Astro.props;
+const { title, showNav = false, description, canonicalPath } = Astro.props;
 const user = Astro.locals.user;
 import "@/styles/tokens.css";
 import Logo from "@/components/Logo.astro";
 import { isAdmin } from "@/lib/admin";
+import { getSiteUrl } from "@/lib/env";
 import { LEGAL } from "@/config/legal";
+const siteUrl = getSiteUrl(Astro.locals.runtime.env).replace(/\/$/, "");
+const canonical = canonicalPath ? `${siteUrl}${canonicalPath}` : null;
+// Public pages on this layout get the first-party pageview beacon; private app
+// pages (dashboard, learn, clinic, admin) are deliberately not measured.
+const p = Astro.url.pathname;
+const beacon =
+  p === "/courses" || p.startsWith("/courses/") ||
+  p === "/help" || p.startsWith("/help/") ||
+  p === "/verify" || p.startsWith("/verify/");
 const userIsAdmin = isAdmin(Astro.locals.runtime.env, user);
 const isClinicOwner = user?.role === "clinic_admin";
 const legalEntity = LEGAL.entityName;
@@ -29,6 +43,20 @@ const isActive = (prefix: string) =>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>{title} · ChiroSmarts</title>
+    {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    {beacon && (
+      <script is:inline>
+        (function () {
+          try {
+            navigator.sendBeacon(
+              "/api/metrics/view",
+              JSON.stringify({ path: location.pathname, referrer: document.referrer || "" }),
+            );
+          } catch (e) {}
+        })();
+      </script>
+    )}
     <style is:global>
       body {
         font-family: system-ui, sans-serif;
@@ -64,7 +92,10 @@ const isActive = (prefix: string) =>
       .row { display: flex; gap: 1rem; }
       .row > div { flex: 1; }
       .check { display: flex; gap: 0.6rem; align-items: flex-start; margin-top: 1rem; }
-      .check input { width: auto; margin-top: 0.25rem; }
+      /* flex:0 0 auto keeps the radio/checkbox from being squeezed (and visibly
+         shrunk) when its label text wraps — otherwise longer options render a
+         smaller circle, which can hint at the answer. */
+      .check input { width: auto; flex: 0 0 auto; margin-top: 0.25rem; }
       /* Keep the in-content form-button spacing the app relied on. */
       .wrap button, .wrap .btn { margin-top: 1.25rem; }
       .wrap button.link { margin-top: 0; }

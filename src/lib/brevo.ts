@@ -76,7 +76,6 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
       details: [],
     };
   }
-  const leadsList = Number(env.BREVO_LIST_ID_LEADS) || 0;
   const usersList = Number(env.BREVO_LIST_ID_USERS) || 0;
 
   // CONFIRMED leads not yet synced (or never synced).
@@ -102,7 +101,7 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
         BIRTH_MONTH: lead.birthMonth ?? "",
         ROLE: "lead",
       },
-      listIds: leadsList ? [leadsList] : [],
+      listIds: listIdForSource(env, lead.source) ? [listIdForSource(env, lead.source)] : [],
     });
     details.push({ email: lead.email, kind: "lead", ok: outcome.ok, action: outcome.action });
     if (outcome.ok) {

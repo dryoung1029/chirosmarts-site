@@ -23,5 +23,5 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       payload: { clinicId: clinic.id, assignmentId },
     });
   }
-  return redirect("/dashboard", 303);
+  return redirect("/clinic", 303);
 };

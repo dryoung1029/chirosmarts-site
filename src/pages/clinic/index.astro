@@ -34,7 +34,7 @@ const params = Astro.url.searchParams;
 const q = {
   error: params.get("error"),
   assigned: params.get("assigned"),
-  dev: params.get("dev"),
+  invite: params.get("invite"),
   seats: params.get("seats"),
 };
 
@@ -107,9 +107,26 @@ const totals = pools.reduce(
       Added {q.seats} seat{q.seats === "1" ? "" : "s"} to the pool (test mode — no charge).
     </div>
   )}
-  {q.dev && (
-    <div class="notice warn">
-      Dev mode (no email key set). Claim link: <a href={q.dev}>{q.dev}</a>
+  {q.invite && (
+    <div class="notice warn" style="display:flex;flex-direction:column;gap:0.4rem">
+      <strong>Invite link ready</strong>
+      <span style="font-size:0.9rem">
+        The invite email couldn't be sent (email isn't fully configured yet), so
+        share this one-time claim link with your CA directly:
+      </span>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+        <input
+          id="invite-link"
+          type="text"
+          readonly
+          value={q.invite}
+          style="flex:1;min-width:16rem;padding:0.4rem;font-size:0.85rem"
+          onclick="this.select()"
+        />
+        <button type="button" class="btn" style="padding:0.4rem 0.9rem"
+          onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value);this.textContent='Copied ✓'">Copy link</button>
+        <a class="btn" href={q.invite} target="_blank" rel="noopener" style="padding:0.4rem 0.9rem">Open</a>
+      </div>
     </div>
   )}
 

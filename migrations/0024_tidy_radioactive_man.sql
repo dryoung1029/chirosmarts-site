@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `stripe_product_id` text;

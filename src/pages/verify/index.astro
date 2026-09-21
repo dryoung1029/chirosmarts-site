@@ -7,7 +7,11 @@ const code = Astro.url.searchParams.get("code")?.trim();
 if (code) return Astro.redirect(`/verify/${encodeURIComponent(code.toUpperCase())}`);
 ---
 
-<Layout title="Verify a certificate">
+<Layout
+  title="Verify a certificate"
+  description="Verify the authenticity of a ChiroSmarts training certificate — enter the verification code from any certificate to confirm it's genuine."
+  canonicalPath="/verify"
+>
   <div style="display:flex;justify-content:center;margin:0.5rem 0 1.5rem">
     <Logo height={38} />
   </div>
