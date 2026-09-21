@@ -13,6 +13,8 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 
 const MODEL = "claude-haiku-4-5";
+/** Total transcript characters we send the model, split evenly across lessons. */
+const PROMPT_BUDGET_CHARS = 14000;
 
 export interface GeneratedQuestion {
   prompt: string;
@@ -126,10 +128,17 @@ async function generateFromCues(
   const n = Math.max(1, Math.min(20, Math.floor(count) || 5));
   const cues = lessonGroups.flatMap((g) => g.cues);
   const lessonsWithText = lessonGroups.filter((g) => g.cues.length > 0);
+  // Split the prompt budget per lesson BEFORE joining. Truncating the joined
+  // string instead would drop later lessons entirely whenever the earlier ones
+  // fill the budget — while the prompt below still promises the model every
+  // lesson is present and asks for even coverage.
+  const perLessonBudget = Math.floor(PROMPT_BUDGET_CHARS / Math.max(1, lessonsWithText.length));
   const text = lessonsWithText
-    .map((g, i) => `### LESSON ${i + 1}: ${g.title}\n${g.cues.map((c) => c.text).join(" ")}`)
-    .join("\n\n")
-    .slice(0, 14000);
+    .map(
+      (g, i) =>
+        `### LESSON ${i + 1}: ${g.title}\n${g.cues.map((c) => c.text).join(" ").slice(0, perLessonBudget)}`,
+    )
+    .join("\n\n");
   if (text.trim().length < 200) {
     throw new Error(notEnoughContentMessage);
   }
