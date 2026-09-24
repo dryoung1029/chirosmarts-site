@@ -8,6 +8,7 @@ import { getCourseStructure } from "@/lib/courses";
 import { unpassedQuizzes } from "@/lib/quiz";
 import { listCertificates } from "@/lib/certificate";
 import { formatPacific } from "@/lib/time";
+import { isAdminEmail } from "@/lib/admin";
 
 const db = getDb(Astro.locals.runtime.env);
 const userId = Astro.params.id!;
@@ -67,6 +68,12 @@ const ownedClinic = await db
   .from(schema.clinics)
   .where(eq(schema.clinics.ownerUserId, userId))
   .get();
+// Allowlisted emails are admins from their next login, even while the row
+// still says "student" — keep the switch away from them too, not just from
+// accounts already carrying the site_admin role.
+const isSiteAdmin =
+  student.role === "site_admin" ||
+  isAdminEmail(Astro.locals.runtime.env, student.email);
 ---
 
 <Layout title={`${student.legalName || student.email} · Admin`} showNav={true}>
@@ -93,7 +100,7 @@ const ownedClinic = await db
     <div class="panel" style="border-color:var(--danger);color:var(--danger)">{flashError}</div>
   )}
 
-  {student.role !== "site_admin" && (
+  {!isSiteAdmin && (
     <div class="panel">
       <h2 style="margin-top:0">Account type</h2>
       <p class="muted" style="margin-top:0;font-size:0.9rem">

@@ -15,8 +15,9 @@
  * site_admin is deliberately out of scope — it stays governed by the
  * ADMIN_EMAILS allowlist, so this screen can never hand out admin rights.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
+import { isAdminEmail } from "@/lib/admin";
 import { createClinicForOwner } from "@/lib/clinic";
 import { instantiatePath } from "@/lib/roadmap";
 import { logEvent } from "@/lib/events";
@@ -43,7 +44,10 @@ export async function switchAccountType(
     .get();
   if (!user) return { ok: false, message: "That account no longer exists." };
 
-  if (user.role === "site_admin") {
+  if (user.role === "site_admin" || isAdminEmail(env, user.email)) {
+    // Role alone isn't enough: ADMIN_EMAILS grants admin immediately via
+    // isAdmin(), and the site_admin role is only persisted on their next
+    // login — so an allowlisted account can still read as "student" here.
     return {
       ok: false,
       message:
@@ -59,6 +63,29 @@ export async function switchAccountType(
 
   const from = user.role;
 
+  /**
+   * Claim the transition with a conditional UPDATE before provisioning
+   * anything. Two concurrent submits would otherwise both pass the checks
+   * above and both run the check-then-insert inside createClinicForOwner /
+   * instantiatePath — which have no unique constraint behind them — leaving
+   * duplicate clinics and roadmaps. Only the request that actually moves the
+   * row off `from` proceeds. Returns false when we can positively see that no
+   * row changed; an unreadable count falls through to the old behaviour rather
+   * than blocking a legitimate switch.
+   */
+  const claim = async (to: SwitchableRole, extra: Record<string, unknown> = {}) => {
+    const res = await db
+      .update(schema.users)
+      .set({ role: to, updatedAt: nowIso(), ...extra })
+      .where(and(eq(schema.users.id, userId), eq(schema.users.role, from)))
+      .run();
+    return (res as { meta?: { changes?: number } })?.meta?.changes !== 0;
+  };
+  const raced: SwitchResult = {
+    ok: false,
+    message: "That account just changed somewhere else — reload the page and try again.",
+  };
+
   if (target === "clinic_admin") {
     // Fall back to the clinic name captured at intake when the admin didn't type one.
     const clinicName = (clinicNameInput ?? "").trim() || (user.clinicName ?? "").trim();
@@ -69,10 +96,7 @@ export async function switchAccountType(
       };
     }
 
-    await db
-      .update(schema.users)
-      .set({ role: "clinic_admin", clinicName, updatedAt: nowIso() })
-      .where(eq(schema.users.id, userId));
+    if (!(await claim("clinic_admin", { clinicName }))) return raced;
     // Returns null when the clinic-owner template is missing or unpublished —
     // the switch still stands, but say so rather than leaving them without a
     // roadmap and no indication why.
@@ -94,10 +118,7 @@ export async function switchAccountType(
     };
   }
 
-  await db
-    .update(schema.users)
-    .set({ role: "student", updatedAt: nowIso() })
-    .where(eq(schema.users.id, userId));
+  if (!(await claim("student"))) return raced;
   await logEvent(db, {
     userId,
     type: "account_type_changed",
