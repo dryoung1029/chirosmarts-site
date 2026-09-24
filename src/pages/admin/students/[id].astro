@@ -59,6 +59,14 @@ const events = await db
 
 const fmtMin = (s: number) => (s / 60).toFixed(1);
 const flash = Astro.url.searchParams.get("done");
+const flashError = Astro.url.searchParams.get("error");
+// Clinic this user owns, if any — shown alongside the account-type switch so
+// it's clear what a clinic account already has behind it.
+const ownedClinic = await db
+  .select({ id: schema.clinics.id, name: schema.clinics.name })
+  .from(schema.clinics)
+  .where(eq(schema.clinics.ownerUserId, userId))
+  .get();
 ---
 
 <Layout title={`${student.legalName || student.email} · Admin`} showNav={true}>
@@ -79,6 +87,44 @@ const flash = Astro.url.searchParams.get("done");
 
   {flash && (
     <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>
+  )}
+
+  {flashError && (
+    <div class="panel" style="border-color:var(--danger);color:var(--danger)">{flashError}</div>
+  )}
+
+  {student.role !== "site_admin" && (
+    <div class="panel">
+      <h2 style="margin-top:0">Account type</h2>
+      <p class="muted" style="margin-top:0;font-size:0.9rem">
+        Currently <strong>{student.role === "clinic_admin" ? "clinic owner" : "student"}</strong>
+        {ownedClinic && <span> · owns <strong>{ownedClinic.name}</strong></span>}.
+        Switching to a clinic owner also creates their clinic and clinic roadmap
+        so they can buy seats and invite CAs. Switching back to student leaves
+        any clinic, its seats, and its members intact. Enrollments and
+        certificates are never affected either way.
+      </p>
+      <form method="POST" action={`/api/admin/users/${userId}/account-type`} class="acct-type-form" style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin:0">
+        <div style="flex:0 0 12rem">
+          <label style="margin:0">Account type</label>
+          <select name="role" id="acct-role" style="width:100%">
+            <option value="student" selected={student.role === "student"}>Student</option>
+            <option value="clinic_admin" selected={student.role === "clinic_admin"}>Clinic owner</option>
+          </select>
+        </div>
+        <div style="flex:1 1 16rem">
+          <label style="margin:0">Clinic name</label>
+          <input
+            type="text"
+            name="clinicName"
+            id="acct-clinic-name"
+            value={ownedClinic?.name ?? student.clinicName ?? ""}
+            placeholder="required when switching to a clinic owner"
+          />
+        </div>
+        <button type="submit" style="margin:0">Change account type</button>
+      </form>
+    </div>
   )}
 
   {!student.legalName?.trim() && (
@@ -317,6 +363,20 @@ const flash = Astro.url.searchParams.get("done");
   </div>
 
   <script is:inline>
+    document.querySelector(".acct-type-form")?.addEventListener("submit", (e) => {
+      const role = document.getElementById("acct-role")?.value;
+      const name = document.getElementById("acct-clinic-name")?.value.trim();
+      if (role === "clinic_admin" && !name) {
+        alert("Enter a clinic name — a clinic account needs one to create the clinic.");
+        e.preventDefault();
+        return;
+      }
+      const msg =
+        role === "clinic_admin"
+          ? `Switch this account to a clinic owner and set up "${name}" as their clinic?`
+          : "Switch this account back to a student? Any clinic they own stays intact.";
+      if (!confirm(msg)) e.preventDefault();
+    });
     document.querySelector(".reset-form")?.addEventListener("submit", (e) => {
       if (!confirm("Reset this user's progress? Enrollments, seat time, attempts, and certificates will be permanently cleared.")) e.preventDefault();
     });
