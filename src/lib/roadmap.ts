@@ -194,12 +194,6 @@ export async function getUserRoadmap(db: Db, userId: string) {
       if (tstep?.stepType === "upload_log") {
         // Hands-on step: send them straight to the Board's signable training log.
         href = OBCE.trainingLog;
-      } else if (
-        tstep?.stepType === "external_action" ||
-        tstep?.stepType === "exam"
-      ) {
-        // Application / fingerprinting / state exam all happen at the Board.
-        href = OBCE.home;
       } else if (tstep?.stepType === "course" && tstep.courseId && status !== "locked") {
         const course = await db
           .select({ slug: schema.courses.slug })
@@ -210,11 +204,21 @@ export async function getUserRoadmap(db: Db, userId: string) {
       } else if (
         // Clinic-management steps (buy seats / invite / track) all live on the
         // dedicated /clinic page. Point any non-locked step there beyond setup.
+        // This has to be tested BEFORE external_action/exam: "Purchase training
+        // seats" is typed external_action, so the Board branch would otherwise
+        // claim it and send clinic owners to OBCE instead of their own seat
+        // purchase.
         template?.slug === "oregon-clinic-owner" &&
         status !== "locked" &&
         step.position > 1
       ) {
         href = "/clinic";
+      } else if (
+        tstep?.stepType === "external_action" ||
+        tstep?.stepType === "exam"
+      ) {
+        // Application / fingerprinting / state exam all happen at the Board.
+        href = OBCE.home;
       }
       steps.push({
         ...step,
