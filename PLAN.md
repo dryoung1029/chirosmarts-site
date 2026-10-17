@@ -16,6 +16,40 @@
 | Plan | **Approved** 2026-06-10 with adjustments (folded in below) |
 | Git model | **`main` is the Cloudflare production branch and auto-deploys on push** (Pages is Git-connected). Work happens on feature branches (`claude/charming-faraday-ixrhmb`, milestone branches) and is merged/fast-forwarded into `main` to ship. (`main` was historically stale while prod tracking drifted to `blissful-archimedes`; realigned 2026-06.) |
 
+### Talking to Pain — course-materials landing page (shipped 2026-10)
+- **`/talking-to-pain`** — the QR target printed on October CE slides/handouts,
+  so the URL is immutable. Served from `src/pages/talking-to-pain.astro` as the
+  owner's finished standalone document (own header, palette, dark mode); copy,
+  markup and CSS are byte-for-byte as delivered, with only `<head>`
+  (canonical/OG/favicons), analytics beacons and mailing-list wiring added.
+  **Public and deliberately unlinked** from nav/footer (it IS in the sitemap and
+  indexable, per the brief).
+- **Why it was a sign-in wall at first:** middleware redirects unknown paths to
+  `/login`, so the printed QR hit auth until the route existed + was public.
+  Worth remembering for any future printed URL: ship the route BEFORE the print run.
+- `canonicalRedirect()` in `legacy-redirects.ts`: trailing-slash and case
+  variants 301 to the canonical path. Extend `CANONICAL_PATHS` for future
+  campaign URLs.
+- Three PDFs at the site root (slides / handout / toolkit) so the page's
+  relative links resolve as siblings. The page has **three** download cards.
+- Mailing list → our own `/api/leads/capture` (`source: talking_to_pain`), not a
+  provider embed, so confirmation stays on-page. Double opt-in as elsewhere.
+  **Tags derived server-side** per source (`SOURCE_TAGS`) — never client-supplied
+  — persisted on `marketing_leads.tags`, pushed to Brevo as the `TAGS` attribute
+  onto the newsletter list. `marketing_leads.name` → Brevo `FIRSTNAME`.
+- Migrations **0028** (tags) + **0029** (name), both additive.
+  ⚠️ **Deploy/migration ordering gotcha:** `main` auto-deploys but migrations are
+  manual, so code reached prod writing columns D1 didn't have and *every* lead
+  source 500'd. `captureLead` now falls back to the pre-migration shape on
+  `isMissingColumn` (`db-errors.ts`); that fallback is dead code once
+  `db:migrate:remote` runs and can be deleted.
+- Dark-mode contrast fixes in the delivered CSS: the email input hard-coded
+  `background:#fff` against near-white `--ink` (~1.1:1, invisible while typing —
+  the page's primary CTA), and `.about a` used default browser blue (~2.3:1).
+  Both now use palette tokens.
+- **Not verified by Claude:** real iOS/Android handset downloads, a live tagged
+  Brevo subscriber (needs the key + a real inbox), and the end-to-end QR scan.
+
 ### Help system (shipped 2026-06)
 - **In-app Help Center** at `/help` (role-aware), distinct from `guides` (public
   SEO) and the AI course tutor (lesson content only). New `help` content
