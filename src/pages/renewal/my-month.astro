@@ -48,7 +48,7 @@ if (Astro.request.method === "POST" && valid) {
     // Confirmed opt-in lead (so the renewal flow + Brevo have the month) → real-time sync.
     const src = "renewal_checker";
     const existing = await db
-      .select()
+      .select({ id: schema.marketingLeads.id })
       .from(schema.marketingLeads)
       .where(and(eq(schema.marketingLeads.email, email), eq(schema.marketingLeads.source, src)))
       .get();

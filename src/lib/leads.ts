@@ -118,8 +118,14 @@ export async function captureLead(
       ? (input.birthMonth as number)
       : null;
 
+  // Explicit columns, never select(): a bare select() names every column in
+  // schema.ts, so adding one breaks reads until the migration lands. Only id
+  // and status are used here.
   const existing = await db
-    .select()
+    .select({
+      id: schema.marketingLeads.id,
+      status: schema.marketingLeads.status,
+    })
     .from(schema.marketingLeads)
     .where(
       and(
@@ -221,7 +227,13 @@ export async function confirmLead(db: Db, token: string) {
   if (!token) return null;
   const hash = await sha256Hex(token);
   const lead = await db
-    .select()
+    .select({
+      id: schema.marketingLeads.id,
+      email: schema.marketingLeads.email,
+      source: schema.marketingLeads.source,
+      status: schema.marketingLeads.status,
+      birthMonth: schema.marketingLeads.birthMonth,
+    })
     .from(schema.marketingLeads)
     .where(eq(schema.marketingLeads.confirmTokenHash, hash))
     .get();
