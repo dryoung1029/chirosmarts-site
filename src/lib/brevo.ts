@@ -19,7 +19,7 @@ export function isBrevoConfigured(env: CloudflareEnv): boolean {
  * later by their SOURCE contact attribute); other sources use LEADS.
  */
 function listIdForSource(env: CloudflareEnv, source: string): number {
-  if (source === "newsletter" || source === "checklist_pdf")
+  if (source === "newsletter" || source === "checklist_pdf" || source === "talking_to_pain")
     return Number(env.BREVO_LIST_ID_NEWSLETTER) || Number(env.BREVO_LIST_ID_LEADS) || 0;
   return Number(env.BREVO_LIST_ID_LEADS) || 0;
 }
@@ -155,6 +155,11 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
         SOURCE: lead.source,
         BIRTH_MONTH: lead.birthMonth ?? "",
         ROLE: "lead",
+        FIRSTNAME: lead.name ?? "",
+        // Brevo v3 contacts have lists + attributes, not first-class tags, so
+        // segmentation labels ride as a comma-separated TAGS attribute you can
+        // filter on when building a CE announcement audience.
+        TAGS: Array.isArray(lead.tags) ? (lead.tags as string[]).join(",") : "",
       },
       listIds: listIdForSource(env, lead.source) ? [listIdForSource(env, lead.source)] : [],
     });

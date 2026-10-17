@@ -1,0 +1,272 @@
+---
+/**
+ * Talking to Pain — course-materials landing page for the October CE course.
+ *
+ * The URL /talking-to-pain is PRINTED ON QR CODES and cannot change; trailing
+ * slash and case variants 301 here from middleware. The page ships as the
+ * owner's finished standalone document — its own header, palette, and
+ * dark-mode handling — so it is served as-is rather than ported into
+ * MarketingLayout, which would double the header and fight the palette. Copy,
+ * markup, and CSS are byte-for-byte the delivered file; only the <head>
+ * (canonical/OG/favicon), the analytics beacons, and the mailing-list wiring
+ * were added.
+ *
+ * The three PDFs live at the site root (public/) so the page's relative links
+ * resolve as siblings of /talking-to-pain.
+ */
+import { getSiteUrl } from "@/lib/env";
+
+const env = Astro.locals.runtime.env;
+const siteUrl = getSiteUrl(env).replace(/\/$/, "");
+const canonical = `${siteUrl}/talking-to-pain`;
+const ogImage = `${siteUrl}/og-default.png`;
+const analyticsToken = env.CF_WEB_ANALYTICS_TOKEN;
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talking to Pain — Course Materials | ChiroSmarts</title>
+<meta name="description" content="Download the slides and one-page handout from Talking to Pain: MI + CBT as a hybrid toolkit for chronic pain management, and join the ChiroSmarts CE mailing list.">
+<link rel="canonical" href={canonical}>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ChiroSmarts">
+<meta property="og:title" content="Talking to Pain — Course Materials | ChiroSmarts">
+<meta property="og:description" content="Download the slides and one-page handout from Talking to Pain: MI + CBT as a hybrid toolkit for chronic pain management, and join the ChiroSmarts CE mailing list.">
+<meta property="og:url" content={canonical}>
+<meta property="og:image" content={ogImage}>
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Talking to Pain — Course Materials | ChiroSmarts">
+<meta name="twitter:description" content="Download the slides and one-page handout from Talking to Pain: MI + CBT as a hybrid toolkit for chronic pain management, and join the ChiroSmarts CE mailing list.">
+<meta name="twitter:image" content={ogImage}>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  :root {
+    --pine: #1F3533; --ink: #22312F; --body: #4C5B58;
+    --teal: #2C7A72; --teal-dark: #21605A; --gold: #C98A2E; --gold-dark: #8A5310;
+    --paper: #FAF9F4; --paper2: #F0EDE3; --line: #E1DFD2; --card: #FFFFFF;
+    --on-dark: #EFEAD9; --on-dark-muted: #A9BCB6; --accent-on-dark: #8FCCC2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Public Sans', -apple-system, 'Segoe UI', Arial, sans-serif; background: var(--paper); color: var(--ink); line-height: 1.55; }
+  .serif { font-family: Georgia, 'Times New Roman', serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+
+  header { background: var(--pine); color: var(--on-dark); padding: 14px 0; }
+  header .wrap { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .brand { font-weight: 800; font-size: 1.25rem; letter-spacing: 0.5px; color: #fff; text-decoration: none; }
+  .brand span { color: var(--accent-on-dark); }
+  .tagline { font-size: 0.85rem; color: var(--on-dark-muted); }
+
+  .hero { background: var(--pine); color: var(--on-dark); padding: 36px 0 44px; }
+  .hero .kicker { font-size: 0.8rem; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent-on-dark); margin-bottom: 10px; }
+  .hero h1 { font-size: clamp(2rem, 5.5vw, 3.1rem); line-height: 1.08; color: #F5F2E8; font-weight: 650; }
+  .hero p.sub { margin-top: 14px; font-size: 1.1rem; color: #D8D2BF; max-width: 620px; }
+  .pills { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill { font-size: 0.85rem; font-weight: 700; padding: 6px 14px; border-radius: 999px; }
+  .pill.t { background: var(--teal); color: #F5F2E8; } .pill.g { background: var(--gold); color: #2A2013; }
+
+  main { padding: 36px 0 12px; }
+  h2 { font-size: 1.45rem; margin-bottom: 16px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .card h3 { font-size: 1.1rem; } .card p { font-size: 0.95rem; color: var(--body); flex: 1; }
+  .btn { display: inline-block; text-align: center; text-decoration: none; font-weight: 700; font-size: 0.98rem; padding: 12px 18px; border-radius: 10px; border: 0; cursor: pointer; }
+  .btn.teal { background: var(--teal); color: #F5F2E8; } .btn.teal:hover { background: var(--teal-dark); }
+  .btn.gold { background: var(--gold); color: #2A2013; } .btn.gold:hover { background: #B0761F; }
+  .tag { align-self: flex-start; font-size: 0.72rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; }
+  .tag.t { background: #E8F1EE; color: var(--teal-dark); } .tag.g { background: #F6EEDD; color: var(--gold-dark); }
+
+  .signup { margin: 36px 0; background: var(--paper2); border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px; }
+  .signup h2 { margin-bottom: 6px; }
+  .signup p.lead { color: var(--body); font-size: 0.98rem; max-width: 640px; }
+  form { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type="text"], input[type="email"] { flex: 1 1 200px; padding: 12px 14px; font-size: 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+  input:focus { outline: 2px solid var(--teal); border-color: var(--teal); }
+  .fine { margin-top: 10px; font-size: 0.78rem; color: var(--body); }
+  .ok { display: none; margin-top: 12px; font-weight: 700; color: var(--teal-dark); }
+
+  .about { margin: 8px 0 36px; color: var(--body); font-size: 0.98rem; max-width: 680px; }
+  footer { background: var(--pine); color: var(--on-dark-muted); padding: 22px 0; font-size: 0.85rem; }
+  footer a { color: var(--accent-on-dark); text-decoration: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #141B1A; --paper2: #1B2422; --card: #1F2A28; --line: #31403D;
+      --ink: #EDEAE0; --body: #B5C2BE; --teal-dark: #8FCCC2; --gold-dark: #E3B36B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #141B1A; --paper2: #1B2422; --card: #1F2A28; --line: #31403D;
+    --ink: #EDEAE0; --body: #B5C2BE; --teal-dark: #8FCCC2; --gold-dark: #E3B36B;
+  }
+</style>
+{analyticsToken && (
+  <script
+    defer
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon={`{"token": "${analyticsToken}"}`}
+  />
+)}
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="https://chirosmarts.com">Chiro<span>Smarts</span></a>
+    <span class="tagline">Continuing education for chiropractors</span>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">Course materials</div>
+    <h1 class="serif">Talking to Pain</h1>
+    <p class="sub">MI + CBT: a hybrid toolkit for chronic pain management &middot; presented by Dr. Jason Young</p>
+    <div class="pills">
+      <span class="pill t">MI is for the patient who won't</span>
+      <span class="pill g">CBT is for the patient who can't</span>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="wrap">
+    <h2>Download your materials</h2>
+    <div class="cards">
+      <div class="card">
+        <span class="tag t">PDF</span>
+        <h3>The full slide deck</h3>
+        <p>Every framework from the session — the 2-Question Triage, OARS, change talk, the five CBT skills, visit templates, and the full reference list.</p>
+        <a class="btn teal" href="talking-to-pain-slides.pdf" download>Download the slides</a>
+      </div>
+      <div class="card">
+        <span class="tag g">PDF &middot; one page</span>
+        <h3>The one-page handout</h3>
+        <p>The whole course on a single sheet: triage flowchart, MI and CBT toolkits, screening tools, and the 10 / 25 / 60-minute visit templates. Print it; keep it at the front desk.</p>
+        <a class="btn gold" href="talking-to-pain-handout.pdf" download>Download the handout</a>
+      </div>
+      <div class="card">
+        <span class="tag t">PDF &middot; 9 pages</span>
+        <h3>The clinic toolkit</h3>
+        <p>Screeners, scripts, and patient worksheets: the screening guide, printable PHQ-4 and PHQ-9, SMART goal worksheet, relaxation scripts, and patient handouts for pacing, sleep, and understanding pain.</p>
+        <a class="btn teal" href="talking-to-pain-toolkit.pdf" download>Download the toolkit</a>
+      </div>
+    </div>
+
+    <div class="signup" id="signup">
+      <h2>Hear about future CE first</h2>
+      <p class="lead">More courses are on the way from ChiroSmarts. Join the mailing list and be the first to know when new continuing-education offerings open for registration.</p>
+      <!-- ============================================================
+           MAILING LIST WIRING
+           Option A (recommended): replace the form's action with your email
+           provider's embedded-form POST URL and field names:
+             Mailchimp:  action="https://YOURLIST.usX.list-manage.com/subscribe/post?u=...&id=..."  email field name="EMAIL", name field name="FNAME"
+             ConvertKit / Kit, Constant Contact, Mailerlite: paste their embed form here instead.
+           Option B (works as shipped): leave as is — the button opens the
+           visitor's email app with a pre-filled subscribe request to you.
+           ============================================================ -->
+      <form id="subform" action="" method="post">
+        <input type="text" name="FNAME" id="subname" placeholder="First name (optional)" autocomplete="given-name">
+        <input type="email" name="EMAIL" id="subemail" placeholder="you@example.com" required autocomplete="email">
+        <button class="btn teal" type="submit">Join the list</button>
+      </form>
+      <p class="ok" id="subok">Thanks — you're on the list. Watch your inbox for upcoming CE announcements.</p>
+      <p class="fine" id="subnote" style="display:none">One quick step: check your inbox and click the confirmation link to finish signing up.</p>
+      <p class="fine">We'll only email you about ChiroSmarts continuing-education offerings. Unsubscribe anytime.</p>
+    </div>
+
+    <p class="about">Questions about the course, or interested in bringing this training to your event? Reach Dr. Jason Young at <a href="mailto:dryoung@yourbodyofhealth.com">dryoung@yourbodyofhealth.com</a>.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">&copy; ChiroSmarts &middot; <a href="https://chirosmarts.com">chirosmarts.com</a> &middot; <a href="mailto:dryoung@yourbodyofhealth.com">dryoung@yourbodyofhealth.com</a></div>
+</footer>
+
+<script is:inline>
+  // Mailing list → our own /api/leads/capture (double opt-in, Brevo-synced).
+  // Posting to our endpoint rather than embedding the provider's form is what
+  // keeps the confirmation on THIS page instead of a provider-branded redirect.
+  (function () {
+    var form = document.getElementById('subform');
+    var ok = document.getElementById('subok');
+    var note = document.getElementById('subnote');
+    var btn = form.querySelector('button[type="submit"]');
+
+    function track(action, detail) {
+      try {
+        navigator.sendBeacon('/api/metrics/event', JSON.stringify({
+          page: '/talking-to-pain', action: action, detail: detail || ''
+        }));
+      } catch (e) {}
+    }
+
+    // Download events (the three PDF buttons).
+    Array.prototype.forEach.call(document.querySelectorAll('a[download]'), function (a) {
+      a.addEventListener('click', function () {
+        track('download', a.getAttribute('href'));
+      });
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = document.getElementById('subemail').value.trim();
+      if (!email) return;
+      btn.disabled = true;
+      btn.textContent = 'Joining…';
+      fetch('/api/leads/capture', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          name: document.getElementById('subname').value.trim(),
+          source: 'talking_to_pain'
+        })
+      })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (res) {
+          if (res && res.ok) {
+            form.style.display = 'none';
+            ok.style.display = 'block';
+            if (note) note.style.display = 'block';
+            track('signup', '');
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Join the list';
+            if (note) {
+              note.textContent = (res && res.message) || 'Something went wrong — please try again.';
+              note.style.display = 'block';
+            }
+          }
+        })
+        .catch(function () {
+          btn.disabled = false;
+          btn.textContent = 'Join the list';
+          if (note) {
+            note.textContent = 'Network error — please try again.';
+            note.style.display = 'block';
+          }
+        });
+    });
+  })();
+</script>
+
+<!-- First-party pageview beacon (same privacy-first endpoint as the rest of the site). -->
+<script is:inline>
+  (function () {
+    try {
+      navigator.sendBeacon('/api/metrics/view', JSON.stringify({
+        path: location.pathname, referrer: document.referrer || ''
+      }));
+    } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

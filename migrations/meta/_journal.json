@@ -197,6 +197,20 @@
       "when": 1789998983746,
       "tag": "0027_handy_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1792262852985,
+      "tag": "0028_freezing_gravity",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1792262917754,
+      "tag": "0029_silly_maverick",
+      "breakpoints": true
     }
   ]
 }

@@ -13,7 +13,24 @@ import { getSiteUrl } from "@/lib/env";
 import { sendEmail } from "@/lib/email/resend";
 import { logEvent } from "@/lib/events";
 
-export type LeadSource = "renewal_checker" | "checklist_pdf" | "newsletter" | "other";
+export type LeadSource =
+  | "renewal_checker"
+  | "checklist_pdf"
+  | "newsletter"
+  | "talking_to_pain"
+  | "other";
+
+/**
+ * Segmentation tags per source, derived HERE rather than accepted from the
+ * client — a public endpoint must never let a caller choose its own labels.
+ */
+export const SOURCE_TAGS: Record<LeadSource, string[]> = {
+  renewal_checker: ["CE-interest"],
+  checklist_pdf: ["CE-interest"],
+  newsletter: ["newsletter"],
+  talking_to_pain: ["talking-to-pain", "CE-interest"],
+  other: [],
+};
 
 export function normalizeEmail(e: string): string {
   return e.trim().toLowerCase();
@@ -25,16 +42,21 @@ export function isValidEmail(e: string): boolean {
 function emailBody(source: LeadSource, confirmUrl: string, site: string) {
   const isChecklist = source === "checklist_pdf";
   const isNewsletter = source === "newsletter";
+  const isCourseCE = source === "talking_to_pain";
   const subject = isChecklist
     ? "Confirm your email to get the Oregon CA certification checklist"
     : isNewsletter
       ? "Confirm your ChiroSmarts newsletter subscription"
-      : "Confirm your ChiroSmarts renewal reminder";
+      : isCourseCE
+        ? "Confirm your spot on the ChiroSmarts CE list"
+        : "Confirm your ChiroSmarts renewal reminder";
   const lead = isChecklist
     ? "Thanks for requesting the Oregon CA certification checklist."
     : isNewsletter
       ? "Thanks for subscribing to the ChiroSmarts newsletter — practical tips for Oregon chiropractic assistants."
-      : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
+      : isCourseCE
+        ? "Thanks for joining the ChiroSmarts continuing-education list after Talking to Pain."
+        : "Thanks — we'll remind you before your Oregon CA renewal deadline.";
   const cta = isChecklist
     ? "Confirm & get the checklist"
     : isNewsletter
@@ -73,6 +95,8 @@ function checklistResendBody(assetUrl: string, site: string) {
 export interface CaptureInput {
   email: string;
   source: LeadSource;
+  /** Optional first name, for personalised CE announcements. */
+  name?: string | null;
   birthMonth?: number | null;
 }
 
@@ -132,13 +156,21 @@ export async function captureLead(
   if (existing) {
     await db
       .update(schema.marketingLeads)
-      .set({ status: "pending", confirmTokenHash, consentAt: nowIso(), birthMonth })
+      .set({
+        status: "pending",
+        confirmTokenHash,
+        consentAt: nowIso(),
+        birthMonth,
+        tags: SOURCE_TAGS[source] ?? [],
+      })
       .where(eq(schema.marketingLeads.id, existing.id));
   } else {
     await db.insert(schema.marketingLeads).values({
       id: newId("lead"),
       email,
       source,
+      name: input.name?.trim().slice(0, 80) || null,
+      tags: SOURCE_TAGS[source] ?? [],
       birthMonth,
       status: "pending",
       confirmTokenHash,

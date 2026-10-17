@@ -21,6 +21,7 @@ const PUBLIC_PREFIXES = [
   "/renewal",
   "/about",
   "/verify",
+  "/talking-to-pain",
   "/terms",
   "/privacy",
 ];

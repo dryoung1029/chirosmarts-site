@@ -5,11 +5,17 @@ import { getDb } from "@/db/client";
 import { captureLead, type LeadSource } from "@/lib/leads";
 import { recordAttribution } from "@/lib/attribution";
 
-const SOURCES: LeadSource[] = ["renewal_checker", "checklist_pdf", "newsletter", "other"];
+const SOURCES: LeadSource[] = [
+  "renewal_checker",
+  "checklist_pdf",
+  "newsletter",
+  "talking_to_pain",
+  "other",
+];
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = getDb(locals.runtime.env);
-  let body: { email?: unknown; source?: unknown; birthMonth?: unknown };
+  let body: { email?: unknown; source?: unknown; birthMonth?: unknown; name?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -26,6 +32,7 @@ export const POST: APIRoute = async ({ request, locals, cookies }) => {
     email,
     source,
     birthMonth,
+    name: typeof body.name === "string" ? body.name : null,
   });
   if (result.ok) await recordAttribution(db, cookies, "lead");
   return json(result, result.ok ? 200 : 400);

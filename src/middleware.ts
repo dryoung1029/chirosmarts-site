@@ -16,7 +16,7 @@ import {
   clearImpersonation,
 } from "@/lib/auth/impersonation";
 import { isAdmin } from "@/lib/admin";
-import { legacyRedirect } from "@/lib/legacy-redirects";
+import { legacyRedirect, canonicalRedirect } from "@/lib/legacy-redirects";
 
 // Routes reachable without a session.
 const PUBLIC_PATHS = new Set<string>([
@@ -54,6 +54,9 @@ function isPublic(pathname: string): boolean {
   if (pathname === "/review") return true;
   // Public reviews page (brand query: "chirosmarts reviews").
   if (pathname === "/reviews") return true;
+  // Course-materials landing page (printed QR target) + its CTA beacon.
+  if (pathname === "/talking-to-pain") return true;
+  if (pathname === "/api/metrics/event") return true;
   // Help Center (articles + contact form) is open to everyone, incl. prospects.
   if (pathname === "/help" || pathname.startsWith("/help/")) return true;
   if (pathname === "/api/help/contact") return true;
@@ -79,6 +82,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // so old inbound links and search results land on the right new page.
   const legacy = legacyRedirect(url.pathname);
   if (legacy) return redirect(legacy, 301);
+
+  // Printed/QR campaign URLs: fold slash + case variants onto the canonical path.
+  const canon = canonicalRedirect(url.pathname);
+  if (canon) return redirect(canon + url.search, 301);
 
   locals.user = null;
   locals.sessionId = null;

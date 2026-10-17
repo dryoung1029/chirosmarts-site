@@ -41,3 +41,22 @@ export function legacyRedirect(pathname: string): string | null {
   if (/^\/module-[\w-]+\//.test(p)) return INITIAL_COURSE;
   return null;
 }
+
+/**
+ * Printed/QR campaign URLs that must resolve at ONE exact path.
+ *
+ * These are on slides, handouts and conference QR codes and cannot change, so
+ * every variant a phone or a human might produce — trailing slash, different
+ * capitalisation — 301s to the canonical form instead of 404ing. Keep entries
+ * lowercase and without a trailing slash.
+ */
+const CANONICAL_PATHS = ["/talking-to-pain"];
+
+export function canonicalRedirect(pathname: string): string | null {
+  const stripped =
+    pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  const match = CANONICAL_PATHS.find((c) => c === stripped.toLowerCase());
+  if (!match) return null;
+  // Already canonical → no redirect; anything else (slash, case) → 301.
+  return pathname === match ? null : match;
+}

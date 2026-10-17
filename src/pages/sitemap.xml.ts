@@ -39,6 +39,7 @@ export const GET: APIRoute = async ({ locals }) => {
     "/blog",
     "/help",
     "/reviews",
+    "/talking-to-pain",
     "/verify",
     "/terms",
     "/privacy",

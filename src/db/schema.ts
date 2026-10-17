@@ -796,7 +796,14 @@ export const marketingLeads = sqliteTable(
     id: text("id").primaryKey(),
     email: text("email").notNull(), // normalized lowercase
     source: text("source", {
-      enum: ["renewal_checker", "checklist_pdf", "newsletter", "other"],
+      // Type-only in SQLite (no CHECK constraint) — adding a value needs no migration.
+      enum: [
+        "renewal_checker",
+        "checklist_pdf",
+        "newsletter",
+        "talking_to_pain",
+        "other",
+      ],
     })
       .notNull()
       .default("other"),
@@ -809,6 +816,11 @@ export const marketingLeads = sqliteTable(
     confirmTokenHash: text("confirm_token_hash"),
     consentAt: text("consent_at").notNull().default(nowUtc),
     confirmedAt: text("confirmed_at"),
+    // Segmentation labels (e.g. ["talking-to-pain","CE-interest"]). Derived
+    // server-side from `source` — never accepted from the client — and pushed
+    // to Brevo as the TAGS attribute so CE announcements can target them.
+    name: text("name"), // optional first name (pushed to Brevo as FIRSTNAME)
+    tags: text("tags", { mode: "json" }),
     syncedToBrevoAt: text("synced_to_brevo_at"),
     createdAt: text("created_at").notNull().default(nowUtc),
   },
