@@ -9,6 +9,7 @@ import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import { newId, randomToken, sha256Hex } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
+import { isMissingColumn } from "@/lib/db-errors";
 import { getSiteUrl } from "@/lib/env";
 import { sendEmail } from "@/lib/email/resend";
 import { logEvent } from "@/lib/events";
@@ -154,27 +155,49 @@ export async function captureLead(
   const confirmTokenHash = await sha256Hex(token);
 
   if (existing) {
-    await db
-      .update(schema.marketingLeads)
-      .set({
-        status: "pending",
-        confirmTokenHash,
-        consentAt: nowIso(),
-        birthMonth,
-        tags: SOURCE_TAGS[source] ?? [],
-      })
-      .where(eq(schema.marketingLeads.id, existing.id));
+    const reset = {
+      status: "pending" as const,
+      confirmTokenHash,
+      consentAt: nowIso(),
+      birthMonth,
+    };
+    try {
+      await db
+        .update(schema.marketingLeads)
+        .set({ ...reset, tags: SOURCE_TAGS[source] ?? [] })
+        .where(eq(schema.marketingLeads.id, existing.id));
+    } catch (e) {
+      // See the insert path: tolerate a schema that hasn't been migrated yet.
+      if (!isMissingColumn(e)) throw e;
+      console.warn("[leads] tags column missing — run db:migrate:remote");
+      await db
+        .update(schema.marketingLeads)
+        .set(reset)
+        .where(eq(schema.marketingLeads.id, existing.id));
+    }
   } else {
-    await db.insert(schema.marketingLeads).values({
+    const base = {
       id: newId("lead"),
       email,
       source,
-      name: input.name?.trim().slice(0, 80) || null,
-      tags: SOURCE_TAGS[source] ?? [],
       birthMonth,
-      status: "pending",
+      status: "pending" as const,
       confirmTokenHash,
-    });
+    };
+    try {
+      await db.insert(schema.marketingLeads).values({
+        ...base,
+        name: input.name?.trim().slice(0, 80) || null,
+        tags: SOURCE_TAGS[source] ?? [],
+      });
+    } catch (e) {
+      // Code can reach production before `npm run db:migrate:remote` runs.
+      // Capturing the lead matters more than labelling it, so fall back to the
+      // pre-migration shape rather than failing the visitor's signup.
+      if (!isMissingColumn(e)) throw e;
+      console.warn("[leads] tags/name columns missing — run db:migrate:remote");
+      await db.insert(schema.marketingLeads).values(base);
+    }
   }
 
   const site = getSiteUrl(env).replace(/\/$/, "");

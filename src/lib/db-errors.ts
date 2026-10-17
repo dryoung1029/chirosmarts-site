@@ -14,3 +14,13 @@ export function describeDbError(e: unknown): string {
   }
   return raw;
 }
+
+/**
+ * True when a write failed because the column isn't in the database yet —
+ * i.e. code has shipped ahead of its migration. Lets a caller degrade to the
+ * pre-migration shape instead of 500ing while the schema catches up.
+ */
+export function isMissingColumn(e: unknown): boolean {
+  const raw = e instanceof Error ? e.message : String(e);
+  return /no such column|has no column named/i.test(raw);
+}
