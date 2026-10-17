@@ -87,12 +87,17 @@ const analyticsToken = env.CF_WEB_ANALYTICS_TOKEN;
   .signup h2 { margin-bottom: 6px; }
   .signup p.lead { color: var(--body); font-size: 0.98rem; max-width: 640px; }
   form { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-  input[type="text"], input[type="email"] { flex: 1 1 200px; padding: 12px 14px; font-size: 1rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+  /* --card (not #fff) so the field follows the palette into dark mode; a literal
+     white background left near-white --ink text invisible while typing. */
+  input[type="text"], input[type="email"] { flex: 1 1 200px; padding: 12px 14px; font-size: 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
   input:focus { outline: 2px solid var(--teal); border-color: var(--teal); }
   .fine { margin-top: 10px; font-size: 0.78rem; color: var(--body); }
   .ok { display: none; margin-top: 12px; font-weight: 700; color: var(--teal-dark); }
 
   .about { margin: 8px 0 36px; color: var(--body); font-size: 0.98rem; max-width: 680px; }
+  /* Default browser blue fails contrast on the dark background; --teal-dark is
+     already palette-correct in both schemes. */
+  .about a { color: var(--teal-dark); }
   footer { background: var(--pine); color: var(--on-dark-muted); padding: 22px 0; font-size: 0.85rem; }
   footer a { color: var(--accent-on-dark); text-decoration: none; }
   @media (prefers-color-scheme: dark) {
