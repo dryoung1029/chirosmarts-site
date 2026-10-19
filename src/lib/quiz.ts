@@ -160,14 +160,28 @@ export async function unpassedQuizzes(
   userId: string,
   courseId: string,
 ): Promise<{ id: string; title: string }[]> {
+  // A module whose knowledge check is marked NOT required is excluded here, so
+  // it can never block certificate issuance. Its attempts are still on record —
+  // nothing is deleted — it simply stops gating. The final exam (module_id
+  // NULL) is never excluded, and neither are checks on required modules.
   const quizzes = await db
-    .select({ id: schema.quizzes.id, title: schema.quizzes.title })
+    .select({
+      id: schema.quizzes.id,
+      title: schema.quizzes.title,
+      kind: schema.quizzes.kind,
+      moduleId: schema.quizzes.moduleId,
+      moduleRequired: schema.modules.knowledgeCheckRequired,
+    })
     .from(schema.quizzes)
+    .leftJoin(schema.modules, eq(schema.quizzes.moduleId, schema.modules.id))
     .where(eq(schema.quizzes.courseId, courseId))
     .all();
   const out: { id: string; title: string }[] = [];
   for (const q of quizzes) {
-    if (!(await hasPassed(db, userId, q.id))) out.push(q);
+    if (q.kind === "knowledge_check" && q.moduleId && q.moduleRequired === false) {
+      continue;
+    }
+    if (!(await hasPassed(db, userId, q.id))) out.push({ id: q.id, title: q.title });
   }
   return out;
 }

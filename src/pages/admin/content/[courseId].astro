@@ -227,6 +227,18 @@ if (lessonIds.length) {
             <input type="checkbox" name="isFreePreview" checked={module.isFreePreview} />
             <span>Free preview (no paywall)</span>
           </label>
+          <label class="check" style="margin-top:0.4rem">
+            <input type="checkbox" name="knowledgeCheckRequired" checked={module.knowledgeCheckRequired} />
+            <span>
+              Knowledge check required
+              <span class="muted" style="display:block;font-size:0.8rem">
+                Off = this module's check no longer blocks the next module or the
+                certificate, and is hidden from the student's progress list. Past
+                attempts are kept. The final exam, the 90%-per-lesson rule, and
+                the required-minutes floor are unaffected.
+              </span>
+            </span>
+          </label>
           <button type="submit" style="margin-top:0.75rem">Save module</button>
         </form>
 

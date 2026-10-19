@@ -33,8 +33,18 @@ export async function getCourseStructure(
   db: Db,
   courseId: string,
 ): Promise<ModuleWithLessons[]> {
+  // Explicit columns, not select(): a bare select() names every column in
+  // schema.ts, so adding one breaks every read until the migration lands.
   const mods = await db
-    .select()
+    .select({
+      id: schema.modules.id,
+      courseId: schema.modules.courseId,
+      position: schema.modules.position,
+      title: schema.modules.title,
+      description: schema.modules.description,
+      isFreePreview: schema.modules.isFreePreview,
+      knowledgeCheckRequired: schema.modules.knowledgeCheckRequired,
+    })
     .from(schema.modules)
     .where(eq(schema.modules.courseId, courseId))
     .orderBy(asc(schema.modules.position))

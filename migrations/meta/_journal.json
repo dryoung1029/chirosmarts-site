@@ -211,6 +211,13 @@
       "when": 1792262917754,
       "tag": "0029_silly_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1792384534738,
+      "tag": "0030_chemical_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

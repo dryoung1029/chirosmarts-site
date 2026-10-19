@@ -259,7 +259,19 @@ const isSiteAdmin =
                     Quizzes not passed yet: {unpassed.map((q) => q.title).join(", ")}.
                   </p>
                 )}
-                <button type="submit" disabled={!student.legalName?.trim()}>
+                <label for={`reason-${course.id}`} style="font-size:0.85rem;margin-top:0.4rem">
+                  Reason (recorded in the audit trail)
+                </label>
+                <input
+                  id={`reason-${course.id}`}
+                  type="text"
+                  name="reason"
+                  required
+                  maxlength="500"
+                  placeholder="e.g. completed the live session on 2026-10-14; knowledge check not applicable"
+                  style="width:100%;max-width:34rem"
+                />
+                <button type="submit" disabled={!student.legalName?.trim()} style="margin-top:0.6rem">
                   Issue certificate for this course
                 </button>
                 {unpassed.length > 0 && (

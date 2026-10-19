@@ -304,6 +304,24 @@ export const modules = sqliteTable(
     isFreePreview: integer("is_free_preview", { mode: "boolean" })
       .notNull()
       .default(false), // Module 1 = true; paywall begins at Module 2
+    /**
+     * Whether this module's knowledge check is REQUIRED. Default true.
+     *
+     * When false the check still exists and attempts are still recorded (quiz
+     * attempts are append-only and are never deleted), but it stops gating:
+     * it no longer blocks the next module, no longer blocks certificate
+     * issuance, and is hidden from the course progress UI. Single-module CE
+     * courses use this — a lone "module 1 of 1" check gates nothing useful and
+     * only strands students short of a certificate.
+     *
+     * It does NOT affect the final exam, the ≥90%-per-lesson coverage rule, or
+     * `courses.required_seat_minutes` — those compliance floors are untouched.
+     */
+    knowledgeCheckRequired: integer("knowledge_check_required", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(true),
   },
   (t) => [index("modules_course_idx").on(t.courseId, t.position)],
 );

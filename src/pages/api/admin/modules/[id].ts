@@ -9,6 +9,7 @@ const Body = z.object({
   description: z.string().trim().optional(),
   position: z.coerce.number().int().min(0),
   isFreePreview: z.coerce.boolean().optional(),
+  knowledgeCheckRequired: z.coerce.boolean().optional(),
 });
 
 export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
@@ -34,6 +35,9 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
       description: d.description || null,
       position: d.position,
       isFreePreview: !!d.isFreePreview, // unchecked box → field absent → false
+      // Unchecking this stops the module's knowledge check gating anything;
+      // existing attempts are kept either way.
+      knowledgeCheckRequired: !!d.knowledgeCheckRequired,
     })
     .where(eq(schema.modules.id, id));
   // Anchor back to the module so saving doesn't jump to the top of the page.

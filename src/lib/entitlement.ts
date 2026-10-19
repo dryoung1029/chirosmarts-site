@@ -76,7 +76,9 @@ export async function getModuleQuizGate(
     // for a student who hasn't enrolled yet.
     gate.set(module.id, module.isFreePreview ? null : blocker);
 
-    if (!blocker) {
+    // A module flagged knowledge_check_required = false never blocks what
+    // follows it, even if its check exists and is unpassed.
+    if (!blocker && module.knowledgeCheckRequired !== false) {
       const quiz = await getModuleQuiz(db, module.id);
       if (quiz && !(await hasPassed(db, userId, quiz.id))) {
         blocker = {

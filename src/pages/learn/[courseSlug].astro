@@ -33,6 +33,10 @@ const lessonCredit = new Map(seat.perLesson.map((p) => [p.lessonId, p]));
 const moduleQuiz = new Map<string, { id: string; passed: boolean }>();
 for (const { module } of structure) {
   if (!(module.isFreePreview || enrolled)) continue;
+  // A module whose check isn't required is omitted entirely: it gates nothing,
+  // so showing it as outstanding work would be misleading. Past attempts are
+  // still retained in quiz_attempts.
+  if (module.knowledgeCheckRequired === false) continue;
   const q = await getModuleQuiz(db, module.id);
   // Real pass state — a student must be able to SEE which checks they still owe.
   if (q) moduleQuiz.set(module.id, { id: q.id, passed: await hasPassed(db, user.id, q.id) });
