@@ -134,6 +134,47 @@ const isSiteAdmin =
     </div>
   )}
 
+  {!isSiteAdmin && (
+    <div class="panel">
+      <h2 style="margin-top:0">Sign-in email</h2>
+      <p class="muted" style="margin-top:0;font-size:0.9rem">
+        Currently <strong>{student.email}</strong>. This address IS the login —
+        sign-in links go to it and nothing else. Changing it moves their clinic
+        membership to the new address, cancels any sign-in link already sent to
+        either address, and emails a notice to both. Progress, quiz attempts,
+        and issued certificates are untouched (certificates print the legal
+        name, not the email, so they stay valid as printed). Recorded in the
+        audit trail.
+      </p>
+      <form method="POST" action={`/api/admin/users/${userId}/email`} class="email-change-form" style="margin:0">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1 1 16rem">
+            <label style="margin:0">New email</label>
+            <input type="email" name="newEmail" id="new-email" autocomplete="off" required style="width:100%" />
+          </div>
+          <div style="flex:1 1 16rem">
+            <label style="margin:0">Repeat new email</label>
+            <input type="email" name="newEmailConfirm" id="new-email-confirm" autocomplete="off" required style="width:100%" />
+          </div>
+        </div>
+        <div style="margin-top:0.5rem">
+          <label style="margin:0">Reason (recorded)</label>
+          <input type="text" name="reason" id="email-change-reason" required
+            placeholder="e.g. student mistyped their address at signup"
+            style="width:100%;max-width:32rem" />
+        </div>
+        <label style="display:flex;gap:0.4rem;align-items:center;margin:0.5rem 0 0.75rem;font-weight:normal">
+          <input type="checkbox" name="keepSessions" style="width:auto;margin:0" />
+          <span class="muted" style="font-size:0.85rem">
+            Keep them signed in on their current devices (by default they're
+            signed out everywhere and sign back in with the new address)
+          </span>
+        </label>
+        <button type="submit" style="margin:0">Change sign-in email</button>
+      </form>
+    </div>
+  )}
+
   {!student.legalName?.trim() && (
     <div class="panel" style="border-color:var(--warn)">
       <strong style="color:var(--warn)">No legal name on file.</strong>
@@ -395,6 +436,21 @@ const isSiteAdmin =
           ? `Switch this account to a clinic owner and set up "${name}" as their clinic?`
           : "Switch this account back to a student? Any clinic they own stays intact.";
       if (!confirm(msg)) e.preventDefault();
+    });
+    document.querySelector(".email-change-form")?.addEventListener("submit", (e) => {
+      const a = document.getElementById("new-email")?.value.trim().toLowerCase();
+      const b = document.getElementById("new-email-confirm")?.value.trim().toLowerCase();
+      if (!a || a !== b) {
+        alert("The two email addresses don't match. Retype the new address to confirm it.");
+        e.preventDefault();
+        return;
+      }
+      if (!document.getElementById("email-change-reason")?.value.trim()) {
+        alert("Add a reason \u2014 the change is recorded in the audit trail.");
+        e.preventDefault();
+        return;
+      }
+      if (!confirm("Change this student's sign-in email to " + a + "? They will sign in with that address from now on.")) e.preventDefault();
     });
     document.querySelector(".reset-form")?.addEventListener("submit", (e) => {
       if (!confirm("Reset this user's progress? Enrollments, seat time, attempts, and certificates will be permanently cleared.")) e.preventDefault();
