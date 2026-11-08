@@ -5,6 +5,15 @@ import { newId } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email/resend";
 import { adminEmails } from "@/lib/admin";
 import { logEvent } from "@/lib/events";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { allowRequest } from "@/lib/rate-limit";
+import { isoInSeconds } from "@/lib/time";
+
+/** Per-address cap on help-form submissions (each one can trigger AI triage). */
+const REQUESTS_PER_EMAIL_PER_HOUR = 3;
+
+const esc = (s: string) =>
+  s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
 
 const schema = z.object({
   email: z.string().email(),
@@ -49,6 +58,26 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   // A signed-in user can't spoof someone else's address; use the session email.
   const replyEmail = locals.user?.email ?? d.email;
+
+  // Throttle: per network, then per address (support_requests is the counter).
+  const db = getDb(env);
+  const tooMany = () =>
+    redirect(
+      "/help/contact?error=" +
+        encodeURIComponent("You've sent several messages recently — we'll reply to those first. Please try again in an hour."),
+      303,
+    );
+  if (!(await allowRequest(db, request, "help_contact"))) return tooMany();
+  try {
+    const recent = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(db_.supportRequests)
+      .where(and(eq(db_.supportRequests.email, replyEmail.toLowerCase()), gt(db_.supportRequests.createdAt, isoInSeconds(-3600))))
+      .get();
+    if ((recent?.n ?? 0) >= REQUESTS_PER_EMAIL_PER_HOUR) return tooMany();
+  } catch {
+    /* counting is best-effort; never block a real request over it */
+  }
   const who = locals.user
     ? `${locals.user.email} (signed in, role: ${locals.user.role})`
     : `${d.email} (not signed in)`;
@@ -62,10 +91,10 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   ].filter(Boolean);
   const text = lines.join("\n");
   const html =
-    `<p><strong>From:</strong> ${who}</p>` +
-    (d.from ? `<p><strong>Page:</strong> ${d.from}</p>` : "") +
-    `<p><strong>Subject:</strong> ${d.subject}</p>` +
-    `<hr><p style="white-space:pre-wrap">${d.message.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</p>`;
+    `<p><strong>From:</strong> ${esc(who)}</p>` +
+    (d.from ? `<p><strong>Page:</strong> ${esc(d.from)}</p>` : "") +
+    `<p><strong>Subject:</strong> ${esc(d.subject)}</p>` +
+    `<hr><p style="white-space:pre-wrap">${esc(d.message)}</p>`;
 
   const result = await sendEmail(env, {
     to: supportInbox(env),
@@ -76,12 +105,11 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   });
 
   // Queue it for AI triage (the cron picks up `new` rows and drafts a reply).
-  const db = getDb(env);
   try {
     await db.insert(db_.supportRequests).values({
       id: newId("sup"),
       userId: locals.user?.id ?? null,
-      email: replyEmail,
+      email: replyEmail.toLowerCase(),
       subject: d.subject,
       message: d.message,
       fromPage: d.from ?? null,

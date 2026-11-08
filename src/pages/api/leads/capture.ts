@@ -4,6 +4,7 @@ import type { APIRoute } from "astro";
 import { getDb } from "@/db/client";
 import { captureLead, type LeadSource } from "@/lib/leads";
 import { recordAttribution } from "@/lib/attribution";
+import { allowRequest } from "@/lib/rate-limit";
 
 const SOURCES: LeadSource[] = [
   "renewal_checker",
@@ -15,6 +16,9 @@ const SOURCES: LeadSource[] = [
 
 export const POST: APIRoute = async ({ request, locals, cookies }) => {
   const db = getDb(locals.runtime.env);
+  if (!(await allowRequest(db, request, "lead_capture"))) {
+    return json({ ok: false, message: "Too many signups from this network — please try again in a little while." }, 429);
+  }
   let body: { email?: unknown; source?: unknown; birthMonth?: unknown; name?: unknown };
   try {
     body = await request.json();

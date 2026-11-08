@@ -8,6 +8,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { getDb } from "@/db/client";
+import { allowRequest } from "@/lib/rate-limit";
 import { isAdmin } from "@/lib/admin";
 import { isTrackablePath, looksLikeBot, recordPageView } from "@/lib/metrics";
 
@@ -25,6 +26,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const env = locals.runtime.env;
     if (!env?.DB) return NO_CONTENT;
+    if (!(await allowRequest(getDb(env), request, "metrics"))) return NO_CONTENT;
 
     // sendBeacon posts text/plain — parse the body as JSON regardless of type.
     const parsed = schema.safeParse(await request.json());

@@ -164,5 +164,39 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return redirect("/dashboard", 302);
   }
 
-  return next();
+  return withSecurityHeaders(await next());
 });
+
+/**
+ * Baseline security headers for every rendered page and API response.
+ * (Cloudflare Pages' `_headers` file covers static assets only. It is NOT
+ * applied to Function responses, so SSR output gets them here.)
+ *
+ * Deliberately conservative: no script-src CSP yet, because the site relies on
+ * inline scripts. These close clickjacking, MIME sniffing, downgrade, and
+ * referrer leakage without risking breakage. Existing values are never
+ * overwritten, so a route can still set its own.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  "Strict-Transport-Security": "max-age=31536000",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Content-Security-Policy": "frame-ancestors 'self'; base-uri 'self'; object-src 'none'",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), usb=()",
+};
+
+function withSecurityHeaders(res: Response): Response {
+  const apply = (h: Headers) => {
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!h.has(k)) h.set(k, v);
+  };
+  try {
+    apply(res.headers);
+    return res;
+  } catch {
+    // Some responses (e.g. a passthrough fetch) have immutable headers.
+    const copy = new Response(res.body, res);
+    apply(copy.headers);
+    return copy;
+  }
+}

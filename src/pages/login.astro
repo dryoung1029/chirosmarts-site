@@ -5,6 +5,7 @@ const params = Astro.url.searchParams;
 const sent = params.get("sent") === "1";
 const error = params.get("error");
 const sendError = params.get("senderror") === "1";
+const throttled = params.get("throttled") === "1";
 const next = params.get("next") ?? "";
 // Dev convenience: when no Resend key is configured, request-link passes the
 // magic-link URL back so you can click it without checking email. Gate on the
@@ -23,6 +24,14 @@ const devLink = emailConfigured ? null : params.get("dev");
     </p>
 
     {error && <div class="notice err">We couldn't sign you in: {error}. Please request a new link.</div>}
+    {
+      throttled && (
+        <div class="notice err">
+          Too many sign-in requests in the last hour. Please use the most recent
+          link already in your inbox (check spam too), or try again in an hour.
+        </div>
+      )
+    }
     {
       sendError && (
         <div class="notice err">

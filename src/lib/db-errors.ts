@@ -21,6 +21,20 @@ export function describeDbError(e: unknown): string {
  * pre-migration shape instead of 500ing while the schema catches up.
  */
 export function isMissingColumn(e: unknown): boolean {
-  const raw = e instanceof Error ? e.message : String(e);
+  const raw = errorText(e);
   return /no such column|has no column named/i.test(raw);
+}
+
+/** True when a query failed because the TABLE isn't in the database yet. */
+export function isMissingTable(e: unknown): boolean {
+  const raw = errorText(e);
+  return /no such table/i.test(raw);
+}
+
+/** Drizzle wraps the driver error: its own message is just the SQL, and the
+ *  reason ("no such table: …") is on `cause`. Check both. */
+function errorText(e: unknown): string {
+  const own = e instanceof Error ? e.message : String(e);
+  const cause = e instanceof Error && e.cause instanceof Error ? e.cause.message : "";
+  return `${own}\n${cause}`;
 }

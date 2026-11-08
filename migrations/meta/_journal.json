@@ -218,6 +218,13 @@
       "when": 1792384534738,
       "tag": "0030_chemical_marvel_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1794159529946,
+      "tag": "0031_magenta_forge",
+      "breakpoints": true
     }
   ]
 }

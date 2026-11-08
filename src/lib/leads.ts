@@ -33,6 +33,9 @@ export const SOURCE_TAGS: Record<LeadSource, string[]> = {
   other: [],
 };
 
+/** Minimum gap between confirmation emails to one pending address. */
+const RESEND_COOLDOWN_MS = 10 * 60 * 1000;
+
 export function normalizeEmail(e: string): string {
   return e.trim().toLowerCase();
 }
@@ -125,6 +128,7 @@ export async function captureLead(
     .select({
       id: schema.marketingLeads.id,
       status: schema.marketingLeads.status,
+      consentAt: schema.marketingLeads.consentAt,
     })
     .from(schema.marketingLeads)
     .where(
@@ -154,6 +158,21 @@ export async function captureLead(
       ok: true,
       alreadyConfirmed: true,
       message: "You're already confirmed — thanks!",
+    };
+  }
+
+  // Per-address throttle: a still-pending lead that was (re)sent a confirmation
+  // in the last few minutes doesn't get another. Re-submitting the form
+  // otherwise mails the same inbox on every click, which is the cheapest way
+  // to use this form against someone. Same reply either way.
+  if (
+    existing &&
+    existing.status === "pending" &&
+    existing.consentAt > new Date(Date.now() - RESEND_COOLDOWN_MS).toISOString()
+  ) {
+    return {
+      ok: true,
+      message: "Almost done — check your email and click the confirmation link.",
     };
   }
 

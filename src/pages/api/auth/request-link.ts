@@ -3,6 +3,13 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { createAndSendMagicLink } from "@/lib/auth/magic-link";
 import { logEvent } from "@/lib/events";
+import { and, eq, gt, sql } from "drizzle-orm";
+import { schema as tables } from "@/db/client";
+import { allowRequest } from "@/lib/rate-limit";
+import { isoInSeconds } from "@/lib/time";
+
+/** Per-address cap: sign-in emails to one inbox per hour. */
+const LINKS_PER_EMAIL_PER_HOUR = 5;
 
 const schema = z.object({
   email: z.string().email(),
@@ -22,6 +29,24 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   }
 
   const db = getDb(env);
+
+  // Throttle before sending: per network (spraying many inboxes) and per
+  // address (bombing one). The magic_links rows we already write are the
+  // per-address counter. Same message either way, and it says nothing about
+  // whether the address has an account.
+  const email = parsed.data.email.trim().toLowerCase();
+  const recent = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(tables.magicLinks)
+    .where(and(eq(tables.magicLinks.email, email), gt(tables.magicLinks.createdAt, isoInSeconds(-3600))))
+    .get();
+  if (
+    (recent?.n ?? 0) >= LINKS_PER_EMAIL_PER_HOUR ||
+    !(await allowRequest(db, request, "magic_link"))
+  ) {
+    return redirect("/login?throttled=1", 303);
+  }
+
   const { url, delivered, error } = await createAndSendMagicLink(
     db,
     env,

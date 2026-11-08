@@ -8,6 +8,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { getDb } from "@/db/client";
+import { allowRequest } from "@/lib/rate-limit";
 import { logEvent } from "@/lib/events";
 import { looksLikeBot } from "@/lib/metrics";
 
@@ -23,6 +24,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const env = locals.runtime.env;
     if (!env?.DB) return NO_CONTENT;
+    if (!(await allowRequest(getDb(env), request, "metrics"))) return NO_CONTENT;
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return NO_CONTENT;
     if (looksLikeBot(request.headers.get("user-agent") ?? "")) return NO_CONTENT;

@@ -1051,3 +1051,40 @@ export const supportRequests = sqliteTable(
     index("support_requests_email_idx").on(t.email),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Email suppressions — the "do not send marketing" list, keyed by address.
+// ---------------------------------------------------------------------------
+// One row per address that has opted out. It is the single authority every
+// marketing send checks (lifecycle flows, Brevo sync, exports), because a
+// person can be on the list three ways at once — an account, one or more
+// double-opt-in leads, a legacy imported contact — and an unsubscribe must
+// cover all of them. Deliberately NOT tied to a user id: suppressing an
+// address must survive account deletion, or a re-import would re-mail someone
+// who asked us to stop. Resubscribing deletes the row; the who/when/why of
+// every change is in `events` (marketing_unsubscribed / _resubscribed).
+// Transactional mail (sign-in links, receipts, certificates) never checks it.
+export const emailSuppressions = sqliteTable("email_suppressions", {
+  email: text("email").primaryKey(), // normalized lowercase
+  reason: text("reason", {
+    enum: ["unsubscribed", "admin", "bounce", "complaint"],
+  })
+    .notNull()
+    .default("unsubscribed"),
+  source: text("source"), // "link" | "one_click" | "admin" | …
+  createdAt: text("created_at").notNull().default(nowUtc),
+});
+
+// ---------------------------------------------------------------------------
+// Rate limits — fixed-window counters for the public, unauthenticated
+// endpoints that send email or spend money (magic links, lead capture, the
+// help form, metrics beacons). Key = `${bucket}:${sha256(ip | windowStart)}`,
+// so the raw IP is never stored and every window starts a fresh row. Pruned
+// daily by the flows cron. Fails OPEN if the table is missing (see
+// src/lib/rate-limit.ts) — a limiter must never take the login page down.
+// ---------------------------------------------------------------------------
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text("key").primaryKey(),
+  windowStart: integer("window_start").notNull(), // epoch seconds, window-aligned
+  count: integer("count").notNull().default(0),
+});

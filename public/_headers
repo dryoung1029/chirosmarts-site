@@ -1,0 +1,9 @@
+# Security headers for STATIC assets (fonts, images, PDFs, client JS).
+# Pages applies this file only to static files. SSR pages and API routes get
+# the same headers from src/middleware.ts (withSecurityHeaders). Keep the two
+# in step.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
