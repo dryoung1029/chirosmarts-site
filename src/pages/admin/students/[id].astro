@@ -9,6 +9,8 @@ import { unpassedQuizzes } from "@/lib/quiz";
 import { listCertificates } from "@/lib/certificate";
 import { formatPacific } from "@/lib/time";
 import { isAdminEmail } from "@/lib/admin";
+import { getMailingStatus, STATUS_HELP, STATUS_LABEL } from "@/lib/audience";
+import { lastPrefEvent } from "@/lib/email-prefs";
 
 const db = getDb(Astro.locals.runtime.env);
 const userId = Astro.params.id!;
@@ -74,6 +76,10 @@ const ownedClinic = await db
 const isSiteAdmin =
   student.role === "site_admin" ||
   isAdminEmail(Astro.locals.runtime.env, student.email);
+
+// Marketing-list status (same rules as Admin → Audience).
+const mailing = await getMailingStatus(db, student.email).catch(() => null);
+const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
 ---
 
 <Layout title={`${student.legalName || student.email} · Admin`} showNav={true}>
@@ -179,6 +185,43 @@ const isSiteAdmin =
     <div class="panel" style="border-color:var(--warn)">
       <strong style="color:var(--warn)">No legal name on file.</strong>
       <span class="muted"> Certificates can't be issued until the student completes intake with their legal name.</span>
+    </div>
+  )}
+
+  {mailing && (
+    <div class="panel">
+      <h2 style="margin-top:0">Mailing list</h2>
+      <p style="margin-top:0">
+        <strong style={mailing.status === "subscribed" ? "color:var(--ok)" : mailing.status === "unsubscribed" ? "color:var(--danger)" : ""}>
+          {STATUS_LABEL[mailing.status]}
+        </strong>
+        <span class="muted"> · {STATUS_HELP[mailing.status]}</span>
+      </p>
+      <ul class="muted" style="font-size:0.9rem;line-height:1.7;margin:0 0 0.75rem;padding-left:1.1rem">
+        <li>Known from: {mailing.sources.join(", ")}</li>
+        {mailing.tags.length > 0 && <li>Tags: {mailing.tags.join(", ")}</li>}
+        {mailing.consentAt && <li>Consented {formatPacific(mailing.consentAt, { dateStyle: "medium" })}</li>}
+        {lastPref && (
+          <li>
+            {lastPref.type === "marketing_unsubscribed" ? "Unsubscribed" : "Resubscribed"}{" "}
+            {formatPacific(lastPref.occurredAt, { dateStyle: "medium" })} via{" "}
+            {(lastPref.payload as { source?: string } | null)?.source ?? "unknown"}
+            {(lastPref.payload as { reason?: string } | null)?.reason && (
+              <span>: “{(lastPref.payload as { reason?: string }).reason}”</span>
+            )}
+          </li>
+        )}
+      </ul>
+      <form method="POST" action="/api/admin/audience/preference" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;margin:0">
+        <input type="hidden" name="email" value={student.email} />
+        <input type="hidden" name="back" value={`/admin/students/${userId}`} />
+        <input type="hidden" name="action" value={mailing.status === "unsubscribed" ? "resubscribe" : "unsubscribe"} />
+        <input type="text" name="reason" required style="flex:1 1 16rem;max-width:28rem;margin:0"
+          placeholder={mailing.status === "unsubscribed" ? "Their request, e.g. “asked by phone”" : "Reason, e.g. “asked by email”"} />
+        <button type="submit" class="btn-secondary" style="margin:0">
+          {mailing.status === "unsubscribed" ? "Resubscribe" : "Unsubscribe from marketing"}
+        </button>
+      </form>
     </div>
   )}
 

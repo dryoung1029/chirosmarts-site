@@ -1,0 +1,246 @@
+---
+/**
+ * Audience: everyone we could email, ONE row per address, merged from
+ * accounts, signup-form leads, and the legacy roster, with their real
+ * marketing status (see src/lib/audience.ts for the rules). Answers "is Jane
+ * on the list?" in one place. Admin-guarded by middleware.
+ */
+import Layout from "@/layouts/Layout.astro";
+import AdminNav from "@/components/AdminNav.astro";
+import { getDb } from "@/db/client";
+import {
+  applyAudienceFilter,
+  audienceQuery,
+  getAudience,
+  parseAudienceFilter,
+  STATUS_HELP,
+  STATUS_LABEL,
+  type MailStatus,
+} from "@/lib/audience";
+import { formatPacific } from "@/lib/time";
+
+const PAGE_SIZE = 50;
+const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const db = getDb(Astro.locals.runtime.env);
+const params = Astro.url.searchParams;
+const flash = params.get("done");
+const flashError = params.get("error");
+
+const all = await getAudience(db);
+const f = parseAudienceFilter(params);
+const filtered = applyAudienceFilter(all, f);
+
+const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+const page = Math.min(pages, Math.max(1, Number(params.get("page")) || 1));
+const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+// Counts per status across EVERYONE (the cards are also the status filter).
+const counts = new Map<MailStatus, number>();
+for (const r of all) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+const statusOrder: MailStatus[] = ["subscribed", "pending", "legacy", "not_opted_in", "unsubscribed"];
+
+// Filter dropdown options come from the data itself.
+const sources = [...new Set(all.flatMap((r) => r.sources))].sort();
+const tags = [...new Set(all.flatMap((r) => r.tags))].sort();
+
+const here = `/admin/audience${audienceQuery(f, page > 1 ? { page: String(page) } : {})}`;
+const statusColor: Record<MailStatus, string> = {
+  subscribed: "var(--success)",
+  pending: "var(--warning-ink)",
+  legacy: "var(--muted)",
+  not_opted_in: "var(--muted)",
+  unsubscribed: "var(--danger)",
+};
+const statusBg: Record<MailStatus, string> = {
+  subscribed: "var(--success-tint)",
+  pending: "var(--warning-tint)",
+  legacy: "var(--brand-tint)",
+  not_opted_in: "var(--canvas)",
+  unsubscribed: "var(--danger-tint)",
+};
+---
+
+<Layout title="Audience · Admin" showNav={true}>
+  <AdminNav active="audience" />
+  <h1 style="margin-bottom:0.25rem">Audience</h1>
+  <p class="muted" style="margin-top:0;max-width:52rem">
+    Everyone we could email, one row per address, combining accounts, every
+    signup form (including Talking to Pain), and the legacy roster. Status is
+    what actually decides whether marketing email may go to them.
+    <a href="/admin/contacts">Legacy roster segments →</a>
+  </p>
+
+  {flash && <div class="panel" style="border-color:var(--ok);color:var(--ok)">{flash}</div>}
+  {flashError && <div class="panel" style="border-color:var(--danger);color:var(--danger)">{flashError}</div>}
+
+  <div class="aud-cards">
+    {statusOrder.map((s) => (
+      <a
+        class={`aud-card${f.status === s ? " is-on" : ""}`}
+        href={`/admin/audience${audienceQuery({ ...f, status: f.status === s ? "" : s })}`}
+        title={STATUS_HELP[s]}
+      >
+        <span class="aud-card-n">{counts.get(s) ?? 0}</span>
+        <span class="aud-card-l">{STATUS_LABEL[s]}</span>
+      </a>
+    ))}
+  </div>
+
+  <form method="get" class="aud-filters">
+    <input type="text" name="q" value={f.q} placeholder="Search name or email…" />
+    <select name="status" aria-label="Status">
+      <option value="">Any status</option>
+      {statusOrder.map((s) => <option value={s} selected={f.status === s}>{STATUS_LABEL[s]}</option>)}
+    </select>
+    <select name="source" aria-label="Source">
+      <option value="">Any source</option>
+      {sources.map((s) => <option value={s} selected={f.source === s}>{s}</option>)}
+    </select>
+    {tags.length > 0 && (
+      <select name="tag" aria-label="Tag">
+        <option value="">Any tag</option>
+        {tags.map((t) => <option value={t} selected={f.tag === t}>{t}</option>)}
+      </select>
+    )}
+    <select name="account" aria-label="Account">
+      <option value="">Account or not</option>
+      <option value="yes" selected={f.account === "yes"}>Has account</option>
+      <option value="no" selected={f.account === "no"}>No account</option>
+    </select>
+    <select name="certified" aria-label="Certified">
+      <option value="">Certified or not</option>
+      <option value="yes" selected={f.certified === "yes"}>Certified</option>
+      <option value="no" selected={f.certified === "no"}>Not certified</option>
+    </select>
+    <button type="submit" style="margin:0">Filter</button>
+    {audienceQuery(f) && <a href="/admin/audience" class="aud-clear">Clear</a>}
+  </form>
+
+  <p class="muted" style="font-size:0.9rem;margin:0 0 0.75rem">
+    {filtered.length} {filtered.length === 1 ? "person" : "people"}
+    {pages > 1 && <span> · page {page} of {pages}</span>}
+    {" · "}
+    <a href={`/api/admin/audience/export${audienceQuery(f)}`}>Download CSV of this view</a>
+    {f.status !== "unsubscribed" && (
+      <span> (unsubscribed people are left out unless you filter to them)</span>
+    )}
+  </p>
+
+  <div class="panel" style="padding:0">
+    <div class="table-scroll">
+      <table class="aud-table">
+        <thead>
+          <tr>
+            <th>Person</th>
+            <th>Status</th>
+            <th>From</th>
+            <th class="num">Cert</th>
+            <th class="num">Renews</th>
+            <th>Consented</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td class="cell-person">
+                <div class="cell-name">
+                  {r.userId ? <a href={`/admin/students/${r.userId}`}>{r.name || r.email}</a> : (r.name || <span class="muted">—</span>)}
+                </div>
+                <div class="cell-email">{r.email}</div>
+              </td>
+              <td data-label="Status">
+                <span class="aud-badge" style={`color:${statusColor[r.status]};background:${statusBg[r.status]}`} title={STATUS_HELP[r.status]}>
+                  {STATUS_LABEL[r.status]}
+                </span>
+              </td>
+              <td data-label="From" class="cell-src">
+                {r.sources.join(", ")}
+                {r.tags.length > 0 && <div class="muted">{r.tags.map((t) => `#${t}`).join(" ")}</div>}
+              </td>
+              <td class="num" data-label="Certified">{r.certified ? "✓" : <span class="muted">–</span>}</td>
+              <td class="num" data-label="Renews">{r.birthMonth ? MONTHS[r.birthMonth] : <span class="muted">–</span>}</td>
+              <td data-label="Consented" class="muted" style="white-space:nowrap">
+                {r.consentAt ? formatPacific(r.consentAt, { dateStyle: "medium" }) : "–"}
+              </td>
+              <td class="cell-act">
+                <details>
+                  <summary>{r.status === "unsubscribed" ? "Resubscribe" : "Unsubscribe"}</summary>
+                  <form method="POST" action="/api/admin/audience/preference" class="aud-pref-form">
+                    <input type="hidden" name="email" value={r.email} />
+                    <input type="hidden" name="back" value={here} />
+                    <input type="hidden" name="action" value={r.status === "unsubscribed" ? "resubscribe" : "unsubscribe"} />
+                    <input
+                      type="text"
+                      name="reason"
+                      required
+                      placeholder={r.status === "unsubscribed" ? "Their request, e.g. “asked by phone 11/8”" : "Reason, e.g. “asked by email”"}
+                    />
+                    <button type="submit" style="margin:0">Confirm</button>
+                  </form>
+                </details>
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colspan="7" class="muted" style="padding:0.9rem 0.75rem">Nobody matches.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {pages > 1 && (
+    <nav class="aud-pager" aria-label="Pages">
+      {page > 1 && <a href={`/admin/audience${audienceQuery(f, { page: String(page - 1) })}`}>← Previous</a>}
+      <span class="muted">Page {page} of {pages}</span>
+      {page < pages && <a href={`/admin/audience${audienceQuery(f, { page: String(page + 1) })}`}>Next →</a>}
+    </nav>
+  )}
+
+  <style>
+    .aud-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .aud-card {
+      display: flex; flex-direction: column; gap: 0.15rem; padding: 0.8rem 1rem;
+      border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      text-decoration: none; color: var(--text);
+    }
+    .aud-card.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+    .aud-card-n { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .aud-card-l { font-size: 0.85rem; color: var(--muted); }
+
+    .aud-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0 0 0.75rem; }
+    .aud-filters input[type="text"] { flex: 1 1 14rem; max-width: 20rem; margin: 0; }
+    .aud-filters select { width: auto; margin: 0; }
+    .aud-clear { font-size: 0.9rem; }
+
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .aud-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 760px; }
+    .aud-table th, .aud-table td { padding: 0.55rem 0.75rem; vertical-align: top; text-align: left; }
+    .aud-table thead th { color: var(--muted); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border); }
+    .aud-table tbody tr { border-top: 1px solid var(--border); }
+    .aud-table tbody tr:first-child { border-top: 0; }
+    .aud-table .num { text-align: center; width: 1%; white-space: nowrap; }
+    .cell-name { font-weight: 600; }
+    .cell-email { color: var(--muted); font-size: 0.85rem; word-break: break-all; }
+    .cell-src { font-size: 0.85rem; }
+    .aud-badge { font-size: 0.78rem; font-weight: 600; border-radius: 6px; padding: 0.12rem 0.5rem; white-space: nowrap; }
+    .cell-act summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+    .aud-pref-form { display: flex; gap: 0.4rem; margin: 0.4rem 0 0; min-width: 16rem; }
+    .aud-pref-form input { margin: 0; font-size: 0.85rem; }
+    .aud-pager { display: flex; gap: 1rem; justify-content: center; align-items: center; margin: 1rem 0; }
+
+    @media (max-width: 720px) {
+      .table-scroll { overflow-x: visible; }
+      .aud-table { min-width: 0; }
+      .aud-table thead { display: none; }
+      .aud-table, .aud-table tbody, .aud-table tr, .aud-table td { display: block; width: auto; }
+      .aud-table tbody tr { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; margin: 0.6rem; }
+      .aud-table td { padding: 0.25rem 0; }
+      .aud-table td[data-label] { display: flex; justify-content: space-between; gap: 1rem; text-align: right; }
+      .aud-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 600; text-align: left; }
+      .aud-pref-form { min-width: 0; flex-wrap: wrap; }
+    }
+  </style>
+</Layout>

@@ -6,6 +6,7 @@
  * and surface the CA count so multi-CA clinics (the bulk-seat targets) sort top.
  */
 import { desc } from "drizzle-orm";
+import { loadSuppressions } from "@/lib/email-prefs";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 
@@ -152,13 +153,20 @@ const inSegment = (r: ContactRow, seg: Segment): boolean => {
 };
 
 /** Full roster for an individual-mail / list export, optionally one segment. */
+/**
+ * Legacy-roster rows for a segment, MINUS anyone who opted out of marketing
+ * email (email_suppressions). This CSV feeds Brevo and mail merges, so an
+ * unsubscribed address must never be in it.
+ */
 export async function getContactsForExport(db: Db, segment: Segment = "all"): Promise<ContactRow[]> {
+  const suppressed = await loadSuppressions(db);
   const rows = await db
     .select()
     .from(schema.importedContacts)
     .orderBy(desc(schema.importedContacts.everBought))
     .all();
   return rows
+    .filter((r) => !suppressed.has(r.email.toLowerCase()))
     .map((r) => ({
       email: r.email,
       firstName: r.firstName ?? "",
@@ -180,7 +188,11 @@ export async function getContactsForExport(db: Db, segment: Segment = "all"): Pr
 /** Build a CSV string from a header list and row objects. */
 export function toCsv(headers: { key: string; label: string }[], rows: Record<string, unknown>[]): string {
   const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
+    let s = v == null ? "" : String(v);
+    // Formula injection: names and other fields come from public forms, and
+    // Excel/Sheets execute a cell that starts with = + - @ (or tab/CR). A
+    // leading apostrophe makes it plain text.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const head = headers.map((h) => esc(h.label)).join(",");
