@@ -14,6 +14,8 @@ import {
   creditedSeconds,
   resumePosition,
   coverageFromHeartbeats,
+  courseGate,
+  COMPLETION_THRESHOLD,
   type Coverage,
 } from "@/lib/seat-time";
 import { getCourseStructure } from "@/lib/courses";
@@ -81,9 +83,10 @@ export interface CourseSeatTime {
 
 // The final exam unlocks once the student has watched at least this fraction of
 // EVERY lesson's content. Tied to completing the material rather than a fixed
-// hour count, so it stays correct as lessons are added or removed. Policy knob —
-// change here (PLAN.md §5), no schema change needed.
-export const COMPLETION_THRESHOLD = 0.9;
+// hour count, so it stays correct as lessons are added or removed. Policy knob:
+// change it in @/lib/seat-time (PLAN.md §5), no schema change needed. The rule
+// itself lives in courseGate() there, so admin views compute the same answer.
+export { COMPLETION_THRESHOLD } from "@/lib/seat-time";
 
 /**
  * Course-wide seat time + the final-exam gate. The exam unlocks when the student
@@ -105,9 +108,7 @@ export async function getCourseSeatTime(
     .where(eq(schema.courses.id, courseId))
     .get();
   const structure = await getCourseStructure(db, courseId);
-  const perLesson: CourseSeatTime["perLesson"] = [];
-  let total = 0;
-  let totalDuration = 0;
+  const progress: (LessonProgress & { title: string })[] = [];
   for (const { lessons } of structure) {
     for (const lesson of lessons) {
       const p = await getLessonProgress(
@@ -116,31 +117,24 @@ export async function getCourseSeatTime(
         lesson.id,
         lesson.durationSeconds,
       );
-      // A zero-duration lesson (no video yet) can't gate anything → treat as met.
-      const fraction =
-        p.durationSeconds > 0 ? p.creditedSeconds / p.durationSeconds : 1;
-      const meetsThreshold = fraction >= COMPLETION_THRESHOLD;
-      perLesson.push({ ...p, title: lesson.title, fraction, meetsThreshold });
-      total += p.creditedSeconds;
-      totalDuration += p.durationSeconds;
+      progress.push({ ...p, title: lesson.title });
     }
   }
-  // Explicit content-minutes floor, clamped to runtime so the gate stays reachable.
-  const requiredSeconds = Math.min(
-    course?.requiredSeatMinutes != null ? course.requiredSeatMinutes * 60 : 0,
-    totalDuration,
-  );
-  const examUnlocked =
-    perLesson.length > 0 &&
-    perLesson.every((p) => p.meetsThreshold) &&
-    total >= requiredSeconds;
+  // The unlock rule itself (every lesson ≥ threshold, plus the clamped
+  // required-minutes floor) lives in courseGate().
+  const gate = courseGate(progress, course?.requiredSeatMinutes ?? null);
+  const perLesson: CourseSeatTime["perLesson"] = progress.map((p, i) => ({
+    ...p,
+    fraction: gate.fractions[i],
+    meetsThreshold: gate.meetsThreshold[i],
+  }));
   return {
-    creditedSeconds: total,
-    totalContentSeconds: totalDuration,
-    watchedFraction: totalDuration > 0 ? total / totalDuration : 0,
+    creditedSeconds: gate.creditedSeconds,
+    totalContentSeconds: gate.totalContentSeconds,
+    watchedFraction: gate.totalContentSeconds > 0 ? gate.creditedSeconds / gate.totalContentSeconds : 0,
     completionThreshold: COMPLETION_THRESHOLD,
-    requiredSeconds,
-    examUnlocked,
+    requiredSeconds: gate.requiredSeconds,
+    examUnlocked: gate.examUnlocked,
     perLesson,
   };
 }

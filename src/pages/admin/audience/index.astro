@@ -135,9 +135,6 @@ const statusBg: Record<MailStatus, string> = {
             <th>Person</th>
             <th>Status</th>
             <th>From</th>
-            <th class="num">Cert</th>
-            <th class="num">Renews</th>
-            <th>Consented</th>
             <th></th>
           </tr>
         </thead>
@@ -151,18 +148,23 @@ const statusBg: Record<MailStatus, string> = {
                 <div class="cell-email">{r.email}</div>
               </td>
               <td data-label="Status">
-                <span class="aud-badge" style={`color:${statusColor[r.status]};background:${statusBg[r.status]}`} title={STATUS_HELP[r.status]}>
-                  {STATUS_LABEL[r.status]}
-                </span>
+                <div>
+                  <span class="aud-badge" style={`color:${statusColor[r.status]};background:${statusBg[r.status]}`} title={STATUS_HELP[r.status]}>
+                    {STATUS_LABEL[r.status]}
+                  </span>
+                  {r.consentAt && (
+                    <div class="muted aud-sub">since {formatPacific(r.consentAt, { dateStyle: "medium" })}</div>
+                  )}
+                </div>
               </td>
               <td data-label="From" class="cell-src">
                 {r.sources.join(", ")}
-                {r.tags.length > 0 && <div class="muted">{r.tags.map((t) => `#${t}`).join(" ")}</div>}
-              </td>
-              <td class="num" data-label="Certified">{r.certified ? "✓" : <span class="muted">–</span>}</td>
-              <td class="num" data-label="Renews">{r.birthMonth ? MONTHS[r.birthMonth] : <span class="muted">–</span>}</td>
-              <td data-label="Consented" class="muted" style="white-space:nowrap">
-                {r.consentAt ? formatPacific(r.consentAt, { dateStyle: "medium" }) : "–"}
+                {r.tags.length > 0 && <div class="muted aud-sub">{r.tags.map((t) => `#${t}`).join(" ")}</div>}
+                {(r.certified || r.birthMonth) && (
+                  <div class="muted aud-sub">
+                    {[r.certified ? "Certified" : "", r.birthMonth ? `renews ${MONTHS[r.birthMonth]}` : ""].filter(Boolean).join(" · ")}
+                  </div>
+                )}
               </td>
               <td class="cell-act">
                 <details>
@@ -184,7 +186,7 @@ const statusBg: Record<MailStatus, string> = {
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colspan="7" class="muted" style="padding:0.9rem 0.75rem">Nobody matches.</td></tr>
+            <tr><td colspan="4" class="muted" style="padding:0.9rem 0.75rem">Nobody matches.</td></tr>
           )}
         </tbody>
       </table>
@@ -216,7 +218,8 @@ const statusBg: Record<MailStatus, string> = {
     .aud-clear { font-size: 0.9rem; }
 
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .aud-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 760px; }
+    .aud-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 560px; }
+    .aud-sub { font-size: 0.8rem; margin-top: 0.2rem; }
     .aud-table th, .aud-table td { padding: 0.55rem 0.75rem; vertical-align: top; text-align: left; }
     .aud-table thead th { color: var(--muted); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border); }
     .aud-table tbody tr { border-top: 1px solid var(--border); }
@@ -227,7 +230,7 @@ const statusBg: Record<MailStatus, string> = {
     .cell-src { font-size: 0.85rem; }
     .aud-badge { font-size: 0.78rem; font-weight: 600; border-radius: 6px; padding: 0.12rem 0.5rem; white-space: nowrap; }
     .cell-act summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
-    .aud-pref-form { display: flex; gap: 0.4rem; margin: 0.4rem 0 0; min-width: 16rem; }
+    .aud-pref-form { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.4rem 0 0; min-width: 11rem; }
     .aud-pref-form input { margin: 0; font-size: 0.85rem; }
     .aud-pager { display: flex; gap: 1rem; justify-content: center; align-items: center; margin: 1rem 0; }
 

@@ -2,7 +2,8 @@
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
-import { sql, eq, desc } from "drizzle-orm";
+import { sql, eq, desc, and, inArray, lt } from "drizzle-orm";
+import { buildRoster, type Flag } from "@/lib/admin/roster";
 import { formatPacific } from "@/lib/time";
 import type { SyncContactDetail } from "@/lib/brevo";
 import { adminEmails } from "@/lib/admin";
@@ -100,6 +101,31 @@ const roleAdmins = await db
 const roleAdminEmails = new Set(roleAdmins.map((r) => r.email.toLowerCase()));
 const staleRoleAdmins = roleAdmins.filter((r) => !allowlist.includes(r.email.toLowerCase()));
 
+// ---- Needs attention: one list of things someone should act on. --------
+const roster = await buildRoster(db, { withMailing: false });
+const flagCount = (fl: Flag) => roster.filter((r) => r.flags.includes(fl)).length;
+const openSupport = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.supportRequests)
+  .where(inArray(schema.supportRequests.status, ["new", "drafted", "escalated"]))
+  .get()
+  .catch(() => null);
+const stalePending = await db
+  .select({ n: sql<number>`count(*)` })
+  .from(schema.marketingLeads)
+  .where(and(eq(schema.marketingLeads.status, "pending"), lt(schema.marketingLeads.createdAt, new Date(Date.now() - 7 * 86400000).toISOString())))
+  .get();
+const attentionItems = [
+  { n: flagCount("exam_ready"), one: "student is exam-ready but hasn't passed the final", many: "students are exam-ready but haven't passed the final", href: "/admin/students?view=exam_ready" },
+  { n: flagCount("passed_no_cert"), one: "passed the final but has no certificate", many: "passed the final but have no certificate", href: "/admin/students?view=attention" },
+  { n: flagCount("exam_failed_twice"), one: "student failed the final exam twice or more", many: "students failed the final exam twice or more", href: "/admin/students?view=attention" },
+  { n: flagCount("stalled"), one: "student stalled mid-course (no activity in 14+ days)", many: "students stalled mid-course (no activity in 14+ days)", href: "/admin/students?view=stalled" },
+  { n: flagCount("no_legal_name"), one: "enrolled student has no legal name (can't certify)", many: "enrolled students have no legal name (can't certify)", href: "/admin/students?view=attention" },
+  { n: flagCount("intake_incomplete"), one: "signed up but never finished intake", many: "signed up but never finished intake", href: "/admin/students?view=intake" },
+  { n: openSupport?.n ?? 0, one: "open support request", many: "open support requests", href: "/admin/support" },
+  { n: stalePending?.n ?? 0, one: "signup unconfirmed for 7+ days", many: "signups unconfirmed for 7+ days", href: "/admin/audience?status=pending" },
+].filter((i) => i.n > 0);
+
 const stats = [
   { label: "Accounts", value: totalUsers?.n ?? 0 },
   { label: "Active enrollments", value: activeEnrollments?.n ?? 0 },
@@ -111,6 +137,21 @@ const stats = [
 <Layout title="Admin" showNav={true}>
   <AdminNav active="overview" />
   <h1>Admin overview</h1>
+
+  <div class="panel attn" style={attentionItems.length ? "border-color:var(--warning)" : ""}>
+    <h2 style="margin-top:0">Needs attention</h2>
+    {attentionItems.length === 0 ? (
+      <p class="muted" style="margin:0">Nothing waiting on you right now.</p>
+    ) : (
+      <ul style="margin:0;padding-left:0;list-style:none;line-height:1.9">
+        {attentionItems.map((i) => (
+          <li>
+            <a href={i.href}><strong style="font-variant-numeric:tabular-nums">{i.n}</strong> {i.n === 1 ? i.one : i.many}</a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin:1.25rem 0">
     {

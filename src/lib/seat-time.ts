@@ -99,3 +99,57 @@ export function creditedMinutes(
 ): number {
   return creditedSeconds(coverage, durationSeconds) / 60;
 }
+
+// ---------------------------------------------------------------------------
+// Final-exam gate (pure). The single statement of the unlock rule, used by
+// getCourseSeatTime (the real gate) and by admin views that need the same
+// answer for many students at once. Keep it the only place the rule lives.
+// ---------------------------------------------------------------------------
+
+/** The exam unlocks when EVERY lesson is watched to at least this fraction. */
+export const COMPLETION_THRESHOLD = 0.9;
+
+export interface GateLesson {
+  durationSeconds: number;
+  creditedSeconds: number;
+}
+
+export interface CourseGate {
+  creditedSeconds: number;
+  totalContentSeconds: number;
+  requiredSeconds: number;
+  /** Per lesson, same order as the input. */
+  fractions: number[];
+  meetsThreshold: boolean[];
+  examUnlocked: boolean;
+}
+
+/**
+ * (a) every lesson watched to ≥ COMPLETION_THRESHOLD of its runtime (a
+ * zero-duration lesson can't gate anything, so it counts as met), AND (b) the
+ * course's explicit `requiredSeatMinutes` floor of credited content, clamped
+ * to total runtime so it can never make the exam unreachable. A course with
+ * no lessons never unlocks.
+ */
+export function courseGate(lessons: GateLesson[], requiredSeatMinutes: number | null): CourseGate {
+  let credited = 0;
+  let total = 0;
+  const fractions: number[] = [];
+  const meets: boolean[] = [];
+  for (const l of lessons) {
+    const fraction = l.durationSeconds > 0 ? l.creditedSeconds / l.durationSeconds : 1;
+    fractions.push(fraction);
+    meets.push(fraction >= COMPLETION_THRESHOLD);
+    credited += l.creditedSeconds;
+    total += l.durationSeconds;
+  }
+  const requiredSeconds = Math.min(requiredSeatMinutes != null ? requiredSeatMinutes * 60 : 0, total);
+  return {
+    creditedSeconds: credited,
+    totalContentSeconds: total,
+    requiredSeconds,
+    fractions,
+    meetsThreshold: meets,
+    examUnlocked: lessons.length > 0 && meets.every(Boolean) && credited >= requiredSeconds,
+  };
+}

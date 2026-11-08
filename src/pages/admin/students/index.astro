@@ -1,159 +1,251 @@
 ---
+/**
+ * Students roster. Built for "about 70 and growing": quick views for what
+ * needs doing, filters, sorting, paging, CSV of the current view. All data
+ * comes from buildRoster (src/lib/admin/roster.ts) in a fixed number of
+ * queries; flags and progress use the same rules as the real exam gate.
+ */
 import Layout from "@/layouts/Layout.astro";
 import AdminNav from "@/components/AdminNav.astro";
 import { getDb, schema } from "@/db/client";
-import { desc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
+import {
+  ago,
+  applyRosterFilter,
+  buildRoster,
+  FLAG_HELP,
+  FLAG_LABEL,
+  inView,
+  parseRosterFilter,
+  primaryCourse,
+  rosterQuery,
+  SORTS,
+  VIEWS,
+  ATTENTION,
+  type View,
+} from "@/lib/admin/roster";
+import { STATUS_LABEL } from "@/lib/audience";
+import { formatPacific } from "@/lib/time";
 
+const PAGE_SIZE = 25;
 const db = getDb(Astro.locals.runtime.env);
+const params = Astro.url.searchParams;
+const now = new Date();
 
-const users = await db
-  .select()
-  .from(schema.users)
-  .orderBy(desc(schema.users.createdAt))
+const all = await buildRoster(db, { now });
+const f = parseRosterFilter(params);
+const filtered = applyRosterFilter(all, f, now);
+const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+const page = Math.min(pages, Math.max(1, Number(params.get("page")) || 1));
+const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+const viewCounts = Object.fromEntries(
+  (Object.keys(VIEWS) as View[]).map((v) => [v, all.filter((r) => inView(r, v, now)).length]),
+) as Record<View, number>;
+
+const courses = await db
+  .select({ id: schema.courses.id, title: schema.courses.title })
+  .from(schema.courses)
+  .orderBy(asc(schema.courses.title))
   .all();
-const enrollments = await db.select().from(schema.enrollments).all();
-const certs = await db.select().from(schema.certificates).all();
 
-const enrollByUser = new Map<string, typeof enrollments>();
-for (const e of enrollments) {
-  const list = enrollByUser.get(e.userId) ?? [];
-  list.push(e);
-  enrollByUser.set(e.userId, list);
-}
-const certCountByUser = new Map<string, number>();
-for (const c of certs) {
-  if (c.status === "issued")
-    certCountByUser.set(c.userId, (certCountByUser.get(c.userId) ?? 0) + 1);
-}
-
-const q = (Astro.url.searchParams.get("q") ?? "").trim().toLowerCase();
-const rows = users
-  .filter(
-    (u) =>
-      !q ||
-      u.email.toLowerCase().includes(q) ||
-      (u.legalName ?? "").toLowerCase().includes(q),
-  )
-  .map((u) => {
-    const es = enrollByUser.get(u.id) ?? [];
-    return {
-      user: u,
-      enrolled: es.filter((e) => e.status === "active" || e.status === "completed").length,
-      completed: es.filter((e) => e.status === "completed").length,
-      certs: certCountByUser.get(u.id) ?? 0,
-    };
-  });
+const PAID_LABEL: Record<string, string> = {
+  paid: "Paid", free: "Free", comp: "Comp", clinic_seat: "Clinic seat", unpaid: "Unpaid",
+};
+const ROLE_LABEL: Record<string, string> = { student: "Student", clinic_admin: "Clinic owner", site_admin: "Admin" };
+const hasFilters = !!(f.q || f.course || f.paid || f.mailing || f.role);
 ---
 
 <Layout title="Students · Admin" showNav={true}>
   <AdminNav active="students" />
-  <h1>Students <span class="muted" style="font-size:1rem">({rows.length})</span></h1>
+  <h1 style="margin-bottom:0.75rem">Students <span class="muted" style="font-size:1rem">({all.length})</span></h1>
 
-  <form method="get" class="stu-search">
-    <input
-      type="text"
-      name="q"
-      value={q}
-      placeholder="Search name or email…"
-    />
-    <button type="submit" style="margin-top:0">Search</button>
-    {q && <a href="/admin/students" class="stu-clear">Clear</a>}
+  <nav class="stu-views" aria-label="Quick views">
+    {(Object.keys(VIEWS) as View[]).map((v) => (
+      <a
+        href={`/admin/students${rosterQuery({ ...f, view: v })}`}
+        class={`stu-view${f.view === v ? " is-on" : ""}${v === "attention" && viewCounts[v] > 0 ? " is-hot" : ""}`}
+      >
+        {VIEWS[v]} <span class="stu-view-n">{viewCounts[v]}</span>
+      </a>
+    ))}
+  </nav>
+
+  <form method="get" class="stu-filters">
+    {f.view !== "all" && <input type="hidden" name="view" value={f.view} />}
+    <input type="text" name="q" value={f.q} placeholder="Name, email, or clinic…" />
+    <select name="course" aria-label="Course">
+      <option value="">Any course</option>
+      {courses.map((c) => <option value={c.id} selected={f.course === c.id}>{c.title}</option>)}
+    </select>
+    <select name="paid" aria-label="How they got access">
+      <option value="">Any access</option>
+      {Object.entries(PAID_LABEL).map(([k, v]) => <option value={k} selected={f.paid === k}>{v}</option>)}
+    </select>
+    <select name="mailing" aria-label="Mailing list">
+      <option value="">Any mailing status</option>
+      {Object.entries(STATUS_LABEL).map(([k, v]) => <option value={k} selected={f.mailing === k}>{v}</option>)}
+    </select>
+    <select name="role" aria-label="Account type">
+      <option value="">Any account type</option>
+      {Object.entries(ROLE_LABEL).map(([k, v]) => <option value={k} selected={f.role === k}>{v}</option>)}
+    </select>
+    <select name="sort" aria-label="Sort">
+      {Object.entries(SORTS).map(([k, v]) => <option value={k} selected={f.sort === k}>Sort: {v}</option>)}
+    </select>
+    <button type="submit" style="margin:0">Apply</button>
+    {hasFilters && <a href={`/admin/students${rosterQuery({ ...f, q: "", course: "", paid: "", mailing: "", role: "" })}`} class="stu-clear">Clear filters</a>}
   </form>
+
+  <p class="muted" style="font-size:0.9rem;margin:0 0 0.75rem">
+    {filtered.length} {filtered.length === 1 ? "student" : "students"}
+    {pages > 1 && <span> · page {page} of {pages}</span>}
+    {" · "}<a href={`/api/admin/students/export${rosterQuery(f)}`}>Download CSV of this view</a>
+  </p>
 
   <div class="panel" style="padding:0">
     <div class="table-scroll">
       <table class="stu-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th class="num" title="Intake completed">Intake</th>
-            <th class="num" title="Active/completed course enrolments">Courses</th>
-            <th class="num" title="Courses completed">Done</th>
-            <th class="num" title="Certificates issued">Certs</th>
+            <th>Student</th>
+            <th>Course</th>
+            <th>Status</th>
+            <th>Last active</th>
           </tr>
         </thead>
         <tbody>
-          {
-            rows.map((r) => (
+          {rows.map((r) => {
+            const pc = primaryCourse(r);
+            const more = r.courses.length - (pc ? 1 : 0);
+            return (
               <tr>
-                <td class="cell-name">
-                  <a href={`/admin/students/${r.user.id}`}>
-                    {r.user.legalName?.trim() || <span class="muted">— no name —</span>}
+                <td class="cell-person">
+                  <a href={`/admin/students/${r.id}`} class="cell-name">
+                    {r.name || <span class="muted">— no name —</span>}
                   </a>
+                  <div class="cell-email">{r.email}</div>
+                  <div class="badges">
+                    {r.role !== "student" && <span class="badge">{ROLE_LABEL[r.role]}</span>}
+                    {r.clinicName && <span class="badge" title="Active CA at this clinic">CA · {r.clinicName}</span>}
+                    {r.mailing === "unsubscribed" && <span class="badge badge-muted">Unsubscribed</span>}
+                  </div>
                 </td>
-                <td class="cell-email">{r.user.email}</td>
-                <td data-label="Role"><span class="role-badge">{r.user.role}</span></td>
-                <td class="num" data-label="Intake">{r.user.intakeCompletedAt ? "✓" : <span class="muted">–</span>}</td>
-                <td class="num" data-label="Courses">{r.enrolled}</td>
-                <td class="num" data-label="Done">{r.completed}</td>
-                <td class="num" data-label="Certs">{r.certs}</td>
+                <td data-label="Course" class="cell-course">
+                  {pc ? (
+                    <>
+                      <div class="course-title">{pc.title}</div>
+                      {pc.status === "completed" ? (
+                        <div class="muted course-sub">Completed</div>
+                      ) : pc.status === "active" && pc.progress != null ? (
+                        <div class="prog" title={`${Math.round(pc.progress * 100)}% of video content credited`}>
+                          <span class="prog-bar"><span style={`width:${Math.round(pc.progress * 100)}%`}></span></span>
+                          <span class="prog-n">{Math.round(pc.progress * 100)}%</span>
+                        </div>
+                      ) : (
+                        <div class="muted course-sub">{pc.status === "refunded" ? "Refunded" : pc.status === "pending" ? "Checkout not finished" : "No video yet"}</div>
+                      )}
+                      <div class="muted course-sub">
+                        {PAID_LABEL[pc.paymentStatus] ?? pc.paymentStatus}
+                        {more > 0 && <span> · +{more} more</span>}
+                      </div>
+                    </>
+                  ) : (
+                    <span class="muted">Not enrolled</span>
+                  )}
+                </td>
+                <td data-label="Status" class="cell-flags">
+                  {r.flags.length === 0 ? (
+                    <span class="muted">{r.certs > 1 ? `Certified ×${r.certs}` : r.certs === 1 ? "Certified" : "On track"}</span>
+                  ) : (
+                    r.flags.map((fl) => (
+                      <span class={`flag${ATTENTION.includes(fl) ? " flag-hot" : ""}`} title={FLAG_HELP[fl]}>{FLAG_LABEL[fl]}</span>
+                    ))
+                  )}
+                </td>
+                <td data-label="Last active" style="white-space:nowrap" title={r.lastActivityAt ? formatPacific(r.lastActivityAt) : "No activity recorded"}>
+                  {ago(r.lastActivityAt, now)}
+                </td>
               </tr>
-            ))
-          }
+            );
+          })}
           {rows.length === 0 && (
-            <tr>
-              <td colspan="7" style="padding:0.9rem 0.75rem" class="muted">No students match.</td>
-            </tr>
+            <tr><td colspan="4" style="padding:0.9rem 0.75rem" class="muted">No students match.</td></tr>
           )}
         </tbody>
       </table>
     </div>
   </div>
 
+  {pages > 1 && (
+    <nav class="stu-pager" aria-label="Pages">
+      {page > 1 && <a href={`/admin/students${rosterQuery(f, { page: String(page - 1) })}`}>← Previous</a>}
+      <span class="muted">Page {page} of {pages}</span>
+      {page < pages && <a href={`/admin/students${rosterQuery(f, { page: String(page + 1) })}`}>Next →</a>}
+    </nav>
+  )}
+
   <style>
-    .stu-search { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
-    .stu-search input { flex: 1; min-width: 12rem; max-width: 22rem; }
+    .stu-views { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.9rem; }
+    .stu-view {
+      display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border); border-radius: 999px; text-decoration: none;
+      color: var(--text); font-size: 0.9rem; background: var(--surface); white-space: nowrap;
+    }
+    .stu-view.is-on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+    .stu-view-n { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85rem; }
+    .stu-view.is-on .stu-view-n { color: inherit; opacity: 0.85; }
+    .stu-view.is-hot:not(.is-on) { border-color: var(--warning); }
+    .stu-view.is-hot:not(.is-on) .stu-view-n { color: var(--warning-ink); font-weight: 700; }
+
+    .stu-filters { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0 0 0.75rem; }
+    .stu-filters input[type="text"] { flex: 1 1 14rem; max-width: 20rem; margin: 0; }
+    .stu-filters select { width: auto; margin: 0; }
     .stu-clear { font-size: 0.9rem; white-space: nowrap; }
 
-    /* Keep wide content scrolling INSIDE the panel — never overflow the page. */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .stu-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 640px; }
-    .stu-table th,
-    .stu-table td { padding: 0.55rem 0.75rem; vertical-align: middle; }
-    .stu-table thead th {
-      text-align: left; color: var(--muted); font-weight: 600; white-space: nowrap;
-      border-bottom: 1px solid var(--border);
-    }
+    .stu-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 560px; }
+    .stu-table th, .stu-table td { padding: 0.6rem 0.75rem; vertical-align: top; text-align: left; }
+    .stu-table thead th { color: var(--muted); font-weight: 600; white-space: nowrap; border-bottom: 1px solid var(--border); }
     .stu-table tbody tr { border-top: 1px solid var(--border); }
     .stu-table tbody tr:first-child { border-top: 0; }
-    /* Numeric columns: centered, compact, never clipped. */
-    .stu-table .num { text-align: center; white-space: nowrap; width: 1%; font-variant-numeric: tabular-nums; }
-    .stu-table thead .num { text-align: center; }
-    .cell-name a { font-weight: 600; }
-    .cell-email { color: var(--muted); word-break: break-all; }
-    .role-badge {
-      font-size: 0.78rem; color: var(--muted); background: var(--brand-tint);
-      border-radius: 6px; padding: 0.1rem 0.45rem; white-space: nowrap;
+    .stu-table .num { text-align: center; width: 1%; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cell-name { font-weight: 600; }
+    .cell-email { color: var(--muted); font-size: 0.85rem; word-break: break-all; }
+    .badges { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+    .badge { font-size: 0.75rem; color: var(--muted); background: var(--brand-tint); border-radius: 6px; padding: 0.05rem 0.4rem; white-space: nowrap; }
+    .badge-muted { background: var(--danger-tint); color: var(--danger); }
+    .course-title { font-weight: 500; }
+    .course-sub { font-size: 0.82rem; }
+    .prog { display: flex; align-items: center; gap: 0.5rem; margin: 0.2rem 0; }
+    .prog-bar { flex: 1 1 auto; max-width: 9rem; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+    .prog-bar > span { display: block; height: 100%; background: var(--accent); }
+    .prog-n { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .cell-flags { max-width: 14rem; }
+    .flag {
+      display: inline-block; font-size: 0.75rem; border-radius: 6px; padding: 0.08rem 0.45rem;
+      margin: 0 0.25rem 0.25rem 0; background: var(--canvas); color: var(--muted); border: 1px solid var(--border);
+      white-space: nowrap;
     }
+    .flag-hot { background: var(--warning-tint); color: var(--warning-ink); border-color: transparent; }
+    .stu-pager { display: flex; gap: 1rem; justify-content: center; align-items: center; margin: 1rem 0; }
 
-    /* Phones: stack each student as a card (no sideways scroll). */
-    @media (max-width: 640px) {
+    /* Phones: each student becomes a card (no sideways scroll). */
+    @media (max-width: 720px) {
       .table-scroll { overflow-x: visible; }
       .stu-table { min-width: 0; }
       .stu-table thead { display: none; }
       .stu-table, .stu-table tbody, .stu-table tr, .stu-table td { display: block; width: auto; }
-      .stu-table tbody tr {
-        border: 1px solid var(--border); border-radius: 10px;
-        padding: 0.85rem 1rem; margin: 0.75rem; background: var(--surface);
-      }
-      .stu-table td { padding: 0.28rem 0; border: 0; }
-      .cell-name { font-size: 1.1rem; }
-      .cell-email {
-        padding: 0 0 0.5rem; margin-bottom: 0.4rem;
-        border-bottom: 1px solid var(--border);
-      }
-      /* metric rows become label ↔ value pairs */
-      .stu-table td[data-label] {
-        display: flex; justify-content: space-between; align-items: center;
-        text-align: right;
-      }
-      .stu-table td[data-label]::before {
-        content: attr(data-label); color: var(--muted); font-weight: 600;
-        text-align: left; margin-right: 1rem;
-      }
+      .stu-table tbody tr { border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 0.95rem; margin: 0.6rem; background: var(--surface); }
+      .stu-table td { padding: 0.28rem 0; }
+      .stu-table td[data-label] { display: flex; justify-content: space-between; gap: 1rem; text-align: right; }
+      .stu-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 600; text-align: left; flex: 0 0 auto; }
+      .cell-flags { max-width: none; }
       .stu-table .num { width: auto; }
+      .prog { justify-content: flex-end; }
+      /* The course cell holds several lines: stack them under the label. */
+      .stu-table td.cell-course { display: block; text-align: right; }
+      .stu-table td.cell-course::before { float: left; }
     }
   </style>
 </Layout>

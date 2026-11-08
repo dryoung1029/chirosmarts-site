@@ -11,6 +11,7 @@ import { formatPacific } from "@/lib/time";
 import { isAdminEmail } from "@/lib/admin";
 import { getMailingStatus, STATUS_HELP, STATUS_LABEL } from "@/lib/audience";
 import { lastPrefEvent } from "@/lib/email-prefs";
+import { ago, ATTENTION, buildRoster, FLAG_HELP, FLAG_LABEL } from "@/lib/admin/roster";
 
 const db = getDb(Astro.locals.runtime.env);
 const userId = Astro.params.id!;
@@ -77,6 +78,11 @@ const isSiteAdmin =
   student.role === "site_admin" ||
   isAdminEmail(Astro.locals.runtime.env, student.email);
 
+// At-a-glance summary: flags + course state, from the same roster logic as
+// the Students list, so the two never disagree.
+const [summary] = await buildRoster(db, { userId, withMailing: false });
+const attention = summary?.flags.filter((fl) => ATTENTION.includes(fl)) ?? [];
+
 // Marketing-list status (same rules as Admin → Audience).
 const mailing = await getMailingStatus(db, student.email).catch(() => null);
 const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
@@ -90,6 +96,63 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
     {student.email} · role: {student.role} ·{" "}
     intake {student.intakeCompletedAt ? formatPacific(student.intakeCompletedAt, { dateStyle: "medium" }) : "not completed"}
   </p>
+
+  {summary && (
+    <div class="panel sum-card">
+      {attention.length > 0 && (
+        <ul class="sum-attn">
+          {attention.map((fl) => (
+            <li><strong>{FLAG_LABEL[fl]}</strong> <span>{FLAG_HELP[fl]}</span></li>
+          ))}
+        </ul>
+      )}
+      <div class="sum-grid">
+        <div>
+          <div class="sum-k">Last sign-in</div>
+          <div class="sum-v" title={summary.lastLoginAt ? formatPacific(summary.lastLoginAt) : ""}>{ago(summary.lastLoginAt)}</div>
+        </div>
+        <div>
+          <div class="sum-k">Last activity</div>
+          <div class="sum-v" title={summary.lastActivityAt ? formatPacific(summary.lastActivityAt) : ""}>{ago(summary.lastActivityAt)}</div>
+        </div>
+        <div>
+          <div class="sum-k">Joined</div>
+          <div class="sum-v">{formatPacific(summary.createdAt, { dateStyle: "medium" })}</div>
+        </div>
+        <div>
+          <div class="sum-k">Certificates</div>
+          <div class="sum-v">{summary.certs}</div>
+        </div>
+      </div>
+      {summary.courses.length > 0 && (
+        <ul class="sum-courses">
+          {summary.courses.map((c) => (
+            <li>
+              <strong>{c.title}</strong>
+              <span class="muted">
+                {" · "}
+                {c.status === "completed"
+                  ? "completed"
+                  : c.status === "active"
+                    ? c.finalPassed
+                      ? "passed the final exam"
+                      : c.examUnlocked
+                        ? "final exam unlocked, not passed yet"
+                        : c.progress == null
+                          ? "no video yet"
+                          : `${Math.round(c.progress * 100)}% watched`
+                    : c.status === "pending"
+                      ? "checkout not finished"
+                      : "refunded"}
+                {c.finalFails > 0 && !c.finalPassed && ` · ${c.finalFails} failed exam attempt${c.finalFails === 1 ? "" : "s"}`}
+                {c.hasCert && " · certificate issued"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )}
 
   <form method="POST" action="/api/impersonate" style="margin:0 0 0.5rem">
     <input type="hidden" name="userId" value={userId} />
@@ -107,8 +170,8 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
   )}
 
   {!isSiteAdmin && (
-    <div class="panel">
-      <h2 style="margin-top:0">Account type</h2>
+    <details class="panel fold">
+      <summary><h2>Account type</h2></summary>
       <p class="muted" style="margin-top:0;font-size:0.9rem">
         Currently <strong>{student.role === "clinic_admin" ? "clinic owner" : "student"}</strong>
         {ownedClinic && <span> · owns <strong>{ownedClinic.name}</strong></span>}.
@@ -137,12 +200,12 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
         </div>
         <button type="submit" style="margin:0">Change account type</button>
       </form>
-    </div>
+    </details>
   )}
 
   {!isSiteAdmin && (
-    <div class="panel">
-      <h2 style="margin-top:0">Sign-in email</h2>
+    <details class="panel fold">
+      <summary><h2>Sign-in email</h2></summary>
       <p class="muted" style="margin-top:0;font-size:0.9rem">
         Currently <strong>{student.email}</strong>. This address IS the login —
         sign-in links go to it and nothing else. Changing it moves their clinic
@@ -178,7 +241,7 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
         </label>
         <button type="submit" style="margin:0">Change sign-in email</button>
       </form>
-    </div>
+    </details>
   )}
 
   {!student.legalName?.trim() && (
@@ -248,6 +311,8 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
             </strong>
           </p>
 
+          <details style="margin-top:0.5rem" open={!seat.examUnlocked && seat.creditedSeconds > 0}>
+          <summary class="muted" style="cursor:pointer;font-size:0.9rem">Per-lesson seat time ({seat.perLesson.length} {seat.perLesson.length === 1 ? "lesson" : "lessons"})</summary>
           <table style="width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:0.5rem">
             <thead>
               <tr style="text-align:left;color:var(--muted)">
@@ -278,6 +343,7 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
               ))}
             </tbody>
           </table>
+          </details>
 
           {/* Per-module seat-time reset (troubleshooting) */}
           <details style="margin-top:0.6rem">
@@ -378,8 +444,8 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
   }
 
   <!-- Quiz attempts -->
-  <div class="panel">
-    <h2>Quiz attempts <span class="muted" style="font-size:0.9rem">(append-only)</span></h2>
+  <details class="panel fold">
+    <summary><h2>Quiz attempts <span class="muted" style="font-size:0.9rem">({attempts.length}, append-only)</span></h2></summary>
     {
       attempts.length === 0 ? (
         <p style="margin:0">No attempts.</p>
@@ -415,11 +481,11 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
         </table>
       )
     }
-  </div>
+  </details>
 
   <!-- Raw event trail -->
-  <div class="panel">
-    <h2>Recent activity</h2>
+  <details class="panel fold">
+    <summary><h2>Recent activity <span class="muted" style="font-size:0.9rem">({events.length})</span></h2></summary>
     {
       events.length === 0 ? (
         <p style="margin:0">No events.</p>
@@ -434,7 +500,7 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
         </ul>
       )
     }
-  </div>
+  </details>
 
   <div class="panel" style="border-color:var(--warn);margin-top:1.5rem">
     <h2 style="margin-top:0;color:var(--warn)">Danger zone</h2>
@@ -464,6 +530,22 @@ const lastPref = await lastPrefEvent(db, student.email).catch(() => null);
       </form>
     </div>
   </div>
+
+  <style>
+    .sum-card { padding: 1rem 1.1rem; }
+    .sum-attn { list-style: none; margin: 0 0 0.85rem; padding: 0.6rem 0.8rem; border-radius: 8px; background: var(--warning-tint); color: var(--warning-ink); font-size: 0.9rem; }
+    .sum-attn li + li { margin-top: 0.3rem; }
+    .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.75rem; }
+    .sum-k { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+    .sum-v { font-weight: 600; }
+    .sum-courses { margin: 0.85rem 0 0; padding-left: 1.1rem; font-size: 0.92rem; line-height: 1.6; }
+    details.fold > summary { cursor: pointer; list-style: none; }
+    details.fold > summary::-webkit-details-marker { display: none; }
+    details.fold > summary h2 { display: inline; margin: 0; font-size: 1.15rem; }
+    details.fold > summary::before { content: "▸"; display: inline-block; width: 1.1rem; color: var(--muted); }
+    details.fold[open] > summary::before { content: "▾"; }
+    details.fold[open] > summary { margin-bottom: 0.75rem; }
+  </style>
 
   <script is:inline>
     document.querySelector(".acct-type-form")?.addEventListener("submit", (e) => {
