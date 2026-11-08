@@ -6,7 +6,7 @@ import { consumeMagicLink } from "@/lib/auth/magic-link";
 import { findOrCreateUserByEmail } from "@/lib/auth/users";
 import { createSession } from "@/lib/auth/session";
 import { logEvent } from "@/lib/events";
-import { isAdminEmail } from "@/lib/admin";
+import { adminEmails, isAdminEmail } from "@/lib/admin";
 
 export const GET: APIRoute = async ({ url, locals, cookies, request, redirect }) => {
   const env = locals.runtime.env;
@@ -20,13 +20,31 @@ export const GET: APIRoute = async ({ url, locals, cookies, request, redirect })
 
   const user = await findOrCreateUserByEmail(db, result.email);
 
-  // Persist the site_admin role for allowlisted emails (idempotent).
+  // Sync the stored role to the ADMIN_EMAILS allowlist, BOTH ways. Promotion
+  // was always here; demotion wasn't, so an address removed from the list kept
+  // admin forever through the persisted role. (isAdmin also checks the list
+  // directly; this keeps the stored role honest for role-only checks.)
   if (isAdminEmail(env, user.email) && user.role !== "site_admin") {
     await db
       .update(schema.users)
       .set({ role: "site_admin" })
       .where(eq(schema.users.id, user.id));
     user.role = "site_admin";
+  } else if (
+    user.role === "site_admin" &&
+    !isAdminEmail(env, user.email) &&
+    adminEmails(env).size > 0 // never demote on a missing/empty env var
+  ) {
+    await db
+      .update(schema.users)
+      .set({ role: "student" })
+      .where(eq(schema.users.id, user.id));
+    user.role = "student";
+    await logEvent(db, {
+      userId: user.id,
+      type: "admin_role_revoked",
+      payload: { email: user.email, reason: "not in ADMIN_EMAILS at login" },
+    });
   }
 
   // Cookies are only marked Secure when the public URL is https (so local

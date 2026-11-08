@@ -156,7 +156,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return redirect("/dashboard", 302);
   }
 
-  // Admin area requires the site_admin role (or an ADMIN_EMAILS match).
+  // Admin area requires an ADMIN_EMAILS match (see isAdmin in @/lib/admin).
   if (
     (path === "/admin" || path.startsWith("/admin/") || path.startsWith("/api/admin/")) &&
     !isAdmin(env, locals.user)

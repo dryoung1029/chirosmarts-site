@@ -1,4 +1,5 @@
 ---
+import { isAdmin as isAdminCheck } from "@/lib/admin";
 /**
  * Public blog index — published articles for chiropractic assistants.
  */
@@ -10,7 +11,7 @@ import { promoteDuePosts } from "@/lib/blog-schedule";
 
 const db = getDb(Astro.locals.runtime.env);
 await promoteDuePosts(db);
-const isAdmin = Astro.locals.user?.role === "site_admin";
+const isAdmin = isAdminCheck(Astro.locals.runtime.env, Astro.locals.user);
 
 // Admins see drafts too (clearly marked); the public sees only published.
 const rows = isAdmin

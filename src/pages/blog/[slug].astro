@@ -1,4 +1,5 @@
 ---
+import { isAdmin as isAdminCheck } from "@/lib/admin";
 /**
  * Public blog article. Published posts are public; admins can also preview
  * drafts (clearly marked). Body is admin-authored Markdown, rendered SSR.
@@ -19,7 +20,7 @@ import { OWNER } from "@/config/marketing";
 
 const env = Astro.locals.runtime.env;
 const { slug } = Astro.params;
-const isAdmin = Astro.locals.user?.role === "site_admin";
+const isAdmin = isAdminCheck(Astro.locals.runtime.env, Astro.locals.user);
 
 const db = getDb(env);
 await promoteDuePosts(db);
