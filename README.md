@@ -57,12 +57,14 @@ Public, non-secret vars live in `wrangler.toml` (`[vars]`). Secrets live in
 | Variable | Where | Purpose |
 |---|---|---|
 | `SITE_URL` | wrangler `[vars]` / `.dev.vars` | Public site URL for magic links, Stripe redirects, cert verification. **Never hard-code URLs.** |
-| `ADMIN_EMAILS` | wrangler `[vars]` / `.dev.vars` | Comma-separated emails granted the admin area (`/admin`). Matching accounts are promoted to `site_admin` on login. |
+| `ADMIN_EMAILS` | wrangler `[vars]` / `.dev.vars` | Comma-separated emails granted the admin area (`/admin`). **The only source of admin access**: removing an address revokes it on the next request, and the stored `site_admin` role is re-synced at sign-in. (Only if this is empty does the stored role count, so a missing var can't lock you out.) |
 | `RESEND_API_KEY` | secret | Transactional + compliance email (magic links). If empty, sign-in links print to the dev console + login page so you can test without a key. |
 | `EMAIL_FROM` | var | From address for transactional email. **For real delivery, set this to an address on a domain you've verified in Resend** (e.g. `ChiroSmarts <login@mail.chirosmarts.com>`). The default `onboarding@resend.dev` is Resend's shared sandbox and **will be spam-filtered** in real inboxes. |
 | `EMAIL_REPLY_TO` | var | Optional reply-to for transactional email (e.g. `support@chirosmarts.com`). Improves trust/deliverability. |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | secret | Payments (M3). Test mode throughout the build. |
 | `CF_ACCOUNT_ID`, `CF_STREAM_API_TOKEN`, `CF_STREAM_SIGNING_KEY_ID`, `CF_STREAM_SIGNING_KEY_PEM` | secret | Cloudflare Stream upload + signed playback (M2). |
+| `CRON_SECRET` | secret (+ GitHub repo secret) | Authorizes `/api/cron/*` and `/health?deep=1`. Sent **only** in the `x-cron-key` header (a `?key=` URL param is no longer accepted). The GitHub workflows `cron` and `smoke` need the same value as a repository secret. |
+| `CONTACT_TOKEN_SECRET` | secret | Signs no-login email links: **unsubscribe**, review, and renewal-month. Unset = a fallback key that's in this repo, so links are forgeable; Admin → Overview → Email diagnostics shows which is in use. Set it to any long random string. |
 | `ANTHROPIC_API_KEY` | secret | AI course tutor (M6) — Claude Haiku 4.5. Without it the tutor replies "not configured yet"; set it in prod via `wrangler pages secret put ANTHROPIC_API_KEY`. |
 
 Bindings (in `wrangler.toml`): `DB` (D1), `DOCS` (R2).
@@ -82,6 +84,37 @@ npm run db:migrate:remote
 
 Migrations are plain SQL in `./migrations` and are applied with Wrangler, so the
 exact same SQL runs locally and on Cloudflare.
+
+**Applying production migrations without a terminal:** GitHub → Actions →
+**migrate** → Run workflow (works from a phone). It also runs by itself when a
+push to `main` changes `migrations/`. One-time setup: add repository secrets
+`CLOUDFLARE_ACCOUNT_ID` (the account that owns the `chirosmarts` D1) and
+`CLOUDFLARE_API_TOKEN` (permission: Account → D1 → Edit).
+
+**Knowing a deploy actually worked:** the **smoke** workflow runs after every
+push to `main` (and daily). It waits until `/health` reports that commit, checks
+the public pages and security headers, then calls `/health?deep=1`, which compares
+the live database with this build's schema and migrations and names any missing
+table, column or migration. A red **smoke** run means look at Cloudflare Pages
+deployments or run **migrate**.
+
+Tests: `npm test`. Database tests run against a real SQLite file with every
+migration applied (`src/test/sqlite-db.ts`, Node 22+).
+
+## Abuse protection (rate limits)
+
+Public endpoints that send email or spend money are throttled in code
+(`src/lib/rate-limit.ts`, table `rate_limits`): per network, generous enough
+for a CE room on one Wi-Fi, plus per address (5 sign-in links/hour, 10-minute
+resend cooldown on signup confirmations, 3 help-form messages/hour). It fails
+open if storage is unavailable.
+
+For a second layer at the edge, add one Cloudflare rate-limiting rule on the
+`chirosmarts.com` zone (Security → WAF → Rate limiting rules; the free plan
+allows one) covering only the three endpoints that send email, so video
+heartbeats, quizzes and Stripe are never affected: match
+`http.request.method eq "POST" and http.request.uri.path in {"/api/auth/request-link" "/api/leads/capture" "/api/help/contact"}`,
+**20 requests per 10 seconds per IP**, action **Block** for 10 seconds.
 
 ## Cloudflare setup + deploy
 

@@ -55,3 +55,17 @@ jobs:
         run: npx astro check
       - name: Production build
         run: npm run build
+
+  test:
+    name: unit + database tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Node 22.5+ for the built-in node:sqlite the DB tests run on
+          # (src/test/sqlite-db.ts). The build job stays on Node 20.
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

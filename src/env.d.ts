@@ -74,3 +74,6 @@ declare namespace App {
     impersonating: boolean;
   }
 }
+
+/** Git commit this build came from (astro.config.mjs → vite.define). */
+declare const __BUILD_SHA__: string;

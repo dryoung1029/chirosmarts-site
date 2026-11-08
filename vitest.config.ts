@@ -8,6 +8,7 @@ export default defineConfig({
       "@": new URL("./src", import.meta.url).pathname,
     },
   },
+  define: { __BUILD_SHA__: JSON.stringify("test") },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

@@ -16,4 +16,12 @@ export default defineConfig({
     // sharp, runtime passthrough) instead of warning + falling back.
     imageService: "compile",
   }),
+  vite: {
+    define: {
+      // The commit this build came from, surfaced by /health so the
+      // post-deploy smoke test can tell when ITS deploy is live. Cloudflare
+      // Pages sets CF_PAGES_COMMIT_SHA during the build.
+      __BUILD_SHA__: JSON.stringify(process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || "dev"),
+    },
+  },
 });

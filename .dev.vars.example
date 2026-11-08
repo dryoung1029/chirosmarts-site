@@ -55,3 +55,11 @@ CF_WEB_ANALYTICS_TOKEN=""
 BREVO_API_KEY=""
 BREVO_LIST_ID_LEADS=""
 BREVO_LIST_ID_USERS=""
+
+# --- Cron + signed email links ---
+# Authorizes /api/cron/* and /health?deep=1 (sent ONLY as the x-cron-key
+# header). Must match the CRON_SECRET GitHub repository secret.
+CRON_SECRET=""
+# Signs no-login email links (unsubscribe, review, renewal month). Any long
+# random string. Unset = a fallback key that's in the repo (forgeable links).
+CONTACT_TOKEN_SECRET=""

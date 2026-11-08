@@ -1,0 +1,78 @@
+name: smoke
+
+# Post-deploy smoke test. Cloudflare Pages builds and deploys on push to
+# main, but GitHub never hears whether that worked, and twice now a deploy
+# or a missing migration has quietly broken production for days. This waits
+# until /health reports THIS commit, then checks the public pages, the
+# security headers, and that the database has every table, column and
+# migration this build expects (/health?deep=1, src/lib/schema-drift.ts).
+#
+# Also runs daily, so drift is caught even when nothing was pushed.
+#
+# Setup: none beyond the CRON_SECRET repository secret cron.yml already uses.
+# Optionally set the SITE_URL repository variable.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 14 * * *" # daily, 14:17 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true # a newer push supersedes waiting for an older one
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SITE_URL: ${{ vars.SITE_URL || 'https://chirosmarts.com' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      WANT_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+    steps:
+      - name: Wait for this commit to be live
+        if: env.WANT_SHA != ''
+        run: |
+          for i in $(seq 1 60); do
+            live=$(curl -fsS "$SITE_URL/health" | jq -r '.checks.build // empty' || true)
+            if [ "$live" = "$WANT_SHA" ]; then echo "Live: $live"; exit 0; fi
+            echo "Waiting for $WANT_SHA (live: ${live:-unknown})"; sleep 20
+          done
+          echo "::error::Commit $WANT_SHA is not live after 20 minutes. Open Cloudflare → Pages → chirosmarts-site → Deployments: a failed or stuck build there is invisible to GitHub."
+          exit 1
+
+      - name: Public pages return 200
+        run: |
+          fail=0
+          for path in / /login /courses /talking-to-pain /help /verify /terms /privacy /sitemap.xml /robots.txt /unsubscribe; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$SITE_URL$path")
+            echo "$code  $path"
+            [ "$code" = "200" ] || fail=1
+          done
+          [ "$fail" = "0" ] || { echo "::error::A public page is not returning 200 (see above)."; exit 1; }
+
+      - name: Security headers present
+        run: |
+          headers=$(curl -sS -D - -o /dev/null "$SITE_URL/")
+          for h in strict-transport-security x-content-type-options x-frame-options content-security-policy; do
+            echo "$headers" | grep -qi "^$h:" || { echo "::error::Missing response header: $h"; exit 1; }
+          done
+          echo "Security headers OK"
+
+      - name: Database matches this build (schema drift)
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not set."
+            exit 1
+          fi
+          # A migration pushed with this commit may still be applying (migrate.yml).
+          for i in 1 2 3 4; do
+            code=$(curl -sS -o /tmp/deep.json -w '%{http_code}' -H "x-cron-key: $CRON_SECRET" "$SITE_URL/health?deep=1")
+            [ "$code" = "200" ] && { jq . /tmp/deep.json; exit 0; }
+            echo "Attempt $i: HTTP $code"; sleep 60
+          done
+          jq . /tmp/deep.json || cat /tmp/deep.json
+          echo "::error::The live database is missing tables/columns/migrations this deploy needs (see 'problems' and 'unappliedMigrations' above). Run the 'migrate' workflow."
+          exit 1
