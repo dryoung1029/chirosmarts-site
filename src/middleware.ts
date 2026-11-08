@@ -80,6 +80,14 @@ function isPublic(pathname: string): boolean {
 export const onRequest = defineMiddleware(async (context, next) => {
   const { locals, cookies, url, redirect } = context;
 
+  // Astro's on-demand image endpoint. Unused here (illustrations are
+  // pre-optimised static files), and the Cloudflare adapter we're pinned to
+  // has an SSRF advisory against it (redirect following). Off until the
+  // Astro 7 / Workers migration brings the fixed adapter.
+  if (url.pathname === "/_image" || url.pathname.startsWith("/_image/")) {
+    return new Response("Not found", { status: 404 });
+  }
+
   // Legacy 301s from the old WordPress site — resolve before any session/DB work
   // so old inbound links and search results land on the right new page.
   const legacy = legacyRedirect(url.pathname);
