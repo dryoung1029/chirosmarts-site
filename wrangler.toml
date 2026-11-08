@@ -16,7 +16,7 @@ pages_build_output_dir = "./dist"
 [vars]
 SITE_URL = "https://chirosmarts.com"
 # Comma-separated emails auto-promoted to site_admin on login (M5 admin access).
-ADMIN_EMAILS = "contact@chirosmarts.com"
+ADMIN_EMAILS = "contact@chirosmarts.com,dryoung1029@gmail.com"
 # Transactional "From" for ALL Resend mail (magic links, receipts, certs).
 # Sends from the VERIFIED mail.chirosmarts.com subdomain (subdomain sending is
 # the recommended practice — it isolates the root domain's reputation). The
