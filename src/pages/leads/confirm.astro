@@ -2,6 +2,7 @@
 import MarketingLayout from "@/layouts/MarketingLayout.astro";
 import { getDb } from "@/db/client";
 import { confirmLead } from "@/lib/leads";
+import { isSuppressed, resubscribeEmail } from "@/lib/email-prefs";
 import { syncLeadToBrevo } from "@/lib/brevo";
 import { notifyAdmins } from "@/lib/email/admin-notify";
 
@@ -9,6 +10,18 @@ const env = Astro.locals.runtime.env;
 const db = getDb(env);
 const token = Astro.url.searchParams.get("token") ?? "";
 const lead = await confirmLead(db, token);
+
+// A confirmed double opt-in is fresh, explicit consent from the person, so it
+// lifts an earlier unsubscribe (logged as marketing_resubscribed). Best-effort.
+if (lead) {
+  try {
+    if (await isSuppressed(db, lead.email)) {
+      await resubscribeEmail(env, db, lead.email, { source: "double_opt_in" });
+    }
+  } catch (e) {
+    console.error("[confirm] could not lift suppression", e);
+  }
+}
 const isChecklist = lead?.source === "checklist_pdf";
 const isNewsletter = lead?.source === "newsletter";
 

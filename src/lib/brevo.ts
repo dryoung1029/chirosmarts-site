@@ -8,6 +8,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import { nowIso } from "@/lib/time";
+import { loadSuppressions } from "@/lib/email-prefs";
 
 export function isBrevoConfigured(env: CloudflareEnv): boolean {
   return !!env.BREVO_API_KEY;
@@ -73,6 +74,23 @@ export async function syncUserToBrevo(
   return outcome.ok;
 }
 
+/**
+ * Mark an address as blacklisted (or not) in Brevo, so Brevo campaigns stop
+ * mailing someone who unsubscribed HERE. A 404 means Brevo never had them,
+ * which is fine. No-op when Brevo isn't configured.
+ */
+export async function setBrevoBlacklisted(env: CloudflareEnv, email: string, blacklisted: boolean): Promise<void> {
+  if (!isBrevoConfigured(env)) return;
+  const res = await fetch(`https://api.brevo.com/v3/contacts/${encodeURIComponent(email)}`, {
+    method: "PUT",
+    headers: { "api-key": env.BREVO_API_KEY!, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ emailBlacklisted: blacklisted }),
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Brevo blacklist ${email} → ${res.status}`);
+  }
+}
+
 async function upsertContact(
   env: CloudflareEnv,
   contact: {
@@ -133,9 +151,19 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
   }
   const usersList = Number(env.BREVO_LIST_ID_USERS) || 0;
 
+  // Opted-out addresses are never pushed, whatever the per-table flags say.
+  const suppressed = await loadSuppressions(db);
+
   // CONFIRMED leads not yet synced (or never synced).
   const leads = await db
-    .select()
+    .select({
+      id: schema.marketingLeads.id,
+      email: schema.marketingLeads.email,
+      source: schema.marketingLeads.source,
+      birthMonth: schema.marketingLeads.birthMonth,
+      name: schema.marketingLeads.name,
+      tags: schema.marketingLeads.tags,
+    })
     .from(schema.marketingLeads)
     .where(
       and(
@@ -149,6 +177,7 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
 
   let leadsSynced = 0;
   for (const lead of leads) {
+    if (suppressed.has(lead.email.toLowerCase())) continue;
     const outcome = await upsertContact(env, {
       email: lead.email,
       attributes: {
@@ -175,13 +204,14 @@ export async function syncToBrevo(env: CloudflareEnv, db: Db): Promise<SyncResul
 
   // Users who OPTED IN to marketing.
   const users = await db
-    .select()
+    .select({ email: schema.users.email, role: schema.users.role, birthMonth: schema.users.birthMonth })
     .from(schema.users)
     .where(eq(schema.users.marketingConsent, true))
     .all();
 
   let usersSynced = 0;
   for (const u of users) {
+    if (suppressed.has(u.email.toLowerCase())) continue;
     const outcome = await upsertContact(env, {
       email: u.email,
       attributes: {

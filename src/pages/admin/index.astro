@@ -6,6 +6,7 @@ import { sql, eq, desc } from "drizzle-orm";
 import { formatPacific } from "@/lib/time";
 import type { SyncContactDetail } from "@/lib/brevo";
 import { adminEmails } from "@/lib/admin";
+import { usingFallbackTokenSecret } from "@/lib/contact-token";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
@@ -28,6 +29,9 @@ const emailHasKey = !!env.RESEND_API_KEY;
 const emailFrom = env.EMAIL_FROM || "onboarding@resend.dev (default sandbox)";
 const emailReplyTo = env.EMAIL_REPLY_TO || "(none)";
 const emailIsSandbox = /@resend\.dev/i.test(emailFrom) || !env.EMAIL_FROM;
+// Signed email links (unsubscribe, review, renewal-month) fall back to a
+// secret that's in the source code when CONTACT_TOKEN_SECRET is unset.
+const tokenSecretMissing = usingFallbackTokenSecret(env);
 
 // Recent real (production) magic-link send failures — so "is Resend actually
 // failing right now?" is answerable without digging through Worker logs.
@@ -226,6 +230,12 @@ const stats = [
           set EMAIL_FROM to fix.
         </li>
       )}
+      <li>
+        Link-signing secret (CONTACT_TOKEN_SECRET):{" "}
+        <strong style={tokenSecretMissing ? "color:var(--warn)" : "color:var(--ok)"}>
+          {tokenSecretMissing ? "NOT set — unsubscribe/review/renewal links use a fallback key that's in the source code, so they can be forged" : "set"}
+        </strong>
+      </li>
     </ul>
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
       <input type="email" id="email-test-to" placeholder="you@example.com" style="flex:1 1 16rem;max-width:24rem" />

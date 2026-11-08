@@ -18,6 +18,8 @@ export interface SendEmailArgs {
   text: string;
   replyTo?: string;
   attachments?: { filename: string; content: string }[]; // content = base64
+  /** Extra MIME headers, e.g. List-Unsubscribe on marketing mail. */
+  headers?: Record<string, string>;
 }
 
 export interface SendEmailResult {
@@ -67,6 +69,7 @@ export async function sendEmail(
         text: args.text,
         ...(replyTo ? { reply_to: replyTo } : {}),
         ...(args.attachments ? { attachments: args.attachments } : {}),
+        ...(args.headers ? { headers: args.headers } : {}),
       }),
     });
 

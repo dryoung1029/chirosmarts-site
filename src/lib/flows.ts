@@ -9,6 +9,13 @@
  *
  * Idempotent: every send logs a `flow_email` event keyed uniquely; we never
  * re-send the same key. Compliance data (events) is append-only.
+ *
+ * Consent: these are marketing emails, so a recipient must (a) not be on the
+ * opt-out list (`email_suppressions`, via loadSuppressions) and (b) if they
+ * have an account, have marketing consent. That's the intake checkbox, whose
+ * wording covers exactly these renewal heads-ups and CE emails. Legacy
+ * imported contacts have no consent flag here and are gated by (a) only, as
+ * before. Due recipients skipped this way are counted in `optedOut`.
  */
 import { and, eq, gte, lte, isNotNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
@@ -18,6 +25,7 @@ import { logEvent } from "@/lib/events";
 import { nextRenewalDeadline } from "@/lib/renewal";
 import { makeContactToken } from "@/lib/contact-token";
 import { sendReviewRequestEmail, sendRenewalReminderEmail } from "@/lib/email/flows";
+import { loadSuppressions } from "@/lib/email-prefs";
 
 const DAY = 86400000;
 const isoMinusDays = (now: Date, d: number) => new Date(now.getTime() - d * DAY).toISOString();
@@ -32,6 +40,8 @@ export interface FlowRunResult {
   reviewSent: number;
   renewalSent: number;
   skipped: number;
+  /** Not sent because the person opted out or never gave marketing consent. */
+  optedOut: number;
   errors: string[];
 }
 
@@ -41,7 +51,8 @@ export async function runDailyFlows(
   now: Date = new Date(),
 ): Promise<FlowRunResult> {
   const site = getSiteUrl(env).replace(/\/$/, "");
-  const res: FlowRunResult = { reviewSent: 0, renewalSent: 0, skipped: 0, errors: [] };
+  const res: FlowRunResult = { reviewSent: 0, renewalSent: 0, skipped: 0, optedOut: 0, errors: [] };
+  const suppressed = await loadSuppressions(db);
 
   // Idempotency: keys we've already sent.
   const prior = await db
@@ -64,6 +75,7 @@ export async function runDailyFlows(
       userId: schema.users.id,
       email: schema.users.email,
       displayName: schema.users.displayName,
+      consent: schema.users.marketingConsent,
     })
     .from(schema.certificates)
     .innerJoin(schema.users, eq(schema.certificates.userId, schema.users.id))
@@ -80,6 +92,10 @@ export async function runDailyFlows(
     const key = `review:${r.certId}`;
     if (sent.has(key)) {
       res.skipped++;
+      continue;
+    }
+    if (!r.consent || suppressed.has(r.email.toLowerCase())) {
+      res.optedOut++;
       continue;
     }
     try {
@@ -130,13 +146,25 @@ export async function runDailyFlows(
     if (!prev || c.issuedAt > prev) latestCertByUser.set(c.userId, c.issuedAt);
   }
 
+  // Every account's consent, by address. When an address has an account, the
+  // account holder's own choice decides, even when a legacy-roster row for the
+  // same address would otherwise make them a renewal candidate.
+  const consentByEmail = new Map<string, boolean>();
+  for (const u of await db
+    .select({ email: schema.users.email, consent: schema.users.marketingConsent })
+    .from(schema.users)
+    .all()) {
+    consentByEmail.set(u.email.toLowerCase(), !!u.consent);
+  }
+
   // Account holders who gave their birth month AND are certified long enough ago.
   for (const u of await db
-    .select({ id: schema.users.id, email: schema.users.email, displayName: schema.users.displayName, legalName: schema.users.legalName, birthMonth: schema.users.birthMonth })
+    .select({ id: schema.users.id, email: schema.users.email, displayName: schema.users.displayName, legalName: schema.users.legalName, birthMonth: schema.users.birthMonth, consent: schema.users.marketingConsent })
     .from(schema.users)
     .where(isNotNull(schema.users.birthMonth))
     .all()) {
     if (u.birthMonth == null) continue;
+    if (!u.consent) continue; // no marketing consent → no renewal marketing
     const certDate = latestCertByUser.get(u.id);
     if (!certDate) continue; // never remind uncertified/new students
     if (isFreshCert(certDate)) continue; // freshly certified — not due to renew yet
@@ -150,6 +178,7 @@ export async function runDailyFlows(
     .where(and(isNotNull(schema.importedContacts.birthMonth), eq(schema.importedContacts.certified, true)))
     .all()) {
     if (c.birthMonth == null || cands.has(c.email)) continue;
+    if (consentByEmail.get(c.email.toLowerCase()) === false) continue; // their account says no
     if (isFreshCert(c.completedAt)) continue; // recently completed — not due to renew yet
     cands.set(c.email, { email: c.email, name: c.firstName, birthMonth: c.birthMonth, userId: null });
   }
@@ -157,6 +186,10 @@ export async function runDailyFlows(
   for (const c of cands.values()) {
     const dl = nextRenewalDeadline(c.birthMonth, now);
     if (!dl) continue;
+    if (suppressed.has(c.email.toLowerCase())) {
+      res.optedOut++;
+      continue;
+    }
     const daysUntil = (Date.UTC(dl.year, dl.month - 1, dl.day) - todayUTC) / DAY;
     if (daysUntil < 1 || daysUntil > 60) continue;
     const key = `renewal:${c.email}:${dl.year}`;

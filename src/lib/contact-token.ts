@@ -50,3 +50,40 @@ export async function renewalSetupUrl(env: CloudflareEnv, siteUrl: string, email
   const base = siteUrl.replace(/\/$/, "");
   return `${base}/renewal/my-month?e=${encodeURIComponent(email)}&t=${t}`;
 }
+
+// ---------------------------------------------------------------------------
+// Unsubscribe links. Signed with a DIFFERENT message than the contact token
+// above ("unsubscribe:" prefix), so a review or renewal-setup link can't be
+// replayed as an unsubscribe link and vice versa.
+// ---------------------------------------------------------------------------
+const UNSUB_SCOPE = "unsubscribe:";
+
+export async function makeUnsubscribeToken(env: CloudflareEnv, email: string): Promise<string> {
+  return hmac(env, UNSUB_SCOPE + email.toLowerCase().trim());
+}
+
+export async function verifyUnsubscribeToken(
+  env: CloudflareEnv,
+  email: string,
+  token: string,
+): Promise<boolean> {
+  if (!email || !token) return false;
+  const expected = await makeUnsubscribeToken(env, email);
+  if (expected.length !== token.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  return diff === 0;
+}
+
+/** The one-click-to-confirm unsubscribe page for an address. */
+export async function unsubscribeUrl(env: CloudflareEnv, siteUrl: string, email: string): Promise<string> {
+  const e = email.toLowerCase().trim();
+  const t = await makeUnsubscribeToken(env, e);
+  return `${siteUrl.replace(/\/$/, "")}/unsubscribe?e=${encodeURIComponent(e)}&t=${t}`;
+}
+
+/** True when CONTACT_TOKEN_SECRET isn't set and the public fallback is in use,
+ *  which makes every signed link forgeable. Shown in admin diagnostics. */
+export function usingFallbackTokenSecret(env: CloudflareEnv): boolean {
+  return !env.CONTACT_TOKEN_SECRET;
+}

@@ -1,0 +1,94 @@
+---
+/**
+ * Marketing unsubscribe — reached from the link in every marketing email's
+ * footer and from mail apps' native "Unsubscribe" button (List-Unsubscribe).
+ * No login: the link carries the address plus an HMAC token scoped to
+ * unsubscribing (src/lib/contact-token.ts).
+ *
+ * GET shows a one-tap confirm; the POST does it. A GET never unsubscribes,
+ * because corporate link scanners fetch every URL in an email, and a GET
+ * that acted would silently opt people out the moment the mail arrived.
+ *
+ * Unsubscribing covers ALL marketing email to the address (account, every
+ * signup form, legacy roster, Brevo). Sign-in, receipt and certificate
+ * emails continue: they're about the person's own account.
+ */
+import MarketingLayout from "@/layouts/MarketingLayout.astro";
+import { getDb } from "@/db/client";
+import { verifyUnsubscribeToken } from "@/lib/contact-token";
+import { isSuppressed, unsubscribeEmail } from "@/lib/email-prefs";
+
+const env = Astro.locals.runtime.env;
+const db = getDb(env);
+
+const email = (Astro.url.searchParams.get("e") ?? "").trim().toLowerCase();
+const token = (Astro.url.searchParams.get("t") ?? "").trim();
+const valid = !!email && (await verifyUnsubscribeToken(env, email, token));
+
+let done = false;
+let failed = false;
+if (valid && Astro.request.method === "POST") {
+  try {
+    await unsubscribeEmail(env, db, email, { source: "link" });
+    done = true;
+  } catch (e) {
+    console.error("[unsubscribe] failed", e);
+    failed = true;
+  }
+}
+const already = valid && !done && (await isSuppressed(db, email).catch(() => false));
+---
+
+<MarketingLayout
+  title="Email preferences"
+  description="Unsubscribe from ChiroSmarts marketing email."
+  canonicalPath="/unsubscribe"
+  hideLeadCapture={true}
+>
+  <section class="mk-section" style="padding-top:3rem">
+    <div class="mk-container" style="max-width:560px">
+      {!valid ? (
+        <>
+          <h1>That link didn't work</h1>
+          <p style="color:var(--muted)">
+            This unsubscribe link is invalid or incomplete. Use the link at the
+            bottom of any email we've sent you, or <a href="/help/contact">contact us</a> and
+            we'll take you off the list.
+          </p>
+        </>
+      ) : done || already ? (
+        <>
+          <h1>You're unsubscribed ✓</h1>
+          <p style="color:var(--muted)">
+            <strong>{email}</strong> won't get renewal reminders, CE tips, or other
+            marketing email from ChiroSmarts.
+          </p>
+          <p style="color:var(--muted)">
+            You'll still get emails about your own account: sign-in links,
+            receipts, and certificates. Changed your mind? Sign up again from any
+            form on the site and confirm the email we send.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1>Unsubscribe?</h1>
+          <p>
+            Stop all ChiroSmarts marketing email to <strong>{email}</strong>,
+            including renewal reminders and CE tips.
+          </p>
+          <p style="color:var(--muted);font-size:0.95rem">
+            Sign-in links, receipts, and certificates for your account will still arrive.
+          </p>
+          {failed && (
+            <p style="color:var(--danger)">
+              Something went wrong on our side. Please try again, or <a href="/help/contact">contact us</a>.
+            </p>
+          )}
+          <form method="POST">
+            <button type="submit" class="btn">Unsubscribe</button>
+          </form>
+        </>
+      )}
+    </div>
+  </section>
+</MarketingLayout>

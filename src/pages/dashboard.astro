@@ -5,6 +5,7 @@ import RoadmapList from "@/components/RoadmapList.astro";
 import { getDb, schema } from "@/db/client";
 import { eq } from "drizzle-orm";
 import { getUserRoadmap } from "@/lib/roadmap";
+import { isSuppressed } from "@/lib/email-prefs";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
@@ -39,6 +40,11 @@ const activeCourses = myCourses.filter(
 const justTransferred = Astro.url.searchParams.get("transferred") === "1";
 const readOnlyBlocked =
   Astro.url.searchParams.get("impersonation_readonly") === "1";
+
+// Email preferences (marketing only; account mail always sends).
+const prefsJustChanged = Astro.url.searchParams.get("prefs");
+const optedOut = await isSuppressed(db, user.email).catch(() => false);
+const getsMarketing = !!user.marketingConsent && !optedOut;
 
 const months = [
   "", "January", "February", "March", "April", "May", "June",
@@ -108,4 +114,25 @@ const months = [
   }
 
   <RoadmapList roadmap={roadmap} />
+
+  <div class="panel" id="email-prefs">
+    <h2 style="margin-top:0">Email preferences</h2>
+    {prefsJustChanged && (
+      <p style="color:var(--ok);margin-top:0">Saved.</p>
+    )}
+    <p style="margin-top:0">
+      {getsMarketing
+        ? "You get a heads-up before your Oregon CA renewal is due, plus occasional CE tips."
+        : "You're not getting renewal reminders or CE tips from us."}
+    </p>
+    <p class="muted" style="font-size:0.9rem">
+      Sign-in links, receipts, and certificates always arrive either way.
+    </p>
+    <form method="POST" action="/api/account/marketing" style="margin:0">
+      <input type="hidden" name="action" value={getsMarketing ? "off" : "on"} />
+      <button type="submit" class={getsMarketing ? "btn-secondary" : ""} style="margin:0">
+        {getsMarketing ? "Stop these emails" : "Send me renewal reminders and CE tips"}
+      </button>
+    </form>
+  </div>
 </Layout>

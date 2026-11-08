@@ -14,6 +14,7 @@ export const GET: APIRoute = ({ locals }) => {
       "Disallow: /learn",
       "Disallow: /api",
       "Disallow: /intake",
+      "Disallow: /unsubscribe",
       "",
       `Sitemap: ${base}/sitemap.xml`,
     ].join("\n") + "\n";

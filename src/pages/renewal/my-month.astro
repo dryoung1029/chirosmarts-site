@@ -13,6 +13,7 @@ import { nextRenewalDeadline } from "@/lib/renewal";
 import { syncLeadToBrevo } from "@/lib/brevo";
 import { newId } from "@/lib/crypto";
 import { nowIso } from "@/lib/time";
+import { isSuppressed, resubscribeEmail } from "@/lib/email-prefs";
 
 const env = Astro.locals.runtime.env;
 const db = getDb(env);
@@ -41,7 +42,11 @@ if (Astro.request.method === "POST" && valid) {
       .set({ birthMonth: month })
       .where(eq(schema.importedContacts.email, email));
     // If they have an account, fill the month when missing.
-    const user = await db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+    const user = await db
+      .select({ id: schema.users.id, birthMonth: schema.users.birthMonth })
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .get();
     if (user && user.birthMonth == null) {
       await db.update(schema.users).set({ birthMonth: month }).where(eq(schema.users.id, user.id));
     }
@@ -69,6 +74,15 @@ if (Astro.request.method === "POST" && valid) {
         birthMonth: month,
         confirmedAt: nowIso(),
       });
+    }
+    // Choosing a month here is opting in to renewal reminders (the page says
+    // so), which lifts any earlier unsubscribe. Logged as marketing_resubscribed.
+    try {
+      if (await isSuppressed(db, email)) {
+        await resubscribeEmail(env, db, email, { source: "renewal_setup" });
+      }
+    } catch (e) {
+      console.error("[my-month] could not lift suppression", e);
     }
     try {
       await syncLeadToBrevo(env, db, { id: leadId, email, source: src, birthMonth: month });

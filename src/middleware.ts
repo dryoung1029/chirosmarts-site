@@ -54,6 +54,8 @@ function isPublic(pathname: string): boolean {
   if (pathname === "/review") return true;
   // Public reviews page (brand query: "chirosmarts reviews").
   if (pathname === "/reviews") return true;
+  // Marketing unsubscribe (HMAC-tokenized link from every marketing email).
+  if (pathname === "/unsubscribe") return true;
   // Course-materials landing page (printed QR target) + its CTA beacon.
   if (pathname === "/talking-to-pain") return true;
   if (pathname === "/api/metrics/event") return true;
