@@ -7,7 +7,7 @@
  * gate sums credited content-seconds across every lesson in the course and
  * compares against `credit_hours × 3600`.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { schema } from "@/db/client";
 import {
@@ -137,4 +137,126 @@ export async function getCourseSeatTime(
     examUnlocked: gate.examUnlocked,
     perLesson,
   };
+}
+
+export interface CourseProgressSummary {
+  userId: string;
+  creditedSeconds: number;
+  totalContentSeconds: number;
+  watchedFraction: number; // 0..1 across the whole course
+  lessonsComplete: number; // lessons at/over COMPLETION_THRESHOLD
+  lessonCount: number;
+  examUnlocked: boolean;
+  certified: boolean; // an issued certificate exists for this course
+}
+
+/**
+ * Course progress for MANY users at once — the clinic roster view.
+ *
+ * Same recompute-from-`events` rule as getCourseSeatTime (compliance req 1): we
+ * never read a stored counter. The difference is shape, not semantics — one
+ * heartbeat query for every user+lesson pair instead of a query per lesson per
+ * user, so a roster costs ~2 queries rather than N×M. User ids are chunked to
+ * stay under D1's bound-parameter ceiling.
+ */
+export async function getCourseProgressForUsers(
+  db: Db,
+  userIds: string[],
+  courseId: string,
+): Promise<Map<string, CourseProgressSummary>> {
+  const out = new Map<string, CourseProgressSummary>();
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return out;
+
+  const course = await db
+    .select({ requiredSeatMinutes: schema.courses.requiredSeatMinutes })
+    .from(schema.courses)
+    .where(eq(schema.courses.id, courseId))
+    .get();
+  const structure = await getCourseStructure(db, courseId);
+  const lessons = structure.flatMap((m) => m.lessons);
+  const lessonIds = lessons.map((l) => l.id);
+  const totalDuration = lessons.reduce((n, l) => n + (l.durationSeconds ?? 0), 0);
+  const requiredSeconds = Math.min(
+    course?.requiredSeatMinutes != null ? course.requiredSeatMinutes * 60 : 0,
+    totalDuration,
+  );
+
+  // userId -> lessonId -> coverage rows
+  const byUser = new Map<string, Map<string, { positionStartSeconds: number | null; positionEndSeconds: number | null }[]>>();
+  if (lessonIds.length > 0) {
+    const CHUNK = 25; // keep userIds + lessonIds + type under D1's 100-param cap
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      const rows = await db
+        .select({
+          userId: schema.events.userId,
+          lessonId: schema.events.lessonId,
+          positionStartSeconds: schema.events.positionStartSeconds,
+          positionEndSeconds: schema.events.positionEndSeconds,
+        })
+        .from(schema.events)
+        .where(
+          and(
+            eq(schema.events.type, HEARTBEAT),
+            inArray(schema.events.userId, slice),
+            inArray(schema.events.lessonId, lessonIds),
+          ),
+        )
+        .all();
+      for (const r of rows) {
+        if (!r.userId || !r.lessonId) continue;
+        const perLesson = byUser.get(r.userId) ?? new Map();
+        const list = perLesson.get(r.lessonId) ?? [];
+        list.push({ positionStartSeconds: r.positionStartSeconds, positionEndSeconds: r.positionEndSeconds });
+        perLesson.set(r.lessonId, list);
+        byUser.set(r.userId, perLesson);
+      }
+    }
+  }
+
+  // Issued certificates for this course (one query).
+  const certified = new Set<string>();
+  for (let i = 0; i < ids.length; i += 50) {
+    const slice = ids.slice(i, i + 50);
+    const rows = await db
+      .select({ userId: schema.certificates.userId, status: schema.certificates.status })
+      .from(schema.certificates)
+      .where(
+        and(
+          eq(schema.certificates.courseId, courseId),
+          inArray(schema.certificates.userId, slice),
+        ),
+      )
+      .all();
+    for (const r of rows) if (r.status === "issued") certified.add(r.userId);
+  }
+
+  for (const userId of ids) {
+    const perLesson = byUser.get(userId);
+    let credited = 0;
+    let complete = 0;
+    let allMeet = lessons.length > 0;
+    for (const lesson of lessons) {
+      const duration = lesson.durationSeconds ?? 0;
+      const coverage = coverageFromHeartbeats(perLesson?.get(lesson.id) ?? []);
+      const c = creditedSeconds(coverage, duration);
+      credited += c;
+      // A zero-duration lesson (no video yet) can't gate anything → treat as met.
+      const fraction = duration > 0 ? c / duration : 1;
+      if (fraction >= COMPLETION_THRESHOLD) complete++;
+      else allMeet = false;
+    }
+    out.set(userId, {
+      userId,
+      creditedSeconds: credited,
+      totalContentSeconds: totalDuration,
+      watchedFraction: totalDuration > 0 ? Math.min(1, credited / totalDuration) : 0,
+      lessonsComplete: complete,
+      lessonCount: lessons.length,
+      examUnlocked: allMeet && credited >= requiredSeconds,
+      certified: certified.has(userId),
+    });
+  }
+  return out;
 }
