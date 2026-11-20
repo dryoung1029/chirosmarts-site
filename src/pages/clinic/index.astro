@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { getClinicForOwner, getRoster } from "@/lib/clinic";
 import { getUserRoadmap } from "@/lib/roadmap";
 import { listPoolsDetailed, type PoolView } from "@/lib/seat-pools";
+import { getCourseProgressForUsers, type CourseProgressSummary } from "@/lib/progress";
 
 const user = Astro.locals.user!;
 const env = Astro.locals.runtime.env;
@@ -39,6 +40,21 @@ const q = {
 };
 
 const pools: PoolView[] = await listPoolsDetailed(db, clinic.id);
+
+// Training progress for every claimed seat, per course. Recomputed from the
+// append-only events trail (never a stored counter) and batched so a roster
+// costs ~2 queries per course instead of one per lesson per CA.
+const progressByCourse = new Map<string, Map<string, CourseProgressSummary>>();
+for (const p of pools) {
+  const userIds = p.assignments
+    .map((a) => a.userId)
+    .filter((id): id is string => !!id);
+  progressByCourse.set(
+    p.courseId,
+    await getCourseProgressForUsers(db, userIds, p.courseId),
+  );
+}
+const pct = (f: number) => Math.round(Math.max(0, Math.min(1, f)) * 100);
 
 // Courses a clinic can buy seats for: published, standalone (non-bundle) courses.
 // Bundles enroll their CHILDREN, so a per-bundle seat pool wouldn't grant access.
@@ -178,6 +194,7 @@ const totals = pools.reduce(
         (a) =>
           a.assignment.status === "invited" || a.assignment.status === "active",
       );
+      const prog = progressByCourse.get(p.courseId);
       return (
         <div class="panel">
           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap">
@@ -220,35 +237,68 @@ const totals = pools.reduce(
             </p>
           ) : (
             <ol style="list-style:none;padding:0;margin:0.75rem 0 0">
-              {visible.map((r) => (
-                <li style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0;border-top:1px solid var(--border)">
-                  <span style="flex:1">
-                    <span style="color:var(--text)">{r.legalName || r.email}</span>
-                    {r.legalName && <span class="muted"> · {r.email}</span>}
-                    <br />
-                    <span class="muted">
-                      {r.assignment.status === "active"
-                        ? r.intakeCompletedAt
-                          ? "Onboarded — in training"
-                          : "Joined — finishing intake"
-                        : "Invited — not claimed yet"}
-                    </span>
-                  </span>
-                  <span
-                    style={`font-size:0.8rem;color:${r.assignment.status === "active" ? "var(--ok)" : "var(--warn)"}`}
-                  >
-                    {assignmentStatusLabel[r.assignment.status]}
-                  </span>
-                  {r.assignment.status === "invited" && (
-                    <form method="POST" action="/api/clinic/revoke" style="margin:0">
-                      <input type="hidden" name="assignmentId" value={r.assignment.id} />
-                      <button class="link" type="submit" style="color:var(--muted)">
-                        Revoke
-                      </button>
-                    </form>
-                  )}
-                </li>
-              ))}
+              {visible.map((r) => {
+                const pr = r.userId ? prog?.get(r.userId) : undefined;
+                const claimed = r.assignment.status === "active";
+                const done = !!pr?.certified;
+                const barPct = done ? 100 : pr ? pct(pr.watchedFraction) : 0;
+                const state = !claimed
+                  ? "Invited — not claimed yet"
+                  : !r.intakeCompletedAt
+                    ? "Joined — finishing intake"
+                    : done
+                      ? "Certified"
+                      : pr?.examUnlocked
+                        ? "Ready for the final exam"
+                        : "In training";
+                return (
+                  <li class="roster-row">
+                    <div class="roster-head">
+                      <span class="roster-who">
+                        <span style="color:var(--text)">{r.legalName || r.email}</span>
+                        {r.legalName && <span class="muted"> · {r.email}</span>}
+                      </span>
+                      <span
+                        class="roster-badge"
+                        style={`color:${done ? "var(--success)" : claimed ? "var(--ok)" : "var(--warn)"}`}
+                      >
+                        {done ? "Certified ✓" : assignmentStatusLabel[r.assignment.status]}
+                      </span>
+                      {r.assignment.status === "invited" && (
+                        <form method="POST" action="/api/clinic/revoke" style="margin:0">
+                          <input type="hidden" name="assignmentId" value={r.assignment.id} />
+                          <button class="link" type="submit" style="color:var(--muted)">
+                            Revoke
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                    {claimed ? (
+                      <div class="roster-prog">
+                        <div
+                          class="prog"
+                          role="progressbar"
+                          aria-valuenow={barPct}
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                          aria-label={`${r.legalName || r.email} — training progress`}
+                        >
+                          <div class={`prog-fill${done ? " is-done" : ""}`} style={`width:${barPct}%`} />
+                        </div>
+                        <span class="roster-meta">
+                          <strong style={`color:${done ? "var(--success)" : "var(--text)"}`}>{barPct}%</strong>
+                          {pr && pr.lessonCount > 0 && (
+                            <span class="muted"> · {pr.lessonsComplete} of {pr.lessonCount} lessons</span>
+                          )}
+                          <span class="muted"> · {state}</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <span class="roster-meta muted">{state}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>
@@ -296,4 +346,27 @@ const totals = pools.reduce(
       <button type="submit" style="margin-top:1rem">Transfer clinic</button>
     </form>
   </div>
+
+  <style>
+    .roster-row { padding: 0.7rem 0; border-top: 1px solid var(--border); }
+    .roster-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+    .roster-who { flex: 1; min-width: 12rem; }
+    .roster-badge { font-size: 0.8rem; white-space: nowrap; }
+    .roster-prog { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.45rem; flex-wrap: wrap; }
+    /* Track + fill. Width is set inline from the recomputed watched fraction. */
+    .prog {
+      flex: 1; min-width: 10rem; height: 8px; border-radius: 999px;
+      background: var(--brand-tint); overflow: hidden;
+    }
+    .prog-fill {
+      height: 100%; border-radius: 999px; background: var(--brand);
+      transition: width 0.3s ease;
+    }
+    .prog-fill.is-done { background: var(--success); }
+    .roster-meta { font-size: 0.85rem; white-space: nowrap; }
+    @media (max-width: 560px) {
+      .roster-meta { white-space: normal; }
+      .prog { min-width: 100%; }
+    }
+  </style>
 </Layout>

@@ -162,6 +162,8 @@ async function getAssignmentsForPool(
 export interface AssignmentRow {
   assignment: SeatAssignment;
   email: string;
+  /** Null until the CA claims their seat (no account yet). */
+  userId: string | null;
   legalName: string | null;
   intakeCompletedAt: string | null;
 }
@@ -205,6 +207,7 @@ export async function listPoolsDetailed(
       .select({
         assignment: schema.seatAssignments,
         email: schema.clinicMembers.email,
+        userId: schema.clinicMembers.userId,
         legalName: schema.users.legalName,
         intakeCompletedAt: schema.users.intakeCompletedAt,
       })
@@ -229,6 +232,7 @@ export async function listPoolsDetailed(
     const assignments: AssignmentRow[] = rows.map((r) => ({
       assignment: r.assignment,
       email: r.email,
+      userId: r.userId ?? null,
       legalName: r.legalName || null,
       intakeCompletedAt: r.intakeCompletedAt ?? null,
     }));
