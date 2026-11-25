@@ -1,7 +1,7 @@
 # ChiroSmarts — Marketing Campaign Plan (Always-On)
 
 > **Author:** planning session, 2026-11-24 · **Owner:** Dr. Jason Young, DC
-> **Status:** PLAN — nothing sent/activated yet. See §9 for blockers before go-live.
+> **Status:** PLAN. **Updated 2026-11-25** after owner review — corrected catalog/infra facts below (Stripe is LIVE, Cultural Competency is LIVE, renewal reminders already ship). First action taken: re-permission email drafted in Brevo (campaign ID 16, Past Buyers list, **not sent**).
 
 ## 0. The brief (decisions locked this session)
 
@@ -18,11 +18,12 @@
 | **Oregon CA — Initial Certification** | 8 | **$149** | ✅ published | **Hero offer** — the money-maker |
 | **Vitals Monitoring** | 2 | **$39** | ✅ published | Renewal entry + add-on |
 | **HIPAA Essentials** | 1 | **$35** | ✅ published | Renewal add-on + clinic staff training |
-| Cultural Competency | 1 | $29 | 🚧 draft | *renewal track blocked until published* |
+| Cultural Competency | 1 | $29 | ✅ LIVE (two courses) | Required annual renewal hour |
+| Suicide intervention | — | — | ⏳ ~1–2 weeks out | Completes the renewal bundle |
 | CBT in Chiropractic | — | $49 | 🚧 draft | future |
 | Annual Renewal Bundle | 6 | $89 | 🚧 draft | *the renewal money offer — blocked until published* |
 
-> **Material constraint:** Oregon renewal needs **6 hrs/yr including 1 hr cultural competency every year**. Today we can sell Vitals + HIPAA (3 hrs) but **not** the complete renewal solution, because Cultural Competency and the 6-hr Bundle are still in draft. The renewal track below runs at half power until those publish — publishing them is the single highest-leverage marketing action available.
+> **Renewal status (corrected):** Oregon renewal needs **6 hrs/yr including 1 hr cultural competency every year**. We now sell Vitals + HIPAA + Cultural Competency live. The **suicide-intervention module (~1–2 weeks out) completes the full 6-hr renewal bundle** — bundling it is the near-term revenue unlock for the renewal track. Compliance renewal reminders already ship (in-app Resend, see §8a), so the retention loop is live.
 
 ---
 
@@ -170,20 +171,39 @@ Suggested monthly split (validate and shift to whatever converts):
 
 ---
 
+## 8a. Retention — renewal reminders (ALREADY LIVE)
+
+Per architecture, renewal reminders are **compliance email via Resend**, not Brevo. This is **already built and deployed** (`src/lib/flows.ts` → `src/pages/api/cron/flows.ts`):
+- Fires **≤60 days before** each certified CA's birth-month renewal, **once per cycle**, idempotent (keyed `flow_email` events, never double-sent).
+- Guards: only **certified** users, and not **freshly** certified (≥300-day cert age) — so new students aren't mistaken for renewers.
+- Covers account holders **and** legacy imported certified contacts who set their birth month.
+- Triggered daily by GitHub Actions (`.github/workflows/cron.yml`, 16:00 UTC) → `/api/cron/flows` (authed by `CRON_SECRET`). Endpoint confirmed live in prod (401 without key).
+- **Verify:** run the `cron` workflow manually (target: flows) and confirm `ok:true`.
+
 ## 9. Blockers & owner actions (honest list — these gate real revenue)
 
-| # | Blocker | Why it matters | Owner action |
+*Resolved since first draft: Stripe is LIVE (daily transactions); Cultural Competency is LIVE; renewal reminders are built, wired (GitHub Actions daily tick → `/api/cron/flows`), and deployed.*
+
+| # | Open item | Why it matters | Owner action |
 |---|---|---|---|
-| 1 | **Stripe is in TEST mode** | No real money can be collected — fatal for an enrollments/revenue campaign | Switch to live keys + verify a real purchase end-to-end |
-| 2 | **Cultural Competency + Renewal Bundle in draft** | Renewal track can't sell the complete 6-hr solution | Finish/publish them |
-| 3 | **Brevo not configured** (`BREVO_API_KEY` + list IDs) | No marketing email/automation can run | Provide keys / connect (Brevo connector is now available) |
-| 4 | **Lead-magnet checklist PDF is a placeholder** | Track A capture promises an asset it can't deliver | Supply/approve the PDF (store in R2) |
-| 5 | **Legal `effectiveDate` + `[VERIFY]` flags pending** | Terms/Privacy must be real before paid traffic | Confirm legal copy + date |
-| 6 | **Custom domain not attached** (still `*.pages.dev`) | Hurts ad trust, brand, deliverability | Attach domain; update `SITE_URL` |
-| 7 | **Instructor bio/photo + guide dates missing** | Credibility + SEO freshness | Provide bio, photo, dates |
-| 8 | **Cloudflare analytics token unset** | Campaign is flying blind | Set `CF_WEB_ANALYTICS_TOKEN` |
+| 1 | **Full 6-hr Renewal Bundle** awaits the suicide-intervention module (~1–2 wks) | The highest-AOV renewal offer | Publish module → publish bundle |
+| 2 | **Brevo app-sync not wired** (lists + attributes + `BREVO_LIST_ID_*`) | New leads/students won't flow into Brevo lists automatically | See §9a wiring checklist |
+| 3 | **Lead-magnet checklist PDF is a placeholder** | Track A capture promises an asset it can't deliver | Supply/approve the PDF (store in R2) |
+| 4 | **Legal `effectiveDate` + `[VERIFY]` flags pending** | Terms/Privacy must be clean before paid traffic | Confirm legal copy + date |
+| 5 | **Instructor bio/photo + guide dates missing** | Credibility + SEO freshness | Provide bio, photo, dates |
+| 6 | **Cloudflare analytics token unset** | Campaign is flying blind | Set `CF_WEB_ANALYTICS_TOKEN` |
+| 7 | **Verify the renewal cron is actually ticking** | Confirms reminders send in prod | Run the `cron` GitHub Action (flows) manually → expect `ok:true` |
 
 ---
+
+## 9a. Brevo app-sync wiring checklist (so leads/students flow automatically)
+
+The ChiroSmarts Brevo account already holds **Past Buyers (666)**, **Oregon Chiropractic Clinics (88)**, and **Newsletter (6)** — plenty to campaign to now. What's NOT yet wired is the app's ongoing push of new confirmed leads + opted-in students into Brevo. `src/lib/brevo.ts` upserts contacts into lists chosen by env vars and sets attributes `ROLE`, `BIRTH_MONTH`, `CLINIC`, `SOURCE` — **none of which exist in the account yet**. The Brevo connector here can't create lists/attributes/contacts (only campaigns/automations/templates), so these are owner clicks in Brevo + Cloudflare:
+
+1. **Create two lists** in Brevo (Newsletter already exists = list 8): **ChiroSmarts Students** and **ChiroSmarts Leads**. Note their numeric IDs.
+2. **Create four contact attributes** (Contacts → Settings → Attributes): `ROLE` (text), `BIRTH_MONTH` (number), `CLINIC` (text), `SOURCE` (text).
+3. **Set env vars in Cloudflare Pages** (Settings → Env vars, then redeploy — Pages applies them on next deploy): `BREVO_API_KEY`, `BREVO_LIST_ID_NEWSLETTER=8`, `BREVO_LIST_ID_LEADS=<Leads id>`, `BREVO_LIST_ID_USERS=<Students id>`.
+4. **Backfill:** Admin → overview → **Sync to Brevo** pushes existing confirmed leads + opted-in users. New ones sync in real time thereafter (`syncLeadToBrevo` / `syncUserToBrevo`).
 
 ## 10. What I can build next (just say which)
 
